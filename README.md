@@ -1,3 +1,14 @@
+D0 - green LED on frame
+D1 - radar OUT
+D2 - red LED on board
+D3 -
+D4 -
+D5 - PIR-sensor OUT
+D6 - MOSFET-switch
+D7 - mode-switch
+D8 - red LED on frame
+
+
 # Arduino
 
 
