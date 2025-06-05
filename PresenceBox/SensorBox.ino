@@ -1,13 +1,12 @@
 #include <ESP8266WiFi.h>
-#include <WiFiClientSecure.h>
+#include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
+#include "secrets.h"
 
-#ifndef STASSID
-#define STASSID "***REMOVED***"
-#define STAPSK "***REMOVED***"
-#endif
+#define MAX_LOG_SIZE 2000
 
 // Certificate for api.iot.yandex.net
 const char GlobalSign_Root_CA[] PROGMEM = R"CERT(
@@ -41,7 +40,6 @@ const int PIR_SENSOR_PIN = 14;
 const int RELAY_PIN = 12;
 const int SWITCH_MODE_PIN = 13;
 const int RED_LED_PIN = 15;
-
 
 //WiFi
 const char* ssid = STASSID;
@@ -80,11 +78,31 @@ WiFiClientSecure client;
 
 HTTPClient https;
 
+ESP8266WebServer server(8008);
+String logData = "Arduino Logs: \n\n";
+
+void log(String message) {
+  Serial.println(message);
+
+  logData += message + "\n";
+
+  // Если размер буфера с логами превышает MAX_LOG_SIZE, обрезаем, не трогая заголовок
+  if (logData.length() > MAX_LOG_SIZE) {
+    logData = logData.substring(logData.indexOf("\n") + 1);  // Убираем первую строку заголовка
+    if (logData.length() > MAX_LOG_SIZE) {
+      logData = logData.substring(logData.length() - MAX_LOG_SIZE);  // Оставляем последние записи
+    }
+  }
+}
+
+//Функция для обработки запроса на главной странице сервера
+void handleRoot() {
+  server.send(200, "text/plain", logData);
+}
+
 void setup() {
   Serial.begin(115200);
-  Serial.print(F("\nReset reason = "));
-  String resetCause = ESP.getResetReason();
-  Serial.println(resetCause);
+  log("Reset reason = " + ESP.getResetReason());
 
   pinMode(GREEN_LED_PIN, OUTPUT);
   pinMode(RADAR_PIN, INPUT);
@@ -94,22 +112,20 @@ void setup() {
   pinMode(RED_LED_PIN, OUTPUT);
 
   initWiFi();
+  initWebServer();
   // Set time via NTP, as required for x.509 validation
   configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
 
-  Serial.print("Waiting for NTP time sync: ");
+  log("Waiting for NTP time sync... ");
   time_t now = time(nullptr);
   while (now < 8 * 3600 * 2) {
     delay(400);
-    Serial.print(".");
     now = time(nullptr);
     yield();
   }
-  Serial.println("");
   struct tm timeinfo;
   gmtime_r(&now, &timeinfo);
-  Serial.print("Current time: ");
-  Serial.print(asctime(&timeinfo));
+  log(String("Current time: ") + asctime(&timeinfo));
 
   client.setTrustAnchors(&cert);
   https.setTimeout(4000);
@@ -123,18 +139,19 @@ void setup() {
     setLampState(true);  //Включаем люстру, если при инициализации обнаружено присутствие
   }
   yield();
-  Serial.println("Waiting one minute for PIR-sensor calibration...");
-  for (int i = 0; i < 60; i++) { //Ждем минуту для калибровки PIR-сенсора
-    delay(1000); // Задержка в 1 секунду
-    yield();     // Сбрасываем Watchdog
+  log("Waiting one minute for PIR-sensor calibration...");
+  for (int i = 0; i < 60; i++) {  //Ждем минуту для калибровки PIR-сенсора
+    delay(1000);                  // Задержка в 1 секунду
+    yield();                      // Сбрасываем Watchdog
   }
   attachInterrupt(digitalPinToInterrupt(PIR_SENSOR_PIN), detectPirSensorPresence, RISING);
 
-  Serial.println("Setup finished!");
+  log("Setup finished!");
   //attachInterrupt(digitalPinToInterrupt(SWITCH_MODE_PIN), detectModeChange, CHANGE);
 }
 
 void loop() {
+  server.handleClient();
   ArduinoOTA.handle();
 
   if (switchedToActiveMode) {
@@ -146,7 +163,7 @@ void loop() {
   }
 
   if (pirSensorPresenceDebug) {
-    Serial.println("PIR SENSOR PRESENCE DEBUG");
+    log("PIR SENSOR PRESENCE DEBUG");
     pirSensorPresenceDebug = false;
   }
 
@@ -157,18 +174,17 @@ void loop() {
       } else if (lowLevelRadarTime > 0) {
         unsigned long currentLowLevelRadarDuration = millis() - lowLevelRadarTime;
         if (currentLowLevelRadarDuration >= lowLevelRadarDuration) {  // Проверка, прошел ли заданный интервал времени для радара
-          Serial.printf("Current low level radar duration - %d seconds\n", currentLowLevelRadarDuration / 1000);
-
+          log(String("Current low level radar duration - ") + String(currentLowLevelRadarDuration / 1000) + " seconds");
           turnOffRadar();
           setLampState(false);
 
           lowLevelRadarTime = 0;  // Сбрасываем время
 
-          Serial.println("Radar deactivated, PIR-sensor activated");
+          log("Radar deactivated, PIR-sensor activated");
         }
       }
     } else if (pirSensorPresence) {
-      Serial.println("Detected movement by PIR-sensor");
+      log("Detected movement by PIR-sensor");
 
       turnOnRadar();
 
@@ -176,14 +192,18 @@ void loop() {
 
       pirSensorPresence = false;
 
-      Serial.println("Radar activated");
+      log("Radar activated");
     }
   }
+}
 
+void initWebServer() {
+  server.on("/", handleRoot);
+  server.begin();
 }
 
 void initOTA() {
-    // Port defaults to 8266
+  // Port defaults to 8266
   ArduinoOTA.setPort(8266);
 
   // Hostname defaults to esp8266-[ChipID]
@@ -205,30 +225,30 @@ void initOTA() {
     }
 
     // NOTE: if updating FS this would be the place to unmount FS using FS.end()
-    Serial.println("Start updating " + type);
+    log("Start updating " + type);
   });
   ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
+    log("\nEnd");
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    log(String("Progress: ") + String(progress / (total / 100)) + "%");
   });
   ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
+    log(String("Error[") + String(error) + "]: ");
     if (error == OTA_AUTH_ERROR) {
-      Serial.println("Auth Failed");
+      log("Auth Failed");
     } else if (error == OTA_BEGIN_ERROR) {
-      Serial.println("Begin Failed");
+      log("Begin Failed");
     } else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("Connect Failed");
+      log("Connect Failed");
     } else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("Receive Failed");
+      log("Receive Failed");
     } else if (error == OTA_END_ERROR) {
-      Serial.println("End Failed");
+      log("End Failed");
     }
   });
   ArduinoOTA.begin();
-  Serial.println("OTA is ready");
+  log("OTA is ready");
 }
 
 IRAM_ATTR void detectPirSensorPresence() {
@@ -256,14 +276,14 @@ IRAM_ATTR void detectModeChange() {
 }
 
 void lightSleepWithInterrupt() {
-  Serial.println("Going to light sleep...");
+  log("Going to light sleep...");
 
   digitalWrite(RED_LED_PIN, false);
   digitalWrite(GREEN_LED_PIN, false);
 
   activeMode = false;
   switchedToLightSleepMode = false;
-  Serial.println("Disconnecting WIFI-station...");
+  log("Disconnecting WIFI-station...");
   WiFi.mode(WIFI_OFF);
   wifi_set_opmode_current(NULL_MODE);
   wifi_fpm_set_sleep_type(LIGHT_SLEEP_T);
@@ -271,39 +291,35 @@ void lightSleepWithInterrupt() {
   wifi_fpm_set_wakeup_cb(wakeUp);  // Set wakeup callback (optional)
   wifi_fpm_open();
   int sleepStatus = wifi_fpm_do_sleep(0xFFFFFFF);  //Проверяем статус - должен быть 0, если всё ОК
-  Serial.print("Sleep status: ");
-  Serial.println(sleepStatus);
+  log("Sleep status: " + sleepStatus);
 }
 
 void wakeUp() {
-  Serial.println("Waking up! - this is the callback");
+  log("Waking up! - this is the callback function");
   activeMode = true;
   switchedToActiveMode = true;
   first = false;
 }
 
 void initWiFi() {
-  Serial.println("Connecting to ");
-  Serial.println(ssid);
+  log(String("Connecting to ") + ssid);
   WiFi.persistent(false);  // don't store the connection each time to save wear on the flash
   WiFi.mode(WIFI_STA);
-  WiFi.setOutputPower(17.5);
+  WiFi.setOutputPower(17.5);  //ОБЯЗАТЕЛЬНО! ИНАЧЕ БУДЕТ ПОСТОЯННЫЙ WDT RESET
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(400);
-    Serial.print(".");
+    // Serial.print(".");
     yield();
   }
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  log("WiFi connected!");
+  log("IP address: " + WiFi.localIP().toString());
   yield();
 }
 
 void turnOnRadar() {
   radarIsActive = true;
-  Serial.println("Turning ON radar...");
+  log("Turning ON radar...");
   digitalWrite(RELAY_PIN, true);  //Активируем радар через реле
   delay(3000);
   attachInterrupt(digitalPinToInterrupt(RADAR_PIN), detectRadarSignalChange, CHANGE);
@@ -314,7 +330,7 @@ void turnOnRadar() {
 
 void turnOffRadar() {
   radarIsActive = false;
-  Serial.println("Turning OFF radar...");
+  log("Turning OFF radar...");
   digitalWrite(RELAY_PIN, false);  //Деактивируем радар через реле
   detachInterrupt(digitalPinToInterrupt(RADAR_PIN));
 
@@ -324,54 +340,55 @@ void turnOffRadar() {
 
 void setLampState(bool lampState) {
   // wait for WiFi connection
-  Serial.println("Switching lamp state...");
+  log("Switching lamp state...");
   if ((WiFi.status() == WL_CONNECTED)) {
     yield();
-    Serial.print("[HTTPS] begin...\n");
+    log("[HTTPS] begin...");
     if (https.begin(client, LAMP_GROUP_ACTION_URL)) {  // HTTPS
       yield();
       https.addHeader("Content-Type", "application/json");
       https.addHeader("Authorization", "Bearer " + YANDEX_OAUTH_TOKEN);
 
-      Serial.println("[HTTPS] POST...\n");
+      log("[HTTPS] POST...");
       // start connection and send HTTP header
       String body = "{\"actions\": [{\"type\": \"devices.capabilities.on_off\", \"state\": {\"instance\": \"on\", \"value\": " + String(lampState ? "true" : "false") + "}}]}";
-      Serial.print(body);
+      // Serial.print(body);
       yield();
       int httpCode = https.POST(body);
       yield();
       // httpCode will be negative on error
       if (httpCode > 0) {
         // HTTP header has been send and Server response header has been handled
-        Serial.printf("[HTTPS] POST... code: %d\n", httpCode);
-
+        log(String("[HTTPS] POST... code: ") + String(httpCode));
         // file found at server
-        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
-          String payload = https.getString();
-          Serial.println(payload);
-        }
+        // if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
+        //   String payload = https.getString();
+        //   log(payload);
+        // }
         currentLampState = lampState;
       } else {
-        Serial.printf("[HTTPS] POST... failed, error: %s\n", https.errorToString(httpCode).c_str());
+        log(String("[HTTPS] POST... failed, error: ") + https.errorToString(httpCode).c_str());
       }
 
       https.end();
     } else {
-      Serial.printf("[HTTPS] Unable to connect\n");
+      log("[HTTPS] Unable to connect");
     }
   }
 }
 
 bool updateCurrentLampState() {
+  log("Updating current lamp state...");
+
   // wait for WiFi connection
   if ((WiFi.status() == WL_CONNECTED)) {
     yield();
-    Serial.print("[HTTPS] begin...\n");
+    log("[HTTPS] begin...");
     if (https.begin(client, LAMP_GROUP_CONDITION_URL)) {  // HTTPS
       https.addHeader("Content-Type", "application/json");
       https.addHeader("Authorization", "Bearer " + YANDEX_OAUTH_TOKEN);
 
-      Serial.print("[HTTPS] GET...\n");
+      log("[HTTPS] GET...");
       // start connection and send HTTP header
       yield();
       int httpCode = https.GET();
@@ -379,7 +396,7 @@ bool updateCurrentLampState() {
       // httpCode will be negative on error
       if (httpCode > 0) {
         // HTTP header has been send and Server response header has been handled
-        Serial.printf("[HTTPS] GET... code: %d\n", httpCode);
+        log(String("[HTTPS] GET... code: ") + String(httpCode));
 
         // file found at server
         if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
@@ -402,8 +419,7 @@ bool updateCurrentLampState() {
 
           // Test if parsing succeeds.
           if (error) {
-            Serial.print(F("deserializeJson() failed: "));
-            Serial.println(error.f_str());
+            log(String("deserializeJson() failed: ") + error.f_str());
             https.end();
             return currentLampState;
           }
@@ -417,19 +433,18 @@ bool updateCurrentLampState() {
             }
           }
 
-          Serial.print("Parsed lamp state value: ");
-          Serial.println(currentLampState);
+          log("Parsed lamp state value: " + currentLampState);
 
           yield();
         }
       } else {
-        Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
+        log(String("[HTTPS] GET... failed, error: ") + https.errorToString(httpCode).c_str());
       }
 
       https.end();
       yield();
     } else {
-      Serial.printf("[HTTPS] Unable to connect\n");
+      log("[HTTPS] Unable to connect");
     }
   }
   return currentLampState;
