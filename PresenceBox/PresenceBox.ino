@@ -4,7 +4,7 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
-#include "secrets.h"
+#include "../secrets.h"
 
 #define MAX_LOG_SIZE 2000
 
