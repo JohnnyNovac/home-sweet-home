@@ -4,7 +4,7 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
-#include "../secrets.h"
+#include "secrets.h"
 
 #define MAX_LOG_SIZE 2000
 
@@ -41,10 +41,6 @@ const int RELAY_PIN = 12;
 const int SWITCH_MODE_PIN = 13;
 const int RED_LED_PIN = 15;
 
-//WiFi
-const char* ssid = STASSID;
-const char* password = STAPSK;
-
 const String LAMP_GROUP_ID = "51c74eab-aef5-4a0e-8fe1-0944d8ffd27b";
 
 const String LAMP_GROUP_ACTION_URL = "https://api.iot.yandex.net/v1.0/groups/" + LAMP_GROUP_ID + "/actions";
@@ -79,7 +75,7 @@ WiFiClientSecure client;
 HTTPClient https;
 
 ESP8266WebServer server(8008);
-String logData = "Arduino Logs: \n\n";
+String logData = "Presence Box logs: \n\n";
 
 void log(String message) {
   Serial.println(message);
@@ -204,10 +200,10 @@ void initWebServer() {
 
 void initOTA() {
   // Port defaults to 8266
-  ArduinoOTA.setPort(8266);
+  //ArduinoOTA.setPort(8266);
 
   // Hostname defaults to esp8266-[ChipID]
-  ArduinoOTA.setHostname("myEsp8266");
+  ArduinoOTA.setHostname("myESP8266");
 
   // No authentication by default
   ArduinoOTA.setPassword("admin");
@@ -302,11 +298,11 @@ void wakeUp() {
 }
 
 void initWiFi() {
-  log(String("Connecting to ") + ssid);
+  log(String("Connecting to ") + STASSID);
   WiFi.persistent(false);  // don't store the connection each time to save wear on the flash
   WiFi.mode(WIFI_STA);
   WiFi.setOutputPower(17.5);  //ОБЯЗАТЕЛЬНО! ИНАЧЕ БУДЕТ ПОСТОЯННЫЙ WDT RESET
-  WiFi.begin(ssid, password);
+  WiFi.begin(STASSID, STAPSK);
   while (WiFi.status() != WL_CONNECTED) {
     delay(400);
     // Serial.print(".");
