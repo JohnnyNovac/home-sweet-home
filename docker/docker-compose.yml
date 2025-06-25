@@ -21,4 +21,6 @@ services:
     privileged: true
     network_mode: host
 volumes:
+  rabbitmq-lib:
+  rabbitmq-log:
   homeassistant_config:
