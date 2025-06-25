@@ -23,4 +23,4 @@ services:
 volumes:
   rabbitmq-lib:
   rabbitmq-log:
-  homeassistant_config:
+  homeassistant-config:
