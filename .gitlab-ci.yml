@@ -10,6 +10,9 @@ test:
 
 deploy:
   stage: deploy
+  variables:
+    RABBITMQ_DEFAULT_USER: $RABBITMQ_DEFAULT_USER_UI
+    RABBITMQ_DEFAULT_PASS: $RABBITMQ_DEFAULT_PASS_UI
   script:
     - echo "This job deploys something from the $CI_COMMIT_BRANCH branch"
     - echo "CI_PROJECT_DIR = $CI_PROJECT_DIR"
