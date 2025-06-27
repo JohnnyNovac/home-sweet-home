@@ -5,6 +5,7 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+      - "1883:1883"
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
@@ -12,17 +13,26 @@ services:
       - rabbitmq-lib:/var/lib/rabbitmq/
       - rabbitmq-log:/var/log/rabbitmq
     restart: unless-stopped
+    networks:
+      - homesweethome_net
   homeassistant:
     container_name: homeassistant
     image: "ghcr.io/home-assistant/home-assistant:stable"
+    ports:
+      - "8123:8123"
     volumes:
       - homeassistant-config:/config
       - /etc/localtime:/etc/localtime:ro
       - /run/dbus:/run/dbus:ro
     restart: unless-stopped
     privileged: true
-    network_mode: host
+    networks:
+      - homesweethome_net
 volumes:
   rabbitmq-lib:
   rabbitmq-log:
   homeassistant-config:
+networks:
+  homesweethome_net:
+    driver: bridge
+
