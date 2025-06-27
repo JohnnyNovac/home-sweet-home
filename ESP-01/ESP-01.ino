@@ -68,7 +68,7 @@ void sendMQTTTemperatureDiscovery() {
   doc["dev_cla"] = "temperature";
   doc["stat_t"] = stateTopic;
   doc["unit_of_meas"] = "°C";
-  doc["val_tpl"] = "{{ value_json.temperature|default(0) }}";
+  doc["val_tpl"] = "{{ value_json.temperature }}";
   doc["uniq_id"] = "esp01_temp";
 
   JsonObject device = doc.createNestedObject("device");
@@ -93,7 +93,7 @@ void sendMQTTHumidityDiscovery() {
   doc["dev_cla"] = "humidity";
   doc["stat_t"] = stateTopic;
   doc["unit_of_meas"] = "%";
-  doc["val_tpl"] = "{{ value_json.humidity|default(0) }}";
+  doc["val_tpl"] = "{{ value_json.humidity }}";
   doc["uniq_id"] = "esp01_hum";
 
   JsonObject device = doc.createNestedObject("device");
