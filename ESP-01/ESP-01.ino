@@ -16,10 +16,12 @@ MQTTClient mqttClient;
 String logData = "ESP-01 Box logs: \n\n";
 
 const char* MQTT_BROKER_IP = "192.168.1.77";  // ← сюда свой IP брокера
+const char* CLIENT_ID = "ESP-01";
+const char* AVAILABILITY_TOPIC = "homeassistant/sensor/esp01/availability";
+const char* STATE_TOPIC = "homeassistant/sensor/esp01/state";
 
-const char* clientID = "ESP-01";
-
-const String stateTopic = "homeassistant/sensor/esp01/state";
+bool isHAOnlineStatusReceived = false;  //Флаг доступности HA
+bool isFirstValuePublished = false;
 
 void log(String message) {
   logData += message + "\n";
@@ -47,7 +49,7 @@ void connectToMQTT() {
   const int maxAttempts = 5;
   int attempt = 0;
 
-  while (!mqttClient.connect(clientID, "***REMOVED***", "pbsnbsvvsvziv") && attempt < maxAttempts) {
+  while (!mqttClient.connect(CLIENT_ID, MQTT_USER, MQTT_PASS) && attempt < maxAttempts) {
     log("MQTT connect failed, retrying...");
     delay(1000);
     ArduinoOTA.handle();  // поддержка OTA во время ожидания
@@ -56,6 +58,12 @@ void connectToMQTT() {
 
   if (mqttClient.connected()) {
     log("MQTT connected!");
+
+    sendMQTTTemperatureDiscovery();
+    sendMQTTHumidityDiscovery();
+
+    // Подписываемся на топик статуса HA
+    mqttClient.subscribe("homeassistant/status");
   } else {
     log("MQTT not connected after " + String(maxAttempts) + " attempts, skipping");
   }
@@ -66,7 +74,8 @@ void sendMQTTTemperatureDiscovery() {
   char payload[512];
 
   doc["dev_cla"] = "temperature";
-  doc["stat_t"] = stateTopic;
+  doc["stat_t"] = STATE_TOPIC;
+  doc["avty_t"] = AVAILABILITY_TOPIC;
   doc["unit_of_meas"] = "°C";
   doc["val_tpl"] = "{{ value_json.temperature }}";
   doc["uniq_id"] = "esp01_temp";
@@ -83,7 +92,7 @@ void sendMQTTTemperatureDiscovery() {
   device["sw"] = "1.0";
 
   size_t length = serializeJson(doc, payload);
-  mqttClient.publish("homeassistant/sensor/esp01_temp/config", payload, length, true, 0);
+  mqttClient.publish("homeassistant/sensor/esp01_temp/config", payload, length);
 }
 
 void sendMQTTHumidityDiscovery() {
@@ -91,7 +100,8 @@ void sendMQTTHumidityDiscovery() {
   char payload[512];
 
   doc["dev_cla"] = "humidity";
-  doc["stat_t"] = stateTopic;
+  doc["stat_t"] = STATE_TOPIC;
+  doc["avty_t"] = AVAILABILITY_TOPIC;
   doc["unit_of_meas"] = "%";
   doc["val_tpl"] = "{{ value_json.humidity }}";
   doc["uniq_id"] = "esp01_hum";
@@ -101,7 +111,21 @@ void sendMQTTHumidityDiscovery() {
   identifiers.add("esp01");
 
   size_t length = serializeJson(doc, payload);
-  mqttClient.publish("homeassistant/sensor/esp01_hum/config", payload, true, 0);
+  mqttClient.publish("homeassistant/sensor/esp01_hum/config", payload);
+}
+
+void messageReceived(String& topic, String& payload) {
+  Serial.println("incoming: " + topic + " - " + payload);
+
+  if (payload == "online") {
+    Serial.println("Status: Home Assitant ONLINE detected!");
+
+    isHAOnlineStatusReceived = true;
+  }
+  // Note: Do not use the client in the callback to publish, subscribe or
+  // unsubscribe as it may cause deadlocks when other things arrive while
+  // sending and receiving acknowledgments. Instead, change a global variable,
+  // or push to a queue and handle it in the loop after calling `client.loop()`.
 }
 
 void setup() {
@@ -119,9 +143,9 @@ void setup() {
   log("Wi-Fi connected!");
 
   mqttClient.begin(MQTT_BROKER_IP, net);
+  mqttClient.onMessage(messageReceived);
+  mqttClient.setWill(AVAILABILITY_TOPIC, "offline");
   connectToMQTT();
-  sendMQTTTemperatureDiscovery();
-  sendMQTTHumidityDiscovery();
 
   initWebServer();
 
@@ -180,12 +204,20 @@ void loop() {
   if (!mqttClient.connected()) {
     connectToMQTT();
   }
+
+  if (isHAOnlineStatusReceived) {
+    sendMQTTTemperatureDiscovery();
+    sendMQTTHumidityDiscovery();
+
+    isHAOnlineStatusReceived = false;  // Сбрасываем флаг доступности HA
+  }
+
   server.handleClient();
   ArduinoOTA.handle();
 
   if (Serial.available()) {
     String receivedData = Serial.readStringUntil('\n');  // Читаем до символа \n    // log(receivedData);
-    Serial.println(receivedData);
+    //Serial.println(receivedData);
 
     int commaIndex = receivedData.indexOf(',');
     if (commaIndex > 0) {
@@ -199,8 +231,12 @@ void loop() {
 
       char payload[128];
       serializeJson(doc, payload);
-
-      mqttClient.publish(stateTopic, payload);
+      // Только при первом успешном измерении отправляем birth message
+      if (!isFirstValuePublished) {
+        mqttClient.publish(AVAILABILITY_TOPIC, "online");
+        isFirstValuePublished = true;
+      }
+      mqttClient.publish(STATE_TOPIC, payload);
     }
   }
 }
