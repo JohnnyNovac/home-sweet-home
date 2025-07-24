@@ -1,0 +1,5 @@
+rootProject.name = 'home-sweet-home'
+
+includeBuild 'eureka-server'
+includeBuild 'event-service'
+
