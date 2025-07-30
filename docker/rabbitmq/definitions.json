@@ -1,0 +1,23 @@
+{
+  "queues": [
+    {
+      "name": "event-service",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "amq.topic",
+      "vhost": "/",
+      "destination": "event-service",
+      "destination_type": "queue",
+      "routing_key": "home.#",
+      "arguments": {
+      }
+    }
+  ]
+}
