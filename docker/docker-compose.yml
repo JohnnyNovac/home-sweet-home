@@ -13,7 +13,7 @@ services:
       - rabbitmq-lib:/var/lib/rabbitmq/
       - rabbitmq-log:/var/log/rabbitmq
       - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
-    #      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
     restart: unless-stopped
     networks:
       - homesweethome_net
