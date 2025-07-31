@@ -1,9 +1,4 @@
 {
-  "vhosts": [
-    {
-      "name": "/"
-    }
-  ],
   "queues": [
     {
       "name": "event-service",
