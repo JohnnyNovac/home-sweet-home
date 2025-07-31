@@ -1,7 +1,7 @@
 #!/bin/bash
 
 (
-  sleep 50;
+  rabbitmqctl await_startup --timeout 300;
   rabbitmqctl import_definitions /etc/rabbitmq/definitions.json;
   echo "*** Definitions imported ***"
 ) &
