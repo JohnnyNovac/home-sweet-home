@@ -1,7 +1,7 @@
 #!/bin/bash
 
 (
-  sleep 10;
+  sleep 50;
   rabbitmqctl import_definitions /etc/rabbitmq/definitions.json;
   echo "*** Definitions imported ***"
 ) &
