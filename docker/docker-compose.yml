@@ -30,7 +30,7 @@ services:
     networks:
       - homesweethome_net
   mongodb:
-    image: mongodb/mongodb-community-server:latest
+    image: mongodb/mongodb-community-server:4.4.29-ubuntu2004
     container_name: mongodb
     ports:
       - "27017:27017"
