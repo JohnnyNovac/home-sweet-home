@@ -17,11 +17,8 @@ String logData = "ESP-01 Box logs: \n\n";
 
 const char* MQTT_BROKER_IP = "192.168.1.77";  // ← сюда свой IP брокера
 const char* CLIENT_ID = "ESP-01";
-const char* AVAILABILITY_TOPIC = "homeassistant/sensor/esp01/availability";
-const char* STATE_TOPIC = "homeassistant/sensor/esp01/state";
-
-bool isHAOnlineStatusReceived = false;  //Флаг доступности HA
-bool isFirstValuePublished = false;
+const char* AVAILABILITY_TOPIC = "home/esp01/availability";
+const char* DATA_TOPIC = "home/esp01/data";
 
 void log(String message) {
   logData += message + "\n";
@@ -58,74 +55,9 @@ void connectToMQTT() {
 
   if (mqttClient.connected()) {
     log("MQTT connected!");
-
-    sendMQTTTemperatureDiscovery();
-    sendMQTTHumidityDiscovery();
-
-    // Подписываемся на топик статуса HA
-    mqttClient.subscribe("homeassistant/status");
   } else {
     log("MQTT not connected after " + String(maxAttempts) + " attempts, skipping");
   }
-}
-
-void sendMQTTTemperatureDiscovery() {
-  DynamicJsonDocument doc(512);
-  char payload[512];
-
-  doc["dev_cla"] = "temperature";
-  doc["stat_t"] = STATE_TOPIC;
-  doc["avty_t"] = AVAILABILITY_TOPIC;
-  doc["unit_of_meas"] = "°C";
-  doc["val_tpl"] = "{{ value_json.temperature }}";
-  doc["uniq_id"] = "esp01_temp";
-
-  JsonObject device = doc.createNestedObject("device");
-  JsonArray identifiers = device.createNestedArray("identifiers");
-  identifiers.add("esp01");
-  device["name"] = "ESP-01";
-  device["mf"] = "My Company";
-  device["mdl"] = "Model 1";
-  device["mdl_id"] = "M1";
-  device["sn"] = "SN001";
-  device["hw"] = "1.0";
-  device["sw"] = "1.0";
-
-  size_t length = serializeJson(doc, payload);
-  mqttClient.publish("homeassistant/sensor/esp01_temp/config", payload, length);
-}
-
-void sendMQTTHumidityDiscovery() {
-  DynamicJsonDocument doc(512);
-  char payload[512];
-
-  doc["dev_cla"] = "humidity";
-  doc["stat_t"] = STATE_TOPIC;
-  doc["avty_t"] = AVAILABILITY_TOPIC;
-  doc["unit_of_meas"] = "%";
-  doc["val_tpl"] = "{{ value_json.humidity }}";
-  doc["uniq_id"] = "esp01_hum";
-
-  JsonObject device = doc.createNestedObject("device");
-  JsonArray identifiers = device.createNestedArray("identifiers");
-  identifiers.add("esp01");
-
-  size_t length = serializeJson(doc, payload);
-  mqttClient.publish("homeassistant/sensor/esp01_hum/config", payload);
-}
-
-void messageReceived(String& topic, String& payload) {
-  Serial.println("incoming: " + topic + " - " + payload);
-
-  if (payload == "online") {
-    Serial.println("Status: Home Assitant ONLINE detected!");
-
-    isHAOnlineStatusReceived = true;
-  }
-  // Note: Do not use the client in the callback to publish, subscribe or
-  // unsubscribe as it may cause deadlocks when other things arrive while
-  // sending and receiving acknowledgments. Instead, change a global variable,
-  // or push to a queue and handle it in the loop after calling `client.loop()`.
 }
 
 void setup() {
@@ -143,7 +75,6 @@ void setup() {
   log("Wi-Fi connected!");
 
   mqttClient.begin(MQTT_BROKER_IP, net);
-  mqttClient.onMessage(messageReceived);
   mqttClient.setWill(AVAILABILITY_TOPIC, "offline");
   connectToMQTT();
 
@@ -205,13 +136,6 @@ void loop() {
     connectToMQTT();
   }
 
-  if (isHAOnlineStatusReceived) {
-    sendMQTTTemperatureDiscovery();
-    sendMQTTHumidityDiscovery();
-
-    isHAOnlineStatusReceived = false;  // Сбрасываем флаг доступности HA
-  }
-
   server.handleClient();
   ArduinoOTA.handle();
 
@@ -231,12 +155,8 @@ void loop() {
 
       char payload[128];
       serializeJson(doc, payload);
-      // Только при первом успешном измерении отправляем birth message
-      if (!isFirstValuePublished) {
-        mqttClient.publish(AVAILABILITY_TOPIC, "online");
-        isFirstValuePublished = true;
-      }
-      mqttClient.publish(STATE_TOPIC, payload);
+      mqttClient.publish(DATA_TOPIC, payload);
+      log("Publishing sensor data - Temperature: " + String(temperature) + "°C, Humidity: " + String(humidity) + "%");
     }
   }
 }
