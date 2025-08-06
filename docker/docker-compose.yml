@@ -29,10 +29,22 @@ services:
     privileged: true
     networks:
       - homesweethome_net
+  mongodb:
+    image: mongodb/mongodb-community-server:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=${MONGODB_INITDB_ROOT_USERNAME}
+      - MONGODB_INITDB_ROOT_PASSWORD=${MONGODB_INITDB_ROOT_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
 volumes:
   rabbitmq-lib:
   rabbitmq-log:
   homeassistant-config:
+  mongo_data:
 networks:
   homesweethome_net:
     driver: bridge
