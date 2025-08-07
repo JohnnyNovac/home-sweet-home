@@ -20,7 +20,12 @@ const char* CLIENT_ID = "ESP-01";
 const char* AVAILABILITY_TOPIC = "home/esp01/availability";
 const char* DATA_TOPIC = "home/esp01/data";
 
+bool isMqttConnected = false;  // Флаг подключения к MQTT
+bool isFirstValuePublished = false;
+
 void log(String message) {
+  Serial.println(message);
+
   logData += message + "\n";
 
   // Если размер буфера с логами превышает MAX_LOG_SIZE, обрезаем, не трогая заголовок
@@ -54,6 +59,8 @@ void connectToMQTT() {
   }
 
   if (mqttClient.connected()) {
+    isMqttConnected = true;
+    mqttClient.publish(AVAILABILITY_TOPIC, "online");
     log("MQTT connected!");
   } else {
     log("MQTT not connected after " + String(maxAttempts) + " attempts, skipping");
@@ -74,11 +81,11 @@ void setup() {
   }
   log("Wi-Fi connected!");
 
+  initWebServer();
+
   mqttClient.begin(MQTT_BROKER_IP, net);
   mqttClient.setWill(AVAILABILITY_TOPIC, "offline");
   connectToMQTT();
-
-  initWebServer();
 
   // Port defaults to 8266
   // ArduinoOTA.setPort(8266);
@@ -132,31 +139,38 @@ void loop() {
   mqttClient.loop();
   delay(10);  // <- fixes some issues with WiFi stability
 
-  if (!mqttClient.connected()) {
-    connectToMQTT();
-  }
-
   server.handleClient();
   ArduinoOTA.handle();
 
+  if (!mqttClient.connected()) {
+    isMqttConnected = false;
+    connectToMQTT();
+  }
+
   if (Serial.available()) {
     String receivedData = Serial.readStringUntil('\n');  // Читаем до символа \n    // log(receivedData);
-    //Serial.println(receivedData);
+    Serial.println(receivedData);
 
-    int commaIndex = receivedData.indexOf(',');
-    if (commaIndex > 0) {
-      float temperature = receivedData.substring(0, commaIndex).toFloat();
-      float humidity = receivedData.substring(commaIndex + 1).toFloat();
+    if (isMqttConnected) {
+      int commaIndex = receivedData.indexOf(',');
+      if (commaIndex > 0) {
+        float temperature = receivedData.substring(0, commaIndex).toFloat();
+        float humidity = receivedData.substring(commaIndex + 1).toFloat();
 
-      // Формируем JSON
-      DynamicJsonDocument doc(128);
-      doc["temperature"] = temperature;
-      doc["humidity"] = humidity;
+        // Формируем JSON
+        DynamicJsonDocument doc(128);
+        doc["temperature"] = temperature;
+        doc["humidity"] = humidity;
 
-      char payload[128];
-      serializeJson(doc, payload);
-      mqttClient.publish(DATA_TOPIC, payload);
-      log("Publishing sensor data - Temperature: " + String(temperature) + "°C, Humidity: " + String(humidity) + "%");
+        char payload[128];
+        serializeJson(doc, payload);
+        if (!isFirstValuePublished) {
+          mqttClient.publish(AVAILABILITY_TOPIC, "online");
+          isFirstValuePublished = true;
+        }
+        mqttClient.publish(DATA_TOPIC, payload);
+        log("Publishing sensor data - Temperature: " + String(temperature) + "°C, Humidity: " + String(humidity) + "%");
+      }
     }
   }
 }
