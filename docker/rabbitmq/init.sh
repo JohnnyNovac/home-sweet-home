@@ -16,6 +16,13 @@
     ELAPSED=$((ELAPSED + INTERVAL))
   done
 
+  # Delete all queues
+  echo "Deleting all queues..."
+  for queue in $(rabbitmqctl list_queues -q name); do
+      echo "Deleting queue: $queue"
+    rabbitmqctl delete_queue "$queue"
+  done
+
   # Import definitions after RabbitMQ is ready
   rabbitmqctl import_definitions /etc/rabbitmq/definitions.json
   echo "*** Definitions imported ***"
