@@ -7,11 +7,20 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.ha")
 public class HATopicsConfigProperties {
 
+    private String serviceAvailabilityTopic;
     private String esp01AvailabilityTopic;
     private String esp01StateTopic;
     private String esp01DiscoveryTempTopic;
     private String esp01DiscoveryHumTopic;
     private String statusTopic;
+
+    public String getServiceAvailabilityTopic() {
+        return serviceAvailabilityTopic;
+    }
+
+    public void setServiceAvailabilityTopic(String serviceAvailabilityTopic) {
+        this.serviceAvailabilityTopic = serviceAvailabilityTopic;
+    }
 
     public String getEsp01AvailabilityTopic() {
         return esp01AvailabilityTopic;
