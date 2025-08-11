@@ -12,6 +12,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class MqttConfig {
 
+    private final HATopicsConfigProperties haTopics;
+
     @Value("${spring.rabbitmq.host}")
     private String brokerHost;
 
@@ -21,6 +23,10 @@ public class MqttConfig {
     @Value("${spring.rabbitmq.password}")
     private String pass;
 
+    @Autowired
+    public MqttConfig(HATopicsConfigProperties haTopics) {
+        this.haTopics = haTopics;
+    }
 
     @Bean
     public MqttClient mqttClient() throws MqttException {
@@ -31,6 +37,7 @@ public class MqttConfig {
         options.setPassword(pass.toCharArray());
         options.setAutomaticReconnect(true);
         options.setCleanSession(true);
+        options.setWill(haTopics.getServiceAvailabilityTopic(), "offline".getBytes(), 1, true);
 
         client.connect(options);
         System.out.println("MQTT connected");

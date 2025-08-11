@@ -93,11 +93,13 @@ public class EventRunner implements CommandLineRunner {
             ObjectNode temperatureDiscovery = objectMapper.createObjectNode();
             temperatureDiscovery.put("dev_cla", "temperature");
             temperatureDiscovery.put("stat_t", haTopics.getEsp01StateTopic());
-            temperatureDiscovery.put("avty_t", haTopics.getEsp01AvailabilityTopic());
             temperatureDiscovery.put("unit_of_meas", "°C");
             temperatureDiscovery.put("val_tpl", "{{ value_json.temperature }}");
             temperatureDiscovery.put("uniq_id", "esp01_temp");
 
+            temperatureDiscovery.putArray("avty")
+                    .add(objectMapper.createObjectNode().put("t", haTopics.getServiceAvailabilityTopic()))
+                    .add(objectMapper.createObjectNode().put("t", haTopics.getEsp01AvailabilityTopic()));
             putDeviceNode(temperatureDiscovery);
 
             mqttPublisher.publish(haTopics.getEsp01DiscoveryTempTopic(), temperatureDiscovery.toString());
@@ -105,11 +107,13 @@ public class EventRunner implements CommandLineRunner {
             ObjectNode humidityDiscovery = objectMapper.createObjectNode();
             humidityDiscovery.put("dev_cla", "humidity");
             humidityDiscovery.put("stat_t", haTopics.getEsp01StateTopic());
-            humidityDiscovery.put("avty_t", haTopics.getEsp01AvailabilityTopic());
             humidityDiscovery.put("unit_of_meas", "%");
             humidityDiscovery.put("val_tpl", "{{ value_json.humidity }}");
             humidityDiscovery.put("uniq_id", "esp01_hum");
 
+            humidityDiscovery.putArray("avty")
+                    .add(objectMapper.createObjectNode().put("t", haTopics.getServiceAvailabilityTopic()))
+                    .add(objectMapper.createObjectNode().put("t", haTopics.getEsp01AvailabilityTopic()));
             putDeviceNode(humidityDiscovery);
 
             mqttPublisher.publish(haTopics.getEsp01DiscoveryHumTopic(), humidityDiscovery.toString());
