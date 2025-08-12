@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.iot.eventservice.config.HATopicsConfigProperties;
 import dev.iot.eventservice.config.RabbitMQConfigProperties;
 import org.eclipse.paho.client.mqttv3.MqttException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
@@ -12,6 +14,8 @@ import reactor.rabbitmq.Receiver;
 
 @Component
 public class EventRunner implements CommandLineRunner {
+
+    private static final Logger logger = LoggerFactory.getLogger(EventRunner.class);
 
     private final Receiver receiver;
     private final RabbitMQConfigProperties rabbitMQProperties;
@@ -22,6 +26,7 @@ public class EventRunner implements CommandLineRunner {
 
     private boolean isHAOnlineStatusReceived = false;
     private boolean isFirstValuePublished = false;
+    private boolean isEsp01Available = false;
 
     public EventRunner(Receiver receiver,
                        RabbitMQConfigProperties properties,
@@ -43,24 +48,26 @@ public class EventRunner implements CommandLineRunner {
     private void subscribeToEvents() {
         receiver.consumeAutoAck(rabbitMQProperties.getEventQueue())
                 .map(msg -> new String(msg.getBody()))
-                .doOnNext(System.out::println)
+//                .doOnNext(System.out::println)
                 .flatMap(json -> {
                     if (!isHAOnlineStatusReceived) {
-                        System.out.println("Home Assistant offline - skipping");
+                        logger.debug("Home Assistant offline - skipping");
                         return Mono.empty();
                     }
                     try {
-                        if (!isFirstValuePublished) {
-                            mqttPublisher.publish(haTopics.getEsp01AvailabilityTopic(), "online");
-                            sendDiscoveryMessages();
-                            isFirstValuePublished = true;
+                        if (isEsp01Available) {
+                            if (!isFirstValuePublished) {
+                                mqttPublisher.publish(haTopics.getServiceAvailabilityTopic(), "online");
+                                logger.debug("Service availability message sent: {}", "online");
+                                sendDiscoveryMessages();
+                                isFirstValuePublished = true;
+                            }
+
+                            mqttPublisher.publish(haTopics.getEsp01StateTopic(), json);
                         }
-
-                        mqttPublisher.publish(haTopics.getEsp01StateTopic(), json);
-
                         return Mono.empty();
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        logger.error("Failed to publish MQTT message due to exception", e);
                         return Mono.error(e);
                     }
                 })
@@ -71,16 +78,20 @@ public class EventRunner implements CommandLineRunner {
         receiver.consumeAutoAck(rabbitMQProperties.getAvailabilityQueue())
                 .map(msg -> new String(msg.getBody()))
                 .doOnNext(body -> {
-                    System.out.println("Received availability message: " + body);
-                    mqttPublisher.publish(haTopics.getEsp01AvailabilityTopic(), body);
+                    logger.debug("Received availability message: {}", body);
+                    if (body.equals("online")) {
+                        isEsp01Available = true;
+                    } else {
+                        mqttPublisher.publish(haTopics.getEsp01AvailabilityTopic(), "offline");
+                    }
                 })
                 .subscribe();
     }
 
     private void subscribeToHAStatus() throws MqttException {
-        mqttPublisher.getClient().subscribe(haTopics.getStatusTopic(), (topic, message) -> {
+        mqttPublisher.client().subscribe(haTopics.getStatusTopic(), (topic, message) -> {
             String status = new String(message.getPayload());
-            System.out.println("Home Assistant status: " + status);
+            logger.debug("Received Home Assistant status: {}", status);
             isHAOnlineStatusReceived = "online".equals(status);
             if (isHAOnlineStatusReceived) {
                 sendDiscoveryMessages();
@@ -118,9 +129,9 @@ public class EventRunner implements CommandLineRunner {
 
             mqttPublisher.publish(haTopics.getEsp01DiscoveryHumTopic(), humidityDiscovery.toString());
 
-            System.out.println("Discovery messages sent");
+            logger.debug("Discovery messages sent");
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Failed to send discovery message due to exception", e);
         }
     }
 
