@@ -4,6 +4,8 @@ import dev.iot.eventservice.service.MqttPublisher;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -11,6 +13,8 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class MqttConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(MqttConfig.class);
 
     private final HATopicsConfigProperties haTopics;
 
@@ -37,10 +41,13 @@ public class MqttConfig {
         options.setPassword(pass.toCharArray());
         options.setAutomaticReconnect(true);
         options.setCleanSession(true);
-        options.setWill(haTopics.getServiceAvailabilityTopic(), "offline".getBytes(), 1, true);
+        int qos = 1;
+        boolean retained = true;
+        options.setWill(haTopics.getServiceAvailabilityTopic(), "offline".getBytes(), qos, retained);
 
         client.connect(options);
-        System.out.println("MQTT connected");
+        logger.info("MQTT connected");
+
         return client;
     }
 
