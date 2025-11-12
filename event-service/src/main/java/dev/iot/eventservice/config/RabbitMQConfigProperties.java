@@ -9,6 +9,7 @@ public class RabbitMQConfigProperties {
 
     private String eventQueue;
     private String availabilityQueue;
+    private String eventServiceAvailabilityQueue;
 
     public String getEventQueue() {
         return eventQueue;
@@ -24,6 +25,14 @@ public class RabbitMQConfigProperties {
 
     public void setAvailabilityQueue(String availabilityQueue) {
         this.availabilityQueue = availabilityQueue;
+    }
+
+    public String getEventServiceAvailabilityQueue() {
+        return eventServiceAvailabilityQueue;
+    }
+
+    public void setEventServiceAvailabilityQueue(String eventServiceAvailabilityQueue) {
+        this.eventServiceAvailabilityQueue = eventServiceAvailabilityQueue;
     }
 
 }

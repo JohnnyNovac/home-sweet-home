@@ -2,7 +2,7 @@ package dev.iot.eventservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import dev.iot.eventservice.config.HATopicsConfigProperties;
+import dev.iot.eventservice.config.HAConfigProperties;
 import dev.iot.eventservice.config.RabbitMQConfigProperties;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
@@ -20,7 +20,8 @@ public class EventRunner implements CommandLineRunner {
     private final Receiver receiver;
     private final RabbitMQConfigProperties rabbitMQProperties;
     private final MqttPublisher mqttPublisher;
-    private final HATopicsConfigProperties haTopics;
+    private final HAConfigProperties haProperties;
+    private final SensorDataService sensorDataService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -31,15 +32,20 @@ public class EventRunner implements CommandLineRunner {
     public EventRunner(Receiver receiver,
                        RabbitMQConfigProperties properties,
                        MqttPublisher mqttPublisher,
-                       HATopicsConfigProperties haTopics) {
+                       HAConfigProperties haProperties,
+                       SensorDataService sensorDataService) {
         this.receiver = receiver;
         this.rabbitMQProperties = properties;
         this.mqttPublisher = mqttPublisher;
-        this.haTopics = haTopics;
+        this.haProperties = haProperties;
+        this.sensorDataService = sensorDataService;
     }
 
     @Override
     public void run(String... args) throws Exception {
+        mqttPublisher.publish(rabbitMQProperties.getEventServiceAvailabilityQueue(), "online");
+        logger.debug("Service availability message sent: {}", "online");
+        
         subscribeToHAStatus();
         subscribeToAvailability();
         subscribeToEvents();
@@ -57,13 +63,13 @@ public class EventRunner implements CommandLineRunner {
                     try {
                         if (isEsp01Available) {
                             if (!isFirstValuePublished) {
-                                mqttPublisher.publish(haTopics.getServiceAvailabilityTopic(), "online");
-                                logger.debug("Service availability message sent: {}", "online");
                                 sendDiscoveryMessages();
                                 isFirstValuePublished = true;
                             }
 
-                            mqttPublisher.publish(haTopics.getEsp01StateTopic(), json);
+                            mqttPublisher.publish(haProperties.getEsp01StateTopic(), json);
+
+                            return sensorDataService.handleIncomingData("ESP-01", json);
                         }
                         return Mono.empty();
                     } catch (Exception e) {
@@ -82,14 +88,14 @@ public class EventRunner implements CommandLineRunner {
                     if (body.equals("online")) {
                         isEsp01Available = true;
                     } else {
-                        mqttPublisher.publish(haTopics.getEsp01AvailabilityTopic(), "offline");
+                        mqttPublisher.publish(haProperties.getEsp01AvailabilityTopic(), "offline");
                     }
                 })
                 .subscribe();
     }
 
     private void subscribeToHAStatus() throws MqttException {
-        mqttPublisher.client().subscribe(haTopics.getStatusTopic(), (topic, message) -> {
+        mqttPublisher.client().subscribe(haProperties.getStatusTopic(), (topic, message) -> {
             String status = new String(message.getPayload());
             logger.debug("Received Home Assistant status: {}", status);
             isHAOnlineStatusReceived = "online".equals(status);
@@ -103,31 +109,33 @@ public class EventRunner implements CommandLineRunner {
         try {
             ObjectNode temperatureDiscovery = objectMapper.createObjectNode();
             temperatureDiscovery.put("dev_cla", "temperature");
-            temperatureDiscovery.put("stat_t", haTopics.getEsp01StateTopic());
+            temperatureDiscovery.put("stat_t", haProperties.getEsp01StateTopic());
             temperatureDiscovery.put("unit_of_meas", "°C");
             temperatureDiscovery.put("val_tpl", "{{ value_json.temperature }}");
             temperatureDiscovery.put("uniq_id", "esp01_temp");
+            temperatureDiscovery.put("exp_aft", haProperties.getExpireAfter());
 
             temperatureDiscovery.putArray("avty")
-                    .add(objectMapper.createObjectNode().put("t", haTopics.getServiceAvailabilityTopic()))
-                    .add(objectMapper.createObjectNode().put("t", haTopics.getEsp01AvailabilityTopic()));
+                    .add(objectMapper.createObjectNode().put("t", rabbitMQProperties.getEventServiceAvailabilityQueue()))
+                    .add(objectMapper.createObjectNode().put("t", haProperties.getEsp01AvailabilityTopic()));
             putDeviceNode(temperatureDiscovery);
 
-            mqttPublisher.publish(haTopics.getEsp01DiscoveryTempTopic(), temperatureDiscovery.toString());
+            mqttPublisher.publish(haProperties.getEsp01DiscoveryTempTopic(), temperatureDiscovery.toString());
 
             ObjectNode humidityDiscovery = objectMapper.createObjectNode();
             humidityDiscovery.put("dev_cla", "humidity");
-            humidityDiscovery.put("stat_t", haTopics.getEsp01StateTopic());
+            humidityDiscovery.put("stat_t", haProperties.getEsp01StateTopic());
             humidityDiscovery.put("unit_of_meas", "%");
             humidityDiscovery.put("val_tpl", "{{ value_json.humidity }}");
             humidityDiscovery.put("uniq_id", "esp01_hum");
+            humidityDiscovery.put("exp_aft", haProperties.getExpireAfter());
 
             humidityDiscovery.putArray("avty")
-                    .add(objectMapper.createObjectNode().put("t", haTopics.getServiceAvailabilityTopic()))
-                    .add(objectMapper.createObjectNode().put("t", haTopics.getEsp01AvailabilityTopic()));
+                    .add(objectMapper.createObjectNode().put("t", rabbitMQProperties.getEventServiceAvailabilityQueue()))
+                    .add(objectMapper.createObjectNode().put("t", haProperties.getEsp01AvailabilityTopic()));
             putDeviceNode(humidityDiscovery);
 
-            mqttPublisher.publish(haTopics.getEsp01DiscoveryHumTopic(), humidityDiscovery.toString());
+            mqttPublisher.publish(haProperties.getEsp01DiscoveryHumTopic(), humidityDiscovery.toString());
 
             logger.debug("Discovery messages sent");
         } catch (Exception e) {

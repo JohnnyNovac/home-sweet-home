@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConfigurationProperties(prefix = "app.ha")
-public class HATopicsConfigProperties {
+public class HAConfigProperties {
 
     private String serviceAvailabilityTopic;
     private String esp01AvailabilityTopic;
@@ -13,6 +13,7 @@ public class HATopicsConfigProperties {
     private String esp01DiscoveryTempTopic;
     private String esp01DiscoveryHumTopic;
     private String statusTopic;
+    private int expireAfter;
 
     public String getServiceAvailabilityTopic() {
         return serviceAvailabilityTopic;
@@ -62,5 +63,12 @@ public class HATopicsConfigProperties {
         this.statusTopic = statusTopic;
     }
 
+    public int getExpireAfter() {
+        return expireAfter;
+    }
+
+    public void setExpireAfter(int expireAfter) {
+        this.expireAfter = expireAfter;
+    }
 }
 
