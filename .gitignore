@@ -1,5 +1,6 @@
 secrets.h
 .env
+application-local.properties
 
 .gradle
 build/

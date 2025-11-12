@@ -16,7 +16,7 @@ public class MqttConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(MqttConfig.class);
 
-    private final HATopicsConfigProperties haTopics;
+    private final HAConfigProperties haTopics;
 
     @Value("${spring.rabbitmq.host}")
     private String brokerHost;
@@ -28,7 +28,7 @@ public class MqttConfig {
     private String pass;
 
     @Autowired
-    public MqttConfig(HATopicsConfigProperties haTopics) {
+    public MqttConfig(HAConfigProperties haTopics) {
         this.haTopics = haTopics;
     }
 
