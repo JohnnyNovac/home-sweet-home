@@ -1,4 +1,4 @@
-package dev.iot.eventservice;
+package dev.iot.presenceservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -6,10 +6,10 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 @SpringBootApplication
 @ConfigurationPropertiesScan
-public class EventServiceApplication {
+public class PresenceServiceApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(EventServiceApplication.class, args);
+        SpringApplication.run(PresenceServiceApplication.class, args);
     }
 
 }
