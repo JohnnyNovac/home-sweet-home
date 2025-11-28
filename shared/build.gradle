@@ -1,0 +1,25 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'dev.iot'
+version = '0.0.1-SNAPSHOT'
+description = 'shared'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("tools.jackson.core:jackson-databind:3.0.2")
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

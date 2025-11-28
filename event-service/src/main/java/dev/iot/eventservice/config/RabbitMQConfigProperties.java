@@ -1,15 +1,14 @@
 package dev.iot.eventservice.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
-@Component
 @ConfigurationProperties(prefix = "app.rabbitmq")
 public class RabbitMQConfigProperties {
 
     private String eventQueue;
-    private String availabilityQueue;
-    private String eventServiceAvailabilityQueue;
+    private Esp01Config esp01;
+    private NodeMCUConfig nodemcu;
+    private String serviceAvailabilityQueue;
 
     public String getEventQueue() {
         return eventQueue;
@@ -19,20 +18,28 @@ public class RabbitMQConfigProperties {
         this.eventQueue = eventQueue;
     }
 
-    public String getAvailabilityQueue() {
-        return availabilityQueue;
+    public Esp01Config getEsp01() {
+        return esp01;
     }
 
-    public void setAvailabilityQueue(String availabilityQueue) {
-        this.availabilityQueue = availabilityQueue;
+    public void setEsp01(Esp01Config esp01) {
+        this.esp01 = esp01;
     }
 
-    public String getEventServiceAvailabilityQueue() {
-        return eventServiceAvailabilityQueue;
+    public NodeMCUConfig getNodemcu() {
+        return nodemcu;
     }
 
-    public void setEventServiceAvailabilityQueue(String eventServiceAvailabilityQueue) {
-        this.eventServiceAvailabilityQueue = eventServiceAvailabilityQueue;
+    public void setNodemcu(NodeMCUConfig nodemcu) {
+        this.nodemcu = nodemcu;
+    }
+
+    public String getServiceAvailabilityQueue() {
+        return serviceAvailabilityQueue;
+    }
+
+    public void setServiceAvailabilityQueue(String serviceAvailabilityQueue) {
+        this.serviceAvailabilityQueue = serviceAvailabilityQueue;
     }
 
 }

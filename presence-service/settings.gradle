@@ -1,0 +1,3 @@
+rootProject.name = 'presence-service'
+
+includeBuild '../shared'
