@@ -47,7 +47,7 @@ void initWebServer() {
   server.begin();
 }
 
-void connectToMQTT() {
+bool connectToMQTT() {
   const int maxAttempts = 5;
   int attempt = 0;
 
@@ -59,11 +59,12 @@ void connectToMQTT() {
   }
 
   if (mqttClient.connected()) {
-    isMqttConnected = true;
     mqttClient.publish(AVAILABILITY_TOPIC, "online");
     log("MQTT connected!");
+    return true;
   } else {
     log("MQTT not connected after " + String(maxAttempts) + " attempts, skipping");
+    return false;
   }
 }
 
@@ -142,16 +143,26 @@ void loop() {
   server.handleClient();
   ArduinoOTA.handle();
 
+  if (Serial.available()) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd == "RESET") {
+      ESP.restart(); // software reset of ESP
+    }
+  }
+
   if (!mqttClient.connected()) {
-    isMqttConnected = false;
-    connectToMQTT();
+    if (!connectToMQTT()) {
+      log("Unable to connect to the MQTT broker. Trying again...");
+      return;
+    }
   }
 
   if (!Serial.available()) return;
+
   String receivedData = Serial.readStringUntil('\n');  // Читаем до символа \n    // log(receivedData);
   Serial.println(receivedData);
-
-  if (!isMqttConnected) return;
+  log("Received data: " + receivedData);
   
   int commaIndex = receivedData.indexOf(',');
   if (commaIndex > 0) {
