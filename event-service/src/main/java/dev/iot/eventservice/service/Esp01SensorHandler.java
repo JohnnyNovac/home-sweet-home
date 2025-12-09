@@ -1,5 +1,7 @@
 package dev.iot.eventservice.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.iot.eventservice.config.HAConfigProperties;
@@ -24,7 +26,6 @@ public class Esp01SensorHandler implements SensorHandler {
     private final ObjectMapper objectMapper;
 
     private boolean isFirstValuePublished = false;
-    private boolean isEsp01Available = false;
 
     public Esp01SensorHandler(
             Receiver receiver,
@@ -44,17 +45,22 @@ public class Esp01SensorHandler implements SensorHandler {
 
     @Override
     public Mono<SensorData> handleIncomingData(String jsonData) {
-        if (isEsp01Available) {
-            if (!isFirstValuePublished) {
-                sendDiscoveryMessage();
-                isFirstValuePublished = true;
-            }
-
-            mqttPublisher.publish(haProperties.getEsp01().getStateTopic(), jsonData);
-
-            return sensorService.saveIncomingData(getType(), jsonData);
+        if (!isFirstValuePublished) {
+            mqttPublisher.publish(haProperties.getEsp01().getAvailabilityTopic(), "online");
+            mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
+            logger.debug("Availability messages for HA have been sent");
+            sendDiscoveryMessage();
+            isFirstValuePublished = true;
         }
-        return Mono.empty();
+        try {
+            String transformedForHAJson = transformForHA(jsonData);
+            mqttPublisher.publish(haProperties.getEsp01().getStateTopic(), transformedForHAJson);
+            logger.debug("Published to state topic: {}", transformedForHAJson);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+
+        return sensorService.saveIncomingData(getType(), jsonData);
     }
 
     @Override
@@ -63,9 +69,7 @@ public class Esp01SensorHandler implements SensorHandler {
                 .map(msg -> new String(msg.getBody()))
                 .doOnNext(body -> {
                     logger.debug("Received ESP-01 availability message: {}", body);
-                    if (body.equals("online")) {
-                        isEsp01Available = true;
-                    } else {
+                    if (body.equals("offline")) {
                         mqttPublisher.publish(haProperties.getEsp01().getAvailabilityTopic(), "offline");
                     }
                 })
@@ -102,7 +106,7 @@ public class Esp01SensorHandler implements SensorHandler {
                 .add(objectMapper.createObjectNode().put("t", haProperties.getEsp01().getAvailabilityTopic()));
         putDeviceNode(humidityDiscovery);
 
-        mqttPublisher.publish(haProperties.getEsp01().getDiscoveryTempTopic(), humidityDiscovery.toString());
+        mqttPublisher.publish(haProperties.getEsp01().getDiscoveryHumTopic(), humidityDiscovery.toString());
 
         logger.debug("ESP-01 discovery messages sent");
     }
@@ -115,6 +119,18 @@ public class Esp01SensorHandler implements SensorHandler {
         device.put("mdl", "Model 1");
         device.put("hw", "1.0");
         device.put("sw", "1.0");
+    }
+
+    private String transformForHA(String jsonData) throws JsonProcessingException {
+        JsonNode root = objectMapper.readTree(jsonData);
+
+        JsonNode measurements = root.path("measurements");
+
+        ObjectNode newJson = objectMapper.createObjectNode();
+        newJson.set("temperature", measurements.get("temperature"));
+        newJson.set("humidity", measurements.get("humidity"));
+
+        return objectMapper.writeValueAsString(newJson);
     }
 
     @Override

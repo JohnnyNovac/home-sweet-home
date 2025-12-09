@@ -8,6 +8,7 @@ public class NodeMCUHAConfig {
     private String availabilityTopic;
     private String stateTopic;
     private String discoveryPresenceTopic;
+    private String discoveryLampStateTopic;
 
     public String getAvailabilityTopic() {
         return availabilityTopic;
@@ -33,4 +34,11 @@ public class NodeMCUHAConfig {
         this.discoveryPresenceTopic = discoveryPresenceTopic;
     }
 
+    public String getDiscoveryLampStateTopic() {
+        return discoveryLampStateTopic;
+    }
+
+    public void setDiscoveryLampStateTopic(String discoveryLampStateTopic) {
+        this.discoveryLampStateTopic = discoveryLampStateTopic;
+    }
 }
