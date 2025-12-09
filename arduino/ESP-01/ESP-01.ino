@@ -143,12 +143,15 @@ void loop() {
   server.handleClient();
   ArduinoOTA.handle();
 
-  if (Serial.available()) {
-    String cmd = Serial.readStringUntil('\n');
-    cmd.trim();
-    if (cmd == "RESET") {
-      ESP.restart(); // software reset of ESP
-    }
+  if (!Serial.available()) return;
+
+  String receivedData = Serial.readStringUntil('\n');  // Читаем до символа \n    // log(receivedData);
+  Serial.println(receivedData);
+  log("Received data: " + receivedData);
+
+  receivedData.trim();
+  if (receivedData == "RESET") {
+    ESP.restart();  // software reset of ESP
   }
 
   if (!mqttClient.connected()) {
@@ -158,12 +161,6 @@ void loop() {
     }
   }
 
-  if (!Serial.available()) return;
-
-  String receivedData = Serial.readStringUntil('\n');  // Читаем до символа \n    // log(receivedData);
-  Serial.println(receivedData);
-  log("Received data: " + receivedData);
-  
   int commaIndex = receivedData.indexOf(',');
   if (commaIndex > 0) {
     float temperature = receivedData.substring(0, commaIndex).toFloat();

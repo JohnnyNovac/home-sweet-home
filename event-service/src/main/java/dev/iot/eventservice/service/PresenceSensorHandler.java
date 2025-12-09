@@ -1,5 +1,7 @@
 package dev.iot.eventservice.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.iot.eventservice.config.HAConfigProperties;
@@ -10,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.rabbitmq.Receiver;
+
 
 @Service
 public class PresenceSensorHandler implements SensorHandler {
@@ -24,7 +27,6 @@ public class PresenceSensorHandler implements SensorHandler {
     private final ObjectMapper objectMapper;
 
     private boolean isFirstValuePublished = false;
-    private boolean isNodeMCUAvailable = false;
 
     public PresenceSensorHandler(
             Receiver receiver,
@@ -44,17 +46,23 @@ public class PresenceSensorHandler implements SensorHandler {
 
     @Override
     public Mono<SensorData> handleIncomingData(String jsonData) {
-        if (isNodeMCUAvailable) {
-            if (!isFirstValuePublished) {
-                sendDiscoveryMessage();
-                isFirstValuePublished = true;
-            }
-
-            mqttPublisher.publish(haProperties.getNodemcu().getStateTopic(), jsonData);
-
-            return sensorService.saveIncomingData(getType(), jsonData);
+        if (!isFirstValuePublished) {
+            mqttPublisher.publish(haProperties.getNodemcu().getAvailabilityTopic(), "online");
+            mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
+            logger.debug("Availability messages for HA have been sent");
+            sendDiscoveryMessage();
+            isFirstValuePublished = true;
         }
-        return Mono.empty();
+
+        try {
+            String transformedForHAJson = transformForHA(jsonData);
+            mqttPublisher.publish(haProperties.getNodemcu().getStateTopic(), transformedForHAJson);
+            logger.debug("Published to state topic: {}", transformedForHAJson);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+
+        return sensorService.saveIncomingData(getType(), jsonData);
     }
 
     @Override
@@ -63,9 +71,7 @@ public class PresenceSensorHandler implements SensorHandler {
                 .map(msg -> new String(msg.getBody()))
                 .doOnNext(body -> {
                     logger.debug("Received NodeMCU availability message: {}", body);
-                    if (body.equals("online")) {
-                        isNodeMCUAvailable = true;
-                    } else {
+                    if (body.equals("offline")) {
                         mqttPublisher.publish(haProperties.getNodemcu().getAvailabilityTopic(), "offline");
                     }
                 })
@@ -77,6 +83,7 @@ public class PresenceSensorHandler implements SensorHandler {
         ObjectNode presenceDiscovery = objectMapper.createObjectNode();
         presenceDiscovery.put("dev_cla", "motion");
         presenceDiscovery.put("stat_t", haProperties.getNodemcu().getStateTopic());
+        presenceDiscovery.put("val_tpl", "{{ value_json.presence }}");
         presenceDiscovery.put("uniq_id", "nodemcu_presence");
         presenceDiscovery.put("exp_aft", haProperties.getExpireAfter());
 
@@ -87,17 +94,50 @@ public class PresenceSensorHandler implements SensorHandler {
 
         mqttPublisher.publish(haProperties.getNodemcu().getDiscoveryPresenceTopic(), presenceDiscovery.toString());
 
+        ObjectNode lampStateDiscovery = objectMapper.createObjectNode();
+        lampStateDiscovery.put("dev_cla", "motion");
+        lampStateDiscovery.put("stat_t", haProperties.getNodemcu().getStateTopic());
+        lampStateDiscovery.put("val_tpl", "{{ value_json.lampState }}");
+        lampStateDiscovery.put("uniq_id", "nodemcu_lamp_state");
+        lampStateDiscovery.put("exp_aft", haProperties.getExpireAfter());
+
+        lampStateDiscovery.putArray("avty")
+                .add(objectMapper.createObjectNode().put("t", haProperties.getServiceAvailabilityTopic()))
+                .add(objectMapper.createObjectNode().put("t", haProperties.getNodemcu().getAvailabilityTopic()));
+        putDeviceNode(lampStateDiscovery);
+
+        mqttPublisher.publish(haProperties.getNodemcu().getDiscoveryLampStateTopic(), lampStateDiscovery.toString());
+
         logger.debug("Presence sensor discovery messages sent");
     }
 
-    private void putDeviceNode(ObjectNode temperatureDiscovery) {
-        ObjectNode device = temperatureDiscovery.putObject("device");
+    private void putDeviceNode(ObjectNode presenceDiscovery) {
+        ObjectNode device = presenceDiscovery.putObject("device");
         device.putArray("identifiers").add("nodemcu");
         device.put("name", getType());
         device.put("mf", "My Company");
         device.put("mdl", "Model 1");
         device.put("hw", "1.0");
         device.put("sw", "1.0");
+    }
+
+    private String transformForHA(String jsonData) throws JsonProcessingException {
+        JsonNode root = objectMapper.readTree(jsonData);
+
+        JsonNode measurements = root.path("measurements");
+
+        boolean radar = measurements.path("radarPresence").asBoolean(false);
+        boolean pir = measurements.path("pirSensorPresence").asBoolean(false);
+        String presence = radar || pir ? "ON" : "OFF";
+
+        boolean lampState = measurements.path("lampState").asBoolean(false);
+        String lampStateValue = lampState ? "ON" : "OFF";
+
+        ObjectNode newJson = objectMapper.createObjectNode();
+        newJson.put("presence", presence);
+        newJson.put("lampState", lampStateValue);
+
+        return objectMapper.writeValueAsString(newJson);
     }
 
     @Override
