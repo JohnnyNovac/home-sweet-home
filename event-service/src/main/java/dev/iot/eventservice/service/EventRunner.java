@@ -9,7 +9,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import reactor.rabbitmq.Receiver;
-import utils.JsonDtoParser;
+import dev.iot.shared.utils.JsonDtoParser;
 
 @Component
 public class EventRunner implements CommandLineRunner {
@@ -55,7 +55,14 @@ public class EventRunner implements CommandLineRunner {
                     }
 
                     String sensorId = JsonDtoParser.parseSensorId(json);
-                    return sensorHandlerFactory.getHandler(sensorId).handleIncomingData(json);
+                    SensorHandler handler = sensorHandlerFactory.getHandler(sensorId);
+
+                    if (handler == null) {
+                        logger.warn("No handler found for sensorId: {}", sensorId);
+                        return Mono.empty(); // just skipping
+                    }
+
+                    return handler.handleIncomingData(json);
                 })
                 .subscribe();
     }

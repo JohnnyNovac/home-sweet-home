@@ -6,7 +6,6 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,7 +26,6 @@ public class MqttConfig {
     @Value("${spring.rabbitmq.password}")
     private String pass;
 
-    @Autowired
     public MqttConfig(HAConfigProperties haTopics) {
         this.haTopics = haTopics;
     }

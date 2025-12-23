@@ -1,14 +1,11 @@
 package dev.iot.eventservice.service;
 
+import dev.iot.eventservice.exception.MqttPublisherException;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public record MqttPublisher(MqttClient client) implements AutoCloseable {
-
-    private static final Logger logger = LoggerFactory.getLogger(MqttPublisher.class);
 
     public void publish(String topic, String payload) {
         try {
@@ -16,7 +13,7 @@ public record MqttPublisher(MqttClient client) implements AutoCloseable {
             message.setQos(1);
             client.publish(topic, message);
         } catch (MqttException e) {
-            logger.error("Failed to publish MQTT message due to exception", e);
+            throw new MqttPublisherException("Failed to publish MQTT message to topic=" + topic, e);
         }
     }
 
