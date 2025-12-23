@@ -1,4 +1,4 @@
-package utils;
+package dev.iot.shared.utils;
 
 import java.util.Map;
 
@@ -12,6 +12,7 @@ public class Units {
     );
 
     public static String getUnit(String type) {
+        if (type == null) return "unknown";
         return UNITS.getOrDefault(type, "unknown");
     }
 }

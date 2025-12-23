@@ -1,5 +1,6 @@
-package utils;
+package dev.iot.shared.utils;
 
+import dev.iot.shared.dto.EventDTO;
 import dev.iot.shared.dto.MeasurementDTO;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -16,10 +17,12 @@ public class JsonDtoParser {
         return root.get("sensorId").asString();
     }
 
-    public static List<MeasurementDTO> parseMeasurements(String jsonData) {
-        List<MeasurementDTO> measurementDTOs = new ArrayList<>();
+    public static EventDTO parseJson(String jsonData) {
 
         JsonNode root = objectMapper.readTree(jsonData);
+        String sensorId = root.get("sensorId").asString();
+
+        List<MeasurementDTO> measurementDTOs = new ArrayList<>();
         JsonNode measurementsNode = root.get("measurements");
 
         measurementsNode.properties().forEach(entry -> {
@@ -33,6 +36,8 @@ public class JsonDtoParser {
                 value = valueNode.numberValue();
             } else if (valueNode.isString()) {
                 value = valueNode.stringValue();
+            } else if (valueNode.isNull()) {
+                value = null;
             } else {
                 value = valueNode.toString();
             }
@@ -40,7 +45,7 @@ public class JsonDtoParser {
             measurementDTOs.add(new MeasurementDTO(type, value));
         });
 
-        return measurementDTOs;
+        return new EventDTO(sensorId, measurementDTOs);
     }
 
 

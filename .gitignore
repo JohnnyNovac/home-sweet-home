@@ -1,4 +1,5 @@
 secrets.h
+*.lck
 .env
 application-local.properties
 

@@ -46,23 +46,22 @@ public class PresenceSensorHandler implements SensorHandler {
 
     @Override
     public Mono<SensorData> handleIncomingData(String jsonData) {
-        if (!isFirstValuePublished) {
-            mqttPublisher.publish(haProperties.getNodemcu().getAvailabilityTopic(), "online");
-            mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
-            logger.debug("Availability messages for HA have been sent");
-            sendDiscoveryMessage();
-            isFirstValuePublished = true;
-        }
+        return Mono.fromCallable(() -> {
+                    validateJsonFormat(jsonData);
 
-        try {
-            String transformedForHAJson = transformForHA(jsonData);
-            mqttPublisher.publish(haProperties.getNodemcu().getStateTopic(), transformedForHAJson);
-            logger.debug("Published to state topic: {}", transformedForHAJson);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+                    if (!isFirstValuePublished) {
+                        mqttPublisher.publish(haProperties.getNodemcu().getAvailabilityTopic(), "online");
+                        mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
+                        logger.debug("Availability messages for HA have been sent");
+                        sendDiscoveryMessage();
+                        isFirstValuePublished = true;
+                    }
 
-        return sensorService.saveIncomingData(getType(), jsonData);
+                    sendDataToHA(jsonData);
+
+                    return jsonData;
+                })
+                .flatMap(sensorService::saveIncomingData);
     }
 
     @Override
@@ -119,6 +118,25 @@ public class PresenceSensorHandler implements SensorHandler {
         device.put("mdl", "Model 1");
         device.put("hw", "1.0");
         device.put("sw", "1.0");
+    }
+
+    private void validateJsonFormat(String jsonData) {
+        try {
+            JsonNode root = objectMapper.readTree(jsonData);
+            JsonNode measurements = root.path("measurements");
+
+            if (!measurements.has("radarPresence") || !measurements.has("pirSensorPresence") || !measurements.has("lampState")) {
+                throw new IllegalArgumentException("NodeMCU requires radarPresence, pirSensorPresence and lampState measurements");
+            }
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Invalid JSON format", e);
+        }
+    }
+
+    private void sendDataToHA(String jsonData) throws JsonProcessingException {
+        String transformedForHAJson = transformForHA(jsonData);
+        mqttPublisher.publish(haProperties.getNodemcu().getStateTopic(), transformedForHAJson);
+        logger.debug("Published to state topic: {}", transformedForHAJson);
     }
 
     private String transformForHA(String jsonData) throws JsonProcessingException {

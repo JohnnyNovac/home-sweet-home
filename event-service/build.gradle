@@ -21,6 +21,10 @@ ext {
     set('springCloudVersion', "2025.0.0")
 }
 
+configurations {
+    mockitoAgent
+}
+
 dependencies {
     implementation 'dev.iot:shared:0.0.1-SNAPSHOT'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
@@ -30,7 +34,10 @@ dependencies {
     implementation 'io.projectreactor.rabbitmq:reactor-rabbitmq:1.5.6'
     implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.projectreactor:reactor-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    mockitoAgent('org.mockito:mockito-core') { transitive = false }
 }
 
 dependencyManagement {
@@ -41,4 +48,6 @@ dependencyManagement {
 
 tasks.named('test') {
     useJUnitPlatform()
+
+    jvmArgs += "-javaagent:${configurations.mockitoAgent.asPath}"
 }

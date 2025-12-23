@@ -3,7 +3,7 @@ package dev.iot.eventservice.mapper;
 import dev.iot.eventservice.model.Measurement;
 import dev.iot.shared.dto.MeasurementDTO;
 import org.springframework.stereotype.Component;
-import utils.Units;
+import dev.iot.shared.utils.Units;
 
 @Component
 public class MeasurementMapper {

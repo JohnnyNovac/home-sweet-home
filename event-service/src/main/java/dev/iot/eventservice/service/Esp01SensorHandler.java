@@ -45,22 +45,22 @@ public class Esp01SensorHandler implements SensorHandler {
 
     @Override
     public Mono<SensorData> handleIncomingData(String jsonData) {
-        if (!isFirstValuePublished) {
-            mqttPublisher.publish(haProperties.getEsp01().getAvailabilityTopic(), "online");
-            mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
-            logger.debug("Availability messages for HA have been sent");
-            sendDiscoveryMessage();
-            isFirstValuePublished = true;
-        }
-        try {
-            String transformedForHAJson = transformForHA(jsonData);
-            mqttPublisher.publish(haProperties.getEsp01().getStateTopic(), transformedForHAJson);
-            logger.debug("Published to state topic: {}", transformedForHAJson);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+        return Mono.fromCallable(() -> {
+                    validateJsonFormat(jsonData);
 
-        return sensorService.saveIncomingData(getType(), jsonData);
+                    if (!isFirstValuePublished) {
+                        mqttPublisher.publish(haProperties.getEsp01().getAvailabilityTopic(), "online");
+                        mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
+                        logger.debug("Availability messages for HA have been sent");
+                        sendDiscoveryMessage();
+                        isFirstValuePublished = true;
+                    }
+
+                    sendDataToHA(jsonData);
+
+                    return jsonData;
+                })
+                .flatMap(data -> sensorService.saveIncomingData(jsonData));
     }
 
     @Override
@@ -119,6 +119,25 @@ public class Esp01SensorHandler implements SensorHandler {
         device.put("mdl", "Model 1");
         device.put("hw", "1.0");
         device.put("sw", "1.0");
+    }
+
+    private void validateJsonFormat(String jsonData) {
+        try {
+            JsonNode root = objectMapper.readTree(jsonData);
+            JsonNode measurements = root.path("measurements");
+
+            if (!measurements.has("temperature") || !measurements.has("humidity")) {
+                throw new IllegalArgumentException("ESP-01 requires temperature and humidity measurements");
+            }
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Invalid JSON format", e);
+        }
+    }
+
+    private void sendDataToHA(String jsonData) throws JsonProcessingException {
+        String transformedJson = transformForHA(jsonData);
+        mqttPublisher.publish(haProperties.getEsp01().getStateTopic(), transformedJson);
+        logger.debug("Published to state topic: {}", transformedJson);
     }
 
     private String transformForHA(String jsonData) throws JsonProcessingException {
