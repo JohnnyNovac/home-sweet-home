@@ -21,7 +21,7 @@ public class PresenceSensorHandler implements SensorHandler {
 
     private final Receiver receiver;
     private final RabbitMQConfigProperties rabbitMQProperties;
-    private final SensorService sensorService;
+    private final SensorDataService sensorDataService;
     private final MqttPublisher mqttPublisher;
     private final HAConfigProperties haProperties;
     private final ObjectMapper objectMapper;
@@ -31,14 +31,14 @@ public class PresenceSensorHandler implements SensorHandler {
     public PresenceSensorHandler(
             Receiver receiver,
             RabbitMQConfigProperties rabbitMQProperties,
-            SensorService sensorService,
+            SensorDataService sensorDataService,
             MqttPublisher mqttPublisher,
             HAConfigProperties haProperties,
             ObjectMapper objectMapper
     ) {
         this.receiver = receiver;
         this.rabbitMQProperties = rabbitMQProperties;
-        this.sensorService = sensorService;
+        this.sensorDataService = sensorDataService;
         this.mqttPublisher = mqttPublisher;
         this.haProperties = haProperties;
         this.objectMapper = objectMapper;
@@ -61,7 +61,7 @@ public class PresenceSensorHandler implements SensorHandler {
 
                     return jsonData;
                 })
-                .flatMap(sensorService::saveIncomingData);
+                .flatMap(sensorDataService::saveIncomingData);
     }
 
     @Override

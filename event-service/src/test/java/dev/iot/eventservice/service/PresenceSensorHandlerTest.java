@@ -33,14 +33,19 @@ class PresenceSensorHandlerTest {
 
     @Mock
     private Receiver receiver;
+
     @Mock
     private RabbitMQConfigProperties rabbitMQProperties;
+
     @Mock
-    private SensorService sensorService;
+    private SensorDataService sensorDataService;
+
     @Mock
     private MqttPublisher mqttPublisher;
+
     @Mock
     private HAConfigProperties haProperties;
+
     @Mock
     private NodeMCUHAConfig nodeMCUHAConfig;
 
@@ -49,7 +54,7 @@ class PresenceSensorHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new PresenceSensorHandler(receiver, rabbitMQProperties, sensorService,
+        handler = new PresenceSensorHandler(receiver, rabbitMQProperties, sensorDataService,
                 mqttPublisher, haProperties, objectMapper);
     }
 
@@ -68,7 +73,7 @@ class PresenceSensorHandlerTest {
                 """;
 
         SensorData expectedData = new SensorData("NodeMCU", null, List.of());
-        when(sensorService.saveIncomingData(jsonData))
+        when(sensorDataService.saveIncomingData(jsonData))
                 .thenReturn(Mono.just(expectedData));
 
         when(haProperties.getNodemcu()).thenReturn(nodeMCUHAConfig);

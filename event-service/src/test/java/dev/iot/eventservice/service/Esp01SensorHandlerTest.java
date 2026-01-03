@@ -33,14 +33,19 @@ class Esp01SensorHandlerTest {
 
     @Mock
     private Receiver receiver;
+
     @Mock
     private RabbitMQConfigProperties rabbitMQProperties;
+
     @Mock
-    private SensorService sensorService;
+    private SensorDataService sensorDataService;
+
     @Mock
     private MqttPublisher mqttPublisher;
+
     @Mock
     private HAConfigProperties haProperties;
+
     @Mock
     private Esp01HAConfig esp01HAConfig;
 
@@ -49,7 +54,7 @@ class Esp01SensorHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new Esp01SensorHandler(receiver, rabbitMQProperties, sensorService,
+        handler = new Esp01SensorHandler(receiver, rabbitMQProperties, sensorDataService,
                 mqttPublisher, haProperties, objectMapper);
     }
 
@@ -67,7 +72,7 @@ class Esp01SensorHandlerTest {
                 """;
 
         SensorData expectedData = new SensorData("ESP-01", null, List.of());
-        when(sensorService.saveIncomingData(jsonData))
+        when(sensorDataService.saveIncomingData(jsonData))
                 .thenReturn(Mono.just(expectedData));
 
         when(haProperties.getEsp01()).thenReturn(esp01HAConfig);

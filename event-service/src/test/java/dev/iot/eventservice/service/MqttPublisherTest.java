@@ -4,11 +4,11 @@ import dev.iot.eventservice.exception.MqttPublisherException;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -23,12 +23,8 @@ class MqttPublisherTest {
     @Mock
     private MqttClient mqttClient;
 
+    @InjectMocks
     private MqttPublisher mqttPublisher;
-
-    @BeforeEach
-    void setUp() {
-        mqttPublisher = new MqttPublisher(mqttClient);
-    }
 
     @Test
     @DisplayName("Should publish MQTT message")

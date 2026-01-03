@@ -3,7 +3,7 @@ package dev.iot.eventservice.service;
 import dev.iot.eventservice.model.SensorData;
 import reactor.core.publisher.Mono;
 
-public interface SensorService {
+public interface SensorDataService {
 
     /**
      * Сохраняет полученные от сенсора данные в MongoDB.
