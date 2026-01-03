@@ -20,7 +20,7 @@ public class Esp01SensorHandler implements SensorHandler {
 
     private final Receiver receiver;
     private final RabbitMQConfigProperties rabbitMQProperties;
-    private final SensorService sensorService;
+    private final SensorDataService sensorDataService;
     private final MqttPublisher mqttPublisher;
     private final HAConfigProperties haProperties;
     private final ObjectMapper objectMapper;
@@ -30,14 +30,14 @@ public class Esp01SensorHandler implements SensorHandler {
     public Esp01SensorHandler(
             Receiver receiver,
             RabbitMQConfigProperties rabbitMQProperties,
-            SensorService sensorService,
+            SensorDataService sensorDataService,
             MqttPublisher mqttPublisher,
             HAConfigProperties haProperties,
             ObjectMapper objectMapper
     ) {
         this.receiver = receiver;
         this.rabbitMQProperties = rabbitMQProperties;
-        this.sensorService = sensorService;
+        this.sensorDataService = sensorDataService;
         this.mqttPublisher = mqttPublisher;
         this.haProperties = haProperties;
         this.objectMapper = objectMapper;
@@ -60,7 +60,7 @@ public class Esp01SensorHandler implements SensorHandler {
 
                     return jsonData;
                 })
-                .flatMap(data -> sensorService.saveIncomingData(jsonData));
+                .flatMap(data -> sensorDataService.saveIncomingData(jsonData));
     }
 
     @Override

@@ -19,7 +19,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class SensorServiceImplTest {
+class SensorDataServiceImplTest {
 
     @Mock
     private SensorDataRepository repository;
@@ -27,11 +27,11 @@ class SensorServiceImplTest {
     @Mock
     private SensorDataMapper sensorDataMapper;
 
-    private SensorServiceImpl sensorService;
+    private SensorDataServiceImpl sensorService;
 
     @BeforeEach
     void setUp() {
-        sensorService = new SensorServiceImpl(repository, sensorDataMapper);
+        sensorService = new SensorDataServiceImpl(repository, sensorDataMapper);
     }
 
     @Test

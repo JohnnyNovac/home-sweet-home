@@ -1,11 +1,10 @@
 package dev.iot.eventservice.integration;
 
-import dev.iot.eventservice.service.SensorService;
+import dev.iot.eventservice.service.SensorDataService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -17,8 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Testcontainers
-@ActiveProfiles("test")
-class SensorServiceIntegrationTest {
+class SensorDataServiceIntegrationTest {
 
     @SuppressWarnings("resource")
     @Container
@@ -31,11 +29,11 @@ class SensorServiceIntegrationTest {
         registry.add("spring.data.mongodb.port", mongoDBContainer::getFirstMappedPort);
     }
 
-    private final SensorService sensorService;
+    private final SensorDataService sensorDataService;
 
     @Autowired
-    public SensorServiceIntegrationTest(SensorService sensorService) {
-        this.sensorService = sensorService;
+    public SensorDataServiceIntegrationTest(SensorDataService sensorDataService) {
+        this.sensorDataService = sensorDataService;
     }
 
     @Test
@@ -52,7 +50,7 @@ class SensorServiceIntegrationTest {
                 }
                 """;
 
-        StepVerifier.create(sensorService.saveIncomingData(jsonData))
+        StepVerifier.create(sensorDataService.saveIncomingData(jsonData))
                 .assertNext(savedData -> {
                     assertThat(savedData.getSensorId()).isEqualTo(sensorId);
                     assertThat(savedData.getMeasurements()).hasSize(2);

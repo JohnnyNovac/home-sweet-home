@@ -9,12 +9,12 @@ import reactor.core.publisher.Mono;
 import dev.iot.shared.utils.JsonDtoParser;
 
 @Service
-public class SensorServiceImpl implements SensorService {
+public class SensorDataServiceImpl implements SensorDataService {
 
     private final SensorDataRepository repository;
     private final SensorDataMapper sensorDataMapper;
 
-    public SensorServiceImpl(
+    public SensorDataServiceImpl(
             SensorDataRepository repository,
             SensorDataMapper sensorDataMapper
     ) {

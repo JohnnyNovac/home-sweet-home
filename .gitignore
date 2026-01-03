@@ -8,6 +8,9 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
+!/.idea/copilot.data.migration.agent.xml
+!/.idea/copilot.data.migration.ask2agent.xml
+!/.idea/copilot.data.migration.edit.xml
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
