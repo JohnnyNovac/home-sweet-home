@@ -11,6 +11,8 @@ import reactor.core.publisher.Mono;
 import reactor.rabbitmq.Receiver;
 import dev.iot.shared.utils.JsonDtoParser;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 @Component
 public class EventRunner implements CommandLineRunner {
 
@@ -22,7 +24,7 @@ public class EventRunner implements CommandLineRunner {
     private final HAConfigProperties haProperties;
     private final SensorHandlerFactory sensorHandlerFactory;
 
-    private boolean isHAOnlineStatusReceived = false;
+    private final AtomicBoolean isHAOnlineStatusReceived = new AtomicBoolean(false);
 
     public EventRunner(Receiver receiver,
                        RabbitMQConfigProperties properties,
@@ -49,7 +51,7 @@ public class EventRunner implements CommandLineRunner {
                 .map(msg -> new String(msg.getBody()))
 //                .doOnNext(System.out::println)
                 .flatMap(json -> {
-                    if (!isHAOnlineStatusReceived) {
+                    if (!isHAOnlineStatusReceived.get()) {
                         logger.debug("Home Assistant offline - skipping");
                         return Mono.empty();
                     }
@@ -71,8 +73,9 @@ public class EventRunner implements CommandLineRunner {
         mqttPublisher.client().subscribe(haProperties.getStatusTopic(), (topic, message) -> {
             String status = new String(message.getPayload());
             logger.debug("Received Home Assistant status: {}", status);
-            isHAOnlineStatusReceived = "online".equals(status);
-            if (isHAOnlineStatusReceived) {
+            boolean isHAOnline = "online".equals(status);
+            isHAOnlineStatusReceived.set(isHAOnline);
+            if (isHAOnline) {
                 sensorHandlerFactory.getHandlers().forEach(SensorHandler::sendDiscoveryMessage);
             }
         });
