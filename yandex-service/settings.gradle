@@ -1,0 +1,3 @@
+rootProject.name = 'yandex-service'
+
+includeBuild '../grpc-api'
