@@ -1,3 +1,4 @@
 rootProject.name = 'presence-service'
 
 includeBuild '../shared'
+includeBuild '../grpc-api'

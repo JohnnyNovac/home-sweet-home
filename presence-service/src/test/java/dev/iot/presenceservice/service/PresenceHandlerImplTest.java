@@ -1,22 +1,47 @@
 package dev.iot.presenceservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.iot.presenceservice.config.MeasurementsProperties;
 import dev.iot.shared.dto.MeasurementDTO;
+import io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import reactor.test.StepVerifier;
+import yandex.Yandex;
+import yandex.YandexServiceGrpc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 
 class PresenceHandlerImplTest {
 
     private PresenceHandlerImpl presenceHandler;
 
+    @Mock
+    private YandexServiceGrpc.YandexServiceStub yandexServiceStub;
+
+    @Mock
+    private MeasurementsProperties measurementsProperties;
+
     @BeforeEach
     void setUp() {
-        presenceHandler = new PresenceHandlerImpl(new ObjectMapper());
+        MockitoAnnotations.openMocks(this);
+        when(measurementsProperties.getLampState().getName()).thenReturn("lampState");
+        when(measurementsProperties.getRadarPresence().getName()).thenReturn("radarPresence");
+        when(measurementsProperties.getPirSensorPresence().getName()).thenReturn("pirSensorPresence");
+        doAnswer(invocation -> {
+            StreamObserver<Yandex.TurnOnOffLampResponse> observer = invocation.getArgument(1);
+            observer.onNext(Yandex.TurnOnOffLampResponse.getDefaultInstance());
+            observer.onCompleted();
+            return null;
+        }).when(yandexServiceStub).turnOnOffLamp(any(), any());
+        presenceHandler = new PresenceHandlerImpl(new ObjectMapper(), yandexServiceStub, measurementsProperties);
     }
 
     @Test

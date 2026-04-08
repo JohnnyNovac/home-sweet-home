@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package yandex;
+
+message TurnOnOffLampRequest {
+  bool turnOn = 1;
+}
+
+message TurnOnOffLampResponse {
+  string status = 1;
+}
+
+service YandexService {
+  rpc TurnOnOffLamp(TurnOnOffLampRequest) returns (TurnOnOffLampResponse);
+}

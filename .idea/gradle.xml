@@ -17,6 +17,11 @@
                   <project path="$PROJECT_DIR$/event-service" />
                 </projects>
               </build>
+              <build path="$PROJECT_DIR$/grpc-api" name="grpc-api">
+                <projects>
+                  <project path="$PROJECT_DIR$/grpc-api" />
+                </projects>
+              </build>
               <build path="$PROJECT_DIR$/presence-service" name="presence-service">
                 <projects>
                   <project path="$PROJECT_DIR$/presence-service" />
@@ -25,6 +30,11 @@
               <build path="$PROJECT_DIR$/shared" name="shared">
                 <projects>
                   <project path="$PROJECT_DIR$/shared" />
+                </projects>
+              </build>
+              <build path="$PROJECT_DIR$/yandex-service" name="yandex-service">
+                <projects>
+                  <project path="$PROJECT_DIR$/yandex-service" />
                 </projects>
               </build>
             </builds>
@@ -36,8 +46,10 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/eureka-server" />
             <option value="$PROJECT_DIR$/event-service" />
+            <option value="$PROJECT_DIR$/grpc-api" />
             <option value="$PROJECT_DIR$/presence-service" />
             <option value="$PROJECT_DIR$/shared" />
+            <option value="$PROJECT_DIR$/yandex-service" />
           </set>
         </option>
       </GradleProjectSettings>
@@ -70,9 +82,22 @@
         </option>
       </GradleProjectSettings>
       <GradleProjectSettings>
+        <option name="externalProjectPath" value="$PROJECT_DIR$/grpc-api" />
+        <option name="modules">
+          <set>
+            <option value="$PROJECT_DIR$/grpc-api" />
+          </set>
+        </option>
+      </GradleProjectSettings>
+      <GradleProjectSettings>
         <compositeConfiguration>
           <compositeBuild compositeDefinitionSource="SCRIPT">
             <builds>
+              <build path="$PROJECT_DIR$/grpc-api" name="grpc-api">
+                <projects>
+                  <project path="$PROJECT_DIR$/grpc-api" />
+                </projects>
+              </build>
               <build path="$PROJECT_DIR$/shared" name="shared">
                 <projects>
                   <project path="$PROJECT_DIR$/shared" />
@@ -84,6 +109,7 @@
         <option name="externalProjectPath" value="$PROJECT_DIR$/presence-service" />
         <option name="modules">
           <set>
+            <option value="$PROJECT_DIR$/grpc-api" />
             <option value="$PROJECT_DIR$/presence-service" />
             <option value="$PROJECT_DIR$/shared" />
           </set>
