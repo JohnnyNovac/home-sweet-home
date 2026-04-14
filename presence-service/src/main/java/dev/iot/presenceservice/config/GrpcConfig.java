@@ -9,8 +9,7 @@ import yandex.YandexServiceGrpc;
 public class GrpcConfig {
 
     @Bean
-    public YandexServiceGrpc.YandexServiceStub yandexServiceStub(GrpcChannelFactory channels) {
-        return YandexServiceGrpc.newStub(channels.createChannel("default"));
+    public YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub(GrpcChannelFactory channels) {
+        return YandexServiceGrpc.newBlockingV2Stub(channels.createChannel("yandex-service"));
     }
-
 }

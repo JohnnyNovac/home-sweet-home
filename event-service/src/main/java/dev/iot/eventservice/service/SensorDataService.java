@@ -12,5 +12,4 @@ public interface SensorDataService {
      * @return {@link Mono} с сохранённой сущностью {@link SensorData}
      */
     Mono<SensorData> saveIncomingData(String jsonData);
-
 }

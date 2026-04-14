@@ -4,9 +4,9 @@ import dev.iot.eventservice.mapper.SensorDataMapper;
 import dev.iot.eventservice.model.SensorData;
 import dev.iot.eventservice.repository.SensorDataRepository;
 import dev.iot.shared.dto.EventDTO;
+import dev.iot.shared.utils.JsonDtoParser;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
-import dev.iot.shared.utils.JsonDtoParser;
 
 @Service
 public class SensorDataServiceImpl implements SensorDataService {
@@ -27,5 +27,4 @@ public class SensorDataServiceImpl implements SensorDataService {
         EventDTO eventDTO = JsonDtoParser.parseJson(jsonData);
         return repository.save(sensorDataMapper.toDocument(eventDTO));
     }
-
 }

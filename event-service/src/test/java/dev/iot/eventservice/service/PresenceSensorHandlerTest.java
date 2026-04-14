@@ -2,9 +2,7 @@ package dev.iot.eventservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.iot.eventservice.config.HAConfigProperties;
-import dev.iot.eventservice.config.NodeMCUConfig;
 import dev.iot.eventservice.config.NodeMCUHAConfig;
-import dev.iot.eventservice.config.RabbitMQConfigProperties;
 import dev.iot.eventservice.model.SensorData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,30 +10,23 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.rabbitmq.Receiver;
-import reactor.test.StepVerifier;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PresenceSensorHandlerTest {
 
-    private static final String AVAILABILITY_TOPIC = "homeassistant/sensor/esp01/availability";
-    private static final String STATE_TOPIC = "homeassistant/sensor/esp01/state";
+    private static final String AVAILABILITY_TOPIC = "homeassistant/sensor/nodemcu/availability";
+    private static final String STATE_TOPIC = "homeassistant/sensor/nodemcu/state";
     private static final String SERVICE_AVAILABILITY_TOPIC = "homeassistant/event-service/availability";
-
-    @Mock
-    private Receiver receiver;
-
-    @Mock
-    private RabbitMQConfigProperties rabbitMQProperties;
 
     @Mock
     private SensorDataService sensorDataService;
@@ -54,7 +45,7 @@ class PresenceSensorHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new PresenceSensorHandler(receiver, rabbitMQProperties, sensorDataService,
+        handler = new PresenceSensorHandler(sensorDataService,
                 mqttPublisher, haProperties, objectMapper);
     }
 
@@ -81,13 +72,12 @@ class PresenceSensorHandlerTest {
         when(nodeMCUHAConfig.getStateTopic()).thenReturn(STATE_TOPIC);
         when(haProperties.getServiceAvailabilityTopic()).thenReturn(SERVICE_AVAILABILITY_TOPIC);
 
-        StepVerifier.create(handler.handleIncomingData(jsonData))
-                .expectNext(expectedData)
-                .verifyComplete();
+        handler.handleIncomingData(jsonData);
 
         verify(mqttPublisher).publish(eq(AVAILABILITY_TOPIC), eq("online"));
         verify(mqttPublisher).publish(eq(SERVICE_AVAILABILITY_TOPIC), eq("online"));
         verify(mqttPublisher).publish(eq(STATE_TOPIC), any(String.class));
+        verify(sensorDataService).saveIncomingData(jsonData);
     }
 
     @Test
@@ -102,27 +92,13 @@ class PresenceSensorHandlerTest {
                 }
                 """;
 
-        StepVerifier.create(handler.handleIncomingData(invalidJsonData))
-                .expectError(IllegalArgumentException.class)
-                .verify();
+        assertThatThrownBy(() -> handler.handleIncomingData(invalidJsonData))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("Should return correct sensor type")
     void shouldReturnCorrectSensorType() {
         assertThat(handler.getType()).isEqualTo("NodeMCU");
-    }
-
-    @Test
-    @DisplayName("Should subscribe to availability messages")
-    void shouldSubscribeToAvailability() {
-        NodeMCUConfig nodeMCURabbitConfig = mock(NodeMCUConfig.class);
-        when(rabbitMQProperties.getNodemcu()).thenReturn(nodeMCURabbitConfig);
-        when(nodeMCURabbitConfig.getAvailabilityQueue()).thenReturn("homeassistant/binary_sensor/nodemcu/availability");
-        when(receiver.consumeAutoAck("homeassistant/binary_sensor/nodemcu/availability")).thenReturn(Flux.empty());
-
-        handler.subscribeToAvailability();
-
-        verify(receiver).consumeAutoAck("homeassistant/binary_sensor/nodemcu/availability");
     }
 }
