@@ -1,15 +1,13 @@
 package dev.iot.eventservice.service;
 
 import dev.iot.eventservice.config.HAConfigProperties;
-import dev.iot.eventservice.config.RabbitMQConfigProperties;
+import dev.iot.shared.utils.JsonDtoParser;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
-import reactor.rabbitmq.Receiver;
-import dev.iot.shared.utils.JsonDtoParser;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -18,22 +16,17 @@ public class EventRunner implements CommandLineRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(EventRunner.class);
 
-    private final Receiver receiver;
-    private final RabbitMQConfigProperties rabbitMQProperties;
     private final MqttPublisher mqttPublisher;
     private final HAConfigProperties haProperties;
     private final SensorHandlerFactory sensorHandlerFactory;
 
     private final AtomicBoolean isHAOnlineStatusReceived = new AtomicBoolean(false);
 
-    public EventRunner(Receiver receiver,
-                       RabbitMQConfigProperties properties,
-                       MqttPublisher mqttPublisher,
-                       HAConfigProperties haProperties,
-                       SensorHandlerFactory sensorHandlerFactory
+    public EventRunner(
+            MqttPublisher mqttPublisher,
+            HAConfigProperties haProperties,
+            SensorHandlerFactory sensorHandlerFactory
     ) {
-        this.receiver = receiver;
-        this.rabbitMQProperties = properties;
         this.mqttPublisher = mqttPublisher;
         this.haProperties = haProperties;
         this.sensorHandlerFactory = sensorHandlerFactory;
@@ -42,31 +35,24 @@ public class EventRunner implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         subscribeToHAStatus();
-        sensorHandlerFactory.getHandlers().forEach(SensorHandler::subscribeToAvailability);
-        subscribeToEvents();
     }
 
-    private void subscribeToEvents() {
-        receiver.consumeAutoAck(rabbitMQProperties.getEventQueue())
-                .map(msg -> new String(msg.getBody()))
-//                .doOnNext(System.out::println)
-                .flatMap(json -> {
-                    if (!isHAOnlineStatusReceived.get()) {
-                        logger.debug("Home Assistant offline - skipping");
-                        return Mono.empty();
-                    }
+    @RabbitListener(queues = "${app.rabbitmq.event-queue}")
+    public void handleEventMessage(String json) {
+        if (!isHAOnlineStatusReceived.get()) {
+            logger.debug("Home Assistant offline - skipping");
+            return;
+        }
 
-                    String sensorId = JsonDtoParser.parseSensorId(json);
-                    SensorHandler handler = sensorHandlerFactory.getHandler(sensorId);
+        String sensorId = JsonDtoParser.parseSensorId(json);
+        SensorHandler handler = sensorHandlerFactory.getHandler(sensorId);
 
-                    if (handler == null) {
-                        logger.warn("No handler found for sensorId: {}", sensorId);
-                        return Mono.empty(); // just skipping
-                    }
+        if (handler == null) {
+            logger.warn("No handler found for sensorId: {}", sensorId);
+            return;
+        }
 
-                    return handler.handleIncomingData(json);
-                })
-                .subscribe();
+        handler.handleIncomingData(json);
     }
 
     private void subscribeToHAStatus() throws MqttException {
@@ -80,5 +66,4 @@ public class EventRunner implements CommandLineRunner {
             }
         });
     }
-
 }

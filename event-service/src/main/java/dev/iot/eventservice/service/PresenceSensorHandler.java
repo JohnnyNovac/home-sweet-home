@@ -5,13 +5,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.iot.eventservice.config.HAConfigProperties;
-import dev.iot.eventservice.config.RabbitMQConfigProperties;
-import dev.iot.eventservice.model.SensorData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
-import reactor.rabbitmq.Receiver;
 
 
 @Service
@@ -19,8 +16,6 @@ public class PresenceSensorHandler implements SensorHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(PresenceSensorHandler.class);
 
-    private final Receiver receiver;
-    private final RabbitMQConfigProperties rabbitMQProperties;
     private final SensorDataService sensorDataService;
     private final MqttPublisher mqttPublisher;
     private final HAConfigProperties haProperties;
@@ -29,15 +24,11 @@ public class PresenceSensorHandler implements SensorHandler {
     private boolean isFirstValuePublished = false;
 
     public PresenceSensorHandler(
-            Receiver receiver,
-            RabbitMQConfigProperties rabbitMQProperties,
             SensorDataService sensorDataService,
             MqttPublisher mqttPublisher,
             HAConfigProperties haProperties,
             ObjectMapper objectMapper
     ) {
-        this.receiver = receiver;
-        this.rabbitMQProperties = rabbitMQProperties;
         this.sensorDataService = sensorDataService;
         this.mqttPublisher = mqttPublisher;
         this.haProperties = haProperties;
@@ -45,36 +36,28 @@ public class PresenceSensorHandler implements SensorHandler {
     }
 
     @Override
-    public Mono<SensorData> handleIncomingData(String jsonData) {
-        return Mono.fromCallable(() -> {
-                    validateJsonFormat(jsonData);
+    public void handleIncomingData(String jsonData) {
+        validateJsonFormat(jsonData);
 
-                    if (!isFirstValuePublished) {
-                        mqttPublisher.publish(haProperties.getNodemcu().getAvailabilityTopic(), "online");
-                        mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
-                        logger.debug("Availability messages for HA have been sent");
-                        sendDiscoveryMessage();
-                        isFirstValuePublished = true;
-                    }
+        if (!isFirstValuePublished) {
+            mqttPublisher.publish(haProperties.getNodemcu().getAvailabilityTopic(), "online");
+            mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
+            logger.debug("Availability messages for HA have been sent");
+            sendDiscoveryMessage();
+            isFirstValuePublished = true;
+        }
 
-                    sendDataToHA(jsonData);
-
-                    return jsonData;
-                })
-                .flatMap(sensorDataService::saveIncomingData);
+        sendDataToHA(jsonData);
+        sensorDataService.saveIncomingData(jsonData).subscribe(sensorData -> logger.debug("Saved sensor data: {}", sensorData),
+                error -> logger.error("Error saving sensor data", error));
     }
 
-    @Override
-    public void subscribeToAvailability() {
-        receiver.consumeAutoAck(rabbitMQProperties.getNodemcu().getAvailabilityQueue())
-                .map(msg -> new String(msg.getBody()))
-                .doOnNext(body -> {
-                    logger.debug("Received NodeMCU availability message: {}", body);
-                    if (body.equals("offline")) {
-                        mqttPublisher.publish(haProperties.getNodemcu().getAvailabilityTopic(), "offline");
-                    }
-                })
-                .subscribe();
+    @RabbitListener(queues = "${app.rabbitmq.nodemcu.availability-queue}")
+    public void handleAvailabilityMessage(String body) {
+        logger.debug("Received NodeMCU availability message: {}", body);
+        if (body.equals("offline")) {
+            mqttPublisher.publish(haProperties.getNodemcu().getAvailabilityTopic(), "offline");
+        }
     }
 
     @Override
@@ -133,10 +116,14 @@ public class PresenceSensorHandler implements SensorHandler {
         }
     }
 
-    private void sendDataToHA(String jsonData) throws JsonProcessingException {
-        String transformedForHAJson = transformForHA(jsonData);
-        mqttPublisher.publish(haProperties.getNodemcu().getStateTopic(), transformedForHAJson);
-        logger.debug("Published to state topic: {}", transformedForHAJson);
+    private void sendDataToHA(String jsonData) {
+        try {
+            String transformedForHAJson = transformForHA(jsonData);
+            mqttPublisher.publish(haProperties.getNodemcu().getStateTopic(), transformedForHAJson);
+            logger.debug("Published to state topic: {}", transformedForHAJson);
+        } catch (JsonProcessingException e) {
+            logger.error("Failed to serialize data for HA", e);
+        }
     }
 
     private String transformForHA(String jsonData) throws JsonProcessingException {

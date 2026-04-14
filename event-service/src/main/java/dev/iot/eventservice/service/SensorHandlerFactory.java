@@ -23,5 +23,4 @@ public class SensorHandlerFactory {
     public List<SensorHandler> getHandlers() {
         return handlers.values().stream().toList();
     }
-
 }

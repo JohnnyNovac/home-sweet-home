@@ -5,21 +5,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.iot.eventservice.config.HAConfigProperties;
-import dev.iot.eventservice.config.RabbitMQConfigProperties;
-import dev.iot.eventservice.model.SensorData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
-import reactor.rabbitmq.Receiver;
 
 @Service
 public class Esp01SensorHandler implements SensorHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(Esp01SensorHandler.class);
 
-    private final Receiver receiver;
-    private final RabbitMQConfigProperties rabbitMQProperties;
     private final SensorDataService sensorDataService;
     private final MqttPublisher mqttPublisher;
     private final HAConfigProperties haProperties;
@@ -28,15 +23,11 @@ public class Esp01SensorHandler implements SensorHandler {
     private boolean isFirstValuePublished = false;
 
     public Esp01SensorHandler(
-            Receiver receiver,
-            RabbitMQConfigProperties rabbitMQProperties,
             SensorDataService sensorDataService,
             MqttPublisher mqttPublisher,
             HAConfigProperties haProperties,
             ObjectMapper objectMapper
     ) {
-        this.receiver = receiver;
-        this.rabbitMQProperties = rabbitMQProperties;
         this.sensorDataService = sensorDataService;
         this.mqttPublisher = mqttPublisher;
         this.haProperties = haProperties;
@@ -44,36 +35,29 @@ public class Esp01SensorHandler implements SensorHandler {
     }
 
     @Override
-    public Mono<SensorData> handleIncomingData(String jsonData) {
-        return Mono.fromCallable(() -> {
-                    validateJsonFormat(jsonData);
+    public void handleIncomingData(String jsonData) {
+        validateJsonFormat(jsonData);
 
-                    if (!isFirstValuePublished) {
-                        mqttPublisher.publish(haProperties.getEsp01().getAvailabilityTopic(), "online");
-                        mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
-                        logger.debug("Availability messages for HA have been sent");
-                        sendDiscoveryMessage();
-                        isFirstValuePublished = true;
-                    }
+        if (!isFirstValuePublished) {
+            mqttPublisher.publish(haProperties.getEsp01().getAvailabilityTopic(), "online");
+            mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
+            logger.debug("Availability messages for HA have been sent");
+            sendDiscoveryMessage();
+            isFirstValuePublished = true;
+        }
 
-                    sendDataToHA(jsonData);
+        sendDataToHA(jsonData);
 
-                    return jsonData;
-                })
-                .flatMap(data -> sensorDataService.saveIncomingData(jsonData));
+        sensorDataService.saveIncomingData(jsonData).subscribe(sensorData -> logger.debug("Saved sensor data: {}", sensorData),
+                error -> logger.error("Error saving sensor data", error));
     }
 
-    @Override
-    public void subscribeToAvailability() {
-        receiver.consumeAutoAck(rabbitMQProperties.getEsp01().getAvailabilityQueue())
-                .map(msg -> new String(msg.getBody()))
-                .doOnNext(body -> {
-                    logger.debug("Received ESP-01 availability message: {}", body);
-                    if (body.equals("offline")) {
-                        mqttPublisher.publish(haProperties.getEsp01().getAvailabilityTopic(), "offline");
-                    }
-                })
-                .subscribe();
+    @RabbitListener(queues = "${app.rabbitmq.esp01.availability-queue}")
+    public void handleAvailabilityMessage(String body) {
+        logger.debug("Received ESP-01 availability message: {}", body);
+        if (body.equals("offline")) {
+            mqttPublisher.publish(haProperties.getEsp01().getAvailabilityTopic(), "offline");
+        }
     }
 
     @Override
@@ -134,10 +118,14 @@ public class Esp01SensorHandler implements SensorHandler {
         }
     }
 
-    private void sendDataToHA(String jsonData) throws JsonProcessingException {
-        String transformedJson = transformForHA(jsonData);
-        mqttPublisher.publish(haProperties.getEsp01().getStateTopic(), transformedJson);
-        logger.debug("Published to state topic: {}", transformedJson);
+    private void sendDataToHA(String jsonData) {
+        try {
+            String transformedJson = transformForHA(jsonData);
+            mqttPublisher.publish(haProperties.getEsp01().getStateTopic(), transformedJson);
+            logger.debug("Published to state topic: {}", transformedJson);
+        } catch (JsonProcessingException e) {
+            logger.error("Failed to serialize data for HA", e);
+        }
     }
 
     private String transformForHA(String jsonData) throws JsonProcessingException {
