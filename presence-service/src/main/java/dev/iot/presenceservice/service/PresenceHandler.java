@@ -35,6 +35,12 @@ public class PresenceHandler {
      * @return обработанный объект {@link Mono}
      */
     public EventDTO handleIncomingData(String jsonData) {
+        // Skip non-JSON service messages like "online" / "offline"
+        if ("online".equalsIgnoreCase(jsonData) || "offline".equalsIgnoreCase(jsonData)) {
+            logger.debug("Skip service message: {}", jsonData);
+            return null;
+        }
+
         validateJsonFormat(jsonData);
 
         EventDTO eventDTO = JsonDtoParser.parseJson(jsonData);
@@ -51,6 +57,8 @@ public class PresenceHandler {
         Yandex.TurnOnOffLampRequest request = Yandex.TurnOnOffLampRequest.newBuilder()
                 .setTurnOn(turnOn)
                 .build();
+
+        logger.info("Setting lamp state to {}", turnOn ? "ON" : "OFF");
 
         try {
             Yandex.TurnOnOffLampResponse response =
