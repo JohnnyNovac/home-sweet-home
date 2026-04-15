@@ -1,15 +1,13 @@
 package dev.iot.presenceservice.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.iot.presenceservice.config.MeasurementsProperties;
 import dev.iot.shared.dto.EventDTO;
 import dev.iot.shared.utils.JsonDtoParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import yandex.Yandex;
 import yandex.YandexServiceGrpc;
 
@@ -32,7 +30,7 @@ public class PresenceHandler {
      * Обрабатывает полученные от датчика присутствия данные.
      *
      * @param jsonData строка JSON с данными измерений
-     * @return обработанный объект {@link Mono}
+     * @return обработанный объект {@link EventDTO}
      */
     public EventDTO handleIncomingData(String jsonData) {
         // Skip non-JSON service messages like "online" / "offline"
@@ -72,17 +70,13 @@ public class PresenceHandler {
     }
 
     private void validateJsonFormat(String jsonData) {
-        try {
-            JsonNode root = objectMapper.readTree(jsonData);
-            JsonNode measurements = root.path("measurements");
+        JsonNode root = objectMapper.readTree(jsonData);
+        JsonNode measurements = root.path("measurements");
 
-            if (!measurements.has(measurementsProperties.getRadarPresence().getName())
-                || !measurements.has(measurementsProperties.getPirSensorPresence().getName())
-                || !measurements.has(measurementsProperties.getLampState().getName())) {
-                throw new IllegalArgumentException("NodeMCU requires radarPresence, pirSensorPresence and lampState measurements");
-            }
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Invalid JSON format", e);
+        if (!measurements.has(measurementsProperties.getRadarPresence().getName())
+            || !measurements.has(measurementsProperties.getPirSensorPresence().getName())
+            || !measurements.has(measurementsProperties.getLampState().getName())) {
+            throw new IllegalArgumentException("NodeMCU requires radarPresence, pirSensorPresence and lampState measurements");
         }
     }
 }

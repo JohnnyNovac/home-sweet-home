@@ -1,7 +1,6 @@
 rootProject.name = 'home-sweet-home'
 
 includeBuild 'shared'
-includeBuild 'eureka-server'
 includeBuild 'event-service'
 includeBuild 'presence-service'
 includeBuild 'grpc-api'
