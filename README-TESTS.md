@@ -19,10 +19,6 @@
 - **PresenceServiceIntegrationTest** - интеграционные тесты с RabbitMQ
 - **PresenceServiceApplicationTest** - тест загрузки Spring контекста
 
-### Eureka Server
-
-- **EurekaServerApplicationTest** - тест запуска Eureka сервера
-
 ## Технологии тестирования
 
 - **JUnit 5** - основной фреймворк для тестирования
@@ -36,7 +32,6 @@
 
 Каждый сервис имеет отдельную тестовую конфигурацию `application.properties`:
 
-- Отключение Eureka клиента
 - Настройка тестовых баз данных
 - Логирование для отладки
 
