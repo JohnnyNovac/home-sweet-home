@@ -12,6 +12,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import yandex.Yandex;
 
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -44,7 +46,7 @@ class GrpcServerServiceTest {
                 .setTurnOn(true)
                 .build();
 
-        DeviceGroupActionResponse response = new DeviceGroupActionResponse("ok", null, null);
+        DeviceGroupActionResponse response = new DeviceGroupActionResponse("id", "ok", List.of());
         when(yandexRestClient.sendGroupAction(any(DeviceGroupActionRequest.class), eq(CHANDELIER_ID)))
                 .thenReturn(response);
 
@@ -65,7 +67,7 @@ class GrpcServerServiceTest {
                 .setTurnOn(true)
                 .build();
 
-        DeviceGroupActionResponse response = new DeviceGroupActionResponse("ok", null, null);
+        DeviceGroupActionResponse response = new DeviceGroupActionResponse("id", "ok", List.of());
         when(yandexRestClient.sendGroupAction(any(DeviceGroupActionRequest.class), eq(CHANDELIER_ID)))
                 .thenReturn(response);
 
@@ -86,7 +88,7 @@ class GrpcServerServiceTest {
                 .setTurnOn(true)
                 .build();
 
-        DeviceGroupActionResponse response = new DeviceGroupActionResponse("error", null, null);
+        DeviceGroupActionResponse response = new DeviceGroupActionResponse("id", "error", List.of());
         when(yandexRestClient.sendGroupAction(any(DeviceGroupActionRequest.class), eq(CHANDELIER_ID)))
                 .thenReturn(response);
 

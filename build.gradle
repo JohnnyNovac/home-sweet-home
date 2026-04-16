@@ -27,3 +27,11 @@ test {
 
     jvmArgs += "-javaagent:${configurations.mockitoAgent.asPath}"
 }
+
+tasks.register("buildAll") {
+    dependsOn gradle.includedBuilds.collect { it.task(':build') }
+}
+
+tasks.register("cleanAll") {
+    dependsOn gradle.includedBuilds.collect { it.task(':clean') }
+}

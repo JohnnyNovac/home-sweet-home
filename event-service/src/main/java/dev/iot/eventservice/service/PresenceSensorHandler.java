@@ -1,14 +1,13 @@
 package dev.iot.eventservice.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.iot.eventservice.config.HAConfigProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 
 @Service
@@ -104,29 +103,21 @@ public class PresenceSensorHandler implements SensorHandler {
     }
 
     private void validateJsonFormat(String jsonData) {
-        try {
-            JsonNode root = objectMapper.readTree(jsonData);
-            JsonNode measurements = root.path("measurements");
+        JsonNode root = objectMapper.readTree(jsonData);
+        JsonNode measurements = root.path("measurements");
 
-            if (!measurements.has("radarPresence") || !measurements.has("pirSensorPresence") || !measurements.has("lampState")) {
-                throw new IllegalArgumentException("NodeMCU requires radarPresence, pirSensorPresence and lampState measurements");
-            }
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Invalid JSON format", e);
+        if (!measurements.has("radarPresence") || !measurements.has("pirSensorPresence") || !measurements.has("lampState")) {
+            throw new IllegalArgumentException("NodeMCU requires radarPresence, pirSensorPresence and lampState measurements");
         }
     }
 
     private void sendDataToHA(String jsonData) {
-        try {
-            String transformedForHAJson = transformForHA(jsonData);
-            mqttPublisher.publish(haProperties.getNodemcu().getStateTopic(), transformedForHAJson);
-            logger.debug("Published to state topic: {}", transformedForHAJson);
-        } catch (JsonProcessingException e) {
-            logger.error("Failed to serialize data for HA", e);
-        }
+        String transformedForHAJson = transformForHA(jsonData);
+        mqttPublisher.publish(haProperties.getNodemcu().getStateTopic(), transformedForHAJson);
+        logger.debug("Published to state topic: {}", transformedForHAJson);
     }
 
-    private String transformForHA(String jsonData) throws JsonProcessingException {
+    private String transformForHA(String jsonData) {
         JsonNode root = objectMapper.readTree(jsonData);
 
         JsonNode measurements = root.path("measurements");

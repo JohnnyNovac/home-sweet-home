@@ -15,7 +15,7 @@
 
 ### Presence Service
 
-- **PresenceHandlerImplTest** - unit тесты обработчика данных присутствия
+- **PresenceHandlerTest** - unit тесты обработчика данных присутствия
 - **PresenceServiceIntegrationTest** - интеграционные тесты с RabbitMQ
 - **PresenceServiceApplicationTest** - тест загрузки Spring контекста
 
