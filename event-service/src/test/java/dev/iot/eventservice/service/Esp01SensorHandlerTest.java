@@ -1,6 +1,5 @@
 package dev.iot.eventservice.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.iot.eventservice.config.Esp01HAConfig;
 import dev.iot.eventservice.config.HAConfigProperties;
 import dev.iot.eventservice.model.SensorData;
@@ -11,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -41,6 +41,7 @@ class Esp01SensorHandlerTest {
     private Esp01HAConfig esp01HAConfig;
 
     private Esp01SensorHandler handler;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach

@@ -43,10 +43,6 @@ class EventRunnerTest {
 
         when(haProps.getStatusTopic()).thenReturn(HA_STATUS_TOPIC);
 
-        SensorHandler handler1 = mock(SensorHandler.class);
-        SensorHandler handler2 = mock(SensorHandler.class);
-        when(sensorHandlerFactory.getHandlers()).thenReturn(List.of(handler1, handler2));
-
         eventRunner.run();
 
         verify(mqttClient).subscribe(eq(haProps.getStatusTopic()), any());

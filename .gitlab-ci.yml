@@ -4,11 +4,6 @@ build:
     - echo "Hello, $GITLAB_USER_LOGIN!"
     - docker build -f docker/Dockerfile -t my-rabbitmq .
 
-test:
-  stage: test
-  script:
-    - echo "This job tests something"
-
 deploy:
   stage: deploy
   script:

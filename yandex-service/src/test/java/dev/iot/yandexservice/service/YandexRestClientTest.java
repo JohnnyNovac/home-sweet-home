@@ -60,7 +60,7 @@ class YandexRestClientTest {
 
         when(restClient.post()).thenReturn(requestBodyUriSpec);
         when(requestBodyUriSpec.uri(GROUP_ACTION_PATH, CHANDELIER_ID)).thenReturn(requestBodyUriSpec);
-        when(requestBodyUriSpec.body(any())).thenReturn(requestBodyUriSpec);
+        when(requestBodyUriSpec.body(any(DeviceGroupActionRequest.class))).thenReturn(requestBodyUriSpec);
         when(requestBodyUriSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(DeviceGroupActionResponse.class)).thenReturn(expectedResponse);
 
@@ -70,4 +70,6 @@ class YandexRestClientTest {
         verify(restClient).post();
     }
 }
+
+
 

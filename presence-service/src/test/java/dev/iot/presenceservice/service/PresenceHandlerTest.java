@@ -1,0 +1,128 @@
+package dev.iot.presenceservice.service;
+
+import dev.iot.presenceservice.config.MeasurementsProperties;
+import dev.iot.shared.dto.MeasurementDTO;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.ObjectMapper;
+import yandex.YandexServiceGrpc;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.AssertionsForClassTypes.tuple;
+
+@ExtendWith(MockitoExtension.class)
+class PresenceHandlerTest {
+
+    private PresenceHandler presenceHandler;
+
+    @Mock
+    private YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub;
+
+    @BeforeEach
+    void setUp() {
+        MeasurementsProperties measurementsProperties = new MeasurementsProperties();
+
+        MeasurementsProperties.Measurement lampState = new MeasurementsProperties.Measurement();
+        lampState.setName("lampState");
+
+        MeasurementsProperties.Measurement radarPresence = new MeasurementsProperties.Measurement();
+        radarPresence.setName("radarPresence");
+
+        MeasurementsProperties.Measurement pirSensorPresence = new MeasurementsProperties.Measurement();
+        pirSensorPresence.setName("pirSensorPresence");
+
+        measurementsProperties.setLampState(lampState);
+        measurementsProperties.setRadarPresence(radarPresence);
+        measurementsProperties.setPirSensorPresence(pirSensorPresence);
+
+        presenceHandler = new PresenceHandler(new ObjectMapper(), yandexServiceStub, measurementsProperties);
+    }
+
+    @Test
+    @DisplayName("Should handle presence sensor data")
+    void shouldHandlePresenceData() {
+        String jsonData = """
+                {
+                    "sensorId": "NodeMCU",
+                    "measurements": {
+                        "radarPresence": true,
+                        "pirSensorPresence": false,
+                        "lampState": true
+                    }
+                }
+                """;
+
+        var eventDTO = presenceHandler.handleIncomingData(jsonData);
+
+        assertThat(eventDTO).isNotNull();
+        assertThat(eventDTO.measurements()).hasSize(3);
+        assertThat(eventDTO.measurements())
+                .extracting(MeasurementDTO::type, MeasurementDTO::value)
+                .containsExactlyInAnyOrder(
+                        tuple("radarPresence", true),
+                        tuple("pirSensorPresence", false),
+                        tuple("lampState", true)
+                );
+    }
+
+    @Test
+    @DisplayName("Should reject data without required fields")
+    void shouldRejectDataWithoutRequiredFields() {
+        String invalidJsonData = "{}";
+
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(invalidJsonData))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("Should extract measurement types from sensor data")
+    void shouldExtractMeasurementTypes() {
+        String jsonData = """
+                {
+                    "sensorId": "NodeMCU",
+                    "measurements": {
+                        "radarPresence": true,
+                        "pirSensorPresence": false,
+                        "lampState": true
+                    }
+                }
+                """;
+
+        var eventDTO = presenceHandler.handleIncomingData(jsonData);
+
+        assertThat(eventDTO).isNotNull();
+        assertThat(eventDTO.measurements())
+                .extracting(MeasurementDTO::type)
+                .containsExactlyInAnyOrder("radarPresence", "pirSensorPresence", "lampState");
+    }
+
+    @Test
+    @DisplayName("Should skip service messages")
+    void shouldSkipServiceMessages() {
+        assertThat(presenceHandler.handleIncomingData("online")).isNull();
+        assertThat(presenceHandler.handleIncomingData("offline")).isNull();
+        assertThat(presenceHandler.handleIncomingData("ONLINE")).isNull();
+        assertThat(presenceHandler.handleIncomingData("OFFLINE")).isNull();
+    }
+
+    @Test
+    @DisplayName("Should throw exception when required measurements are missing")
+    void shouldThrowExceptionWhenRequiredMeasurementsAreMissing() {
+        String invalidJsonData = """
+                {
+                    "sensorId": "NodeMCU",
+                    "measurements": {
+                        "radarPresence": true
+                    }
+                }
+                """;
+
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(invalidJsonData))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+}
