@@ -1,11 +1,18 @@
 services:
   rabbitmq:
     image: my-rabbitmq
+    build:
+      context: ./rabbitmq
     hostname: rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
       - "1883:1883"
+    healthcheck:
+      test: rabbitmq-diagnostics -q check_running
+      interval: 5s
+      timeout: 5s
+      retries: 10
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
@@ -16,6 +23,7 @@ services:
     restart: unless-stopped
     networks:
       - homesweethome_net
+
   homeassistant:
     container_name: homeassistant
     image: "ghcr.io/home-assistant/home-assistant:stable"
@@ -29,6 +37,7 @@ services:
     privileged: true
     networks:
       - homesweethome_net
+
   mongodb:
     image: mongodb/mongodb-community-server:4.4.29-ubuntu2004
     container_name: mongodb
@@ -40,11 +49,63 @@ services:
     volumes:
       - mongodb_data:/data/db
     restart: unless-stopped
+    networks:
+      - homesweethome_net
+
+  event-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        JAR_FILE: event-service/build/libs/event-service-0.0.1-SNAPSHOT.jar
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+    networks:
+      - homesweethome_net
+
+  presence-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        JAR_FILE: presence-service/build/libs/presence-service-0.0.1-SNAPSHOT.jar
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - homesweethome_net
+
+  yandex-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        JAR_FILE: yandex-service/build/libs/yandex-service-0.0.1-SNAPSHOT.jar
+    restart: unless-stopped
+    networks:
+      - homesweethome_net
+
+
 volumes:
   rabbitmq-lib:
   rabbitmq-log:
   homeassistant-config:
   mongodb_data:
+
+
 networks:
   homesweethome_net:
     driver: bridge
