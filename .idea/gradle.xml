@@ -48,22 +48,10 @@
         </option>
       </GradleProjectSettings>
       <GradleProjectSettings>
-        <compositeConfiguration>
-          <compositeBuild compositeDefinitionSource="SCRIPT">
-            <builds>
-              <build path="$PROJECT_DIR$/shared" name="shared">
-                <projects>
-                  <project path="$PROJECT_DIR$/shared" />
-                </projects>
-              </build>
-            </builds>
-          </compositeBuild>
-        </compositeConfiguration>
         <option name="externalProjectPath" value="$PROJECT_DIR$/event-service" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$/event-service" />
-            <option value="$PROJECT_DIR$/shared" />
           </set>
         </option>
       </GradleProjectSettings>
@@ -76,28 +64,10 @@
         </option>
       </GradleProjectSettings>
       <GradleProjectSettings>
-        <compositeConfiguration>
-          <compositeBuild compositeDefinitionSource="SCRIPT">
-            <builds>
-              <build path="$PROJECT_DIR$/grpc-api" name="grpc-api">
-                <projects>
-                  <project path="$PROJECT_DIR$/grpc-api" />
-                </projects>
-              </build>
-              <build path="$PROJECT_DIR$/shared" name="shared">
-                <projects>
-                  <project path="$PROJECT_DIR$/shared" />
-                </projects>
-              </build>
-            </builds>
-          </compositeBuild>
-        </compositeConfiguration>
         <option name="externalProjectPath" value="$PROJECT_DIR$/presence-service" />
         <option name="modules">
           <set>
-            <option value="$PROJECT_DIR$/grpc-api" />
             <option value="$PROJECT_DIR$/presence-service" />
-            <option value="$PROJECT_DIR$/shared" />
           </set>
         </option>
       </GradleProjectSettings>
