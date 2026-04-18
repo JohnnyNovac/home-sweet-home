@@ -18,7 +18,7 @@
 
   # Delete all queues
   echo "Deleting all queues..."
-  for queue in $(rabbitmqctl list_queues -q name); do
+  for queue in $(rabbitmqctl list_queues -q name | tail -n +2); do
       echo "Deleting queue: $queue"
     rabbitmqctl delete_queue "$queue"
   done

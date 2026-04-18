@@ -32,7 +32,8 @@ public class MqttConfig {
 
     @Bean
     public MqttClient mqttClient() throws MqttException {
-        MqttClient client = new MqttClient(String.format("tcp://%s:1883", brokerHost), "event-service");
+        String brokerUrl = String.format("tcp://%s:1883", brokerHost);
+        MqttClient client = new MqttClient(brokerUrl, "event-service");
 
         MqttConnectOptions options = new MqttConnectOptions();
         options.setUserName(user);
@@ -43,10 +44,34 @@ public class MqttConfig {
         boolean retained = true;
         options.setWill(haTopics.getServiceAvailabilityTopic(), "offline".getBytes(), qos, retained);
 
-        client.connect(options);
-        logger.info("MQTT connected");
+        int maxAttempts = 10;
 
-        return client;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                logger.info("MQTT connection attempt {}/{} -> {}", attempt, maxAttempts, brokerUrl);
+
+                client.connect(options);
+
+                logger.info("MQTT connected successfully");
+                return client;
+
+            } catch (Exception e) {
+                logger.error("MQTT connection failed (attempt {}): {}", attempt, e.getMessage());
+
+                try {
+                    long delay = Math.min(30_000L, 2000L * attempt); // 2s,4s,6s... max 30s
+                    logger.info("Retrying in {} ms...", delay);
+
+                    Thread.sleep(delay);
+
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("MQTT retry interrupted", ie);
+                }
+            }
+        }
+
+        throw new IllegalStateException("MQTT broker is unavailable after " + maxAttempts + " attempts");
     }
 
     @Bean

@@ -1,12 +1,6 @@
-FROM rabbitmq:3.12-management
+FROM eclipse-temurin:21-jre
 
-# Enable plugins during build
-RUN rabbitmq-plugins enable --offline rabbitmq_mqtt
+ARG JAR_FILE
+COPY ${JAR_FILE} app.jar
 
-# Installing netcat
-RUN apt-get update && apt-get install -y netcat
-
-COPY docker/rabbitmq/init.sh /init.sh
-RUN chmod +x /init.sh
-
-ENTRYPOINT ["/init.sh"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
