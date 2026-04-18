@@ -12,16 +12,18 @@ D8 - red LED on frame
 
 
 Перед началом работы убедитесь, что на вашей машине выполнено следующее:
-1. Установлен Docker и обеспечена возможность работать с ним без sudo
+
+1. Установлена Java 21
+2. Установлен Docker и обеспечена возможность работать с ним без sudo
    sudo groupadd docker
    sudo usermod -aG docker $USER
    sudo usermod -aG docker gitlab-runner
-2. Установлен GitLab Runner и добавлен в группу docker
-3. Установлен Gradle
-4. Добавлены CI/CD Variables через UI - для RabbitMQ, MongoDB
-5. В HomeAssistant создан аккаунт и настроена интеграция MQTT. Также нужно СОХРАНЯТЬ значение топика
+3. Установлен GitLab Runner и добавлен в группу docker
+4. Установлен Gradle
+5. Добавлены CI/CD Variables через UI - для RabbitMQ, MongoDB
+6. В HomeAssistant создан аккаунт и настроена интеграция MQTT. Также нужно СОХРАНЯТЬ значение топика
    homeassistant/status для того, чтобы сервис мог получить состояние HA
    при старте
-6. Установить активный профиль для локальной разработки local
+7. Установить активный профиль для локальной разработки local
 
 
