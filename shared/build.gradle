@@ -2,36 +2,9 @@ plugins {
     id 'java-library'
 }
 
-group = 'dev.iot'
-version = '0.0.1-SNAPSHOT'
 description = 'shared'
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
-}
-
-repositories {
-    mavenCentral()
-}
-
-configurations {
-    mockitoAgent
-}
-
 dependencies {
-    implementation("tools.jackson.core:jackson-databind:3.0.2")
-    testImplementation("org.junit.jupiter:junit-jupiter:6.0.1")
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    implementation 'tools.jackson.core:jackson-databind:3.0.2'
     testImplementation 'org.assertj:assertj-core:3.27.6'
-    mockitoAgent('org.mockito:mockito-core:5.21.0') {
-        transitive = false
-    }
-}
-
-tasks.named('test') {
-    useJUnitPlatform()
-
-    jvmArgs += "-javaagent:${configurations.mockitoAgent.asPath}"
 }
