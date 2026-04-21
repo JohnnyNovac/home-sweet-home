@@ -1,31 +1,15 @@
 plugins {
-    id 'java'
-    id "com.google.protobuf" version "0.9.6"
+    id 'com.google.protobuf'
 }
 
-group = 'dev.iot'
-version = '0.0.1-SNAPSHOT'
 description = 'grpc-api'
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
-}
-
-def grpcVersion = '1.78.0';
+def grpcVersion = '1.78.0'
 def protocVersion = '3.25.8'
-
-repositories {
-    mavenCentral()
-}
 
 dependencies {
     implementation "io.grpc:grpc-protobuf:${grpcVersion}"
     implementation "io.grpc:grpc-stub:${grpcVersion}"
-
-    testImplementation("org.junit.jupiter:junit-jupiter:6.0.1")
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 protobuf {
@@ -42,8 +26,4 @@ protobuf {
             grpc {}
         }
     }
-}
-
-tasks.named('test') {
-    useJUnitPlatform()
 }
