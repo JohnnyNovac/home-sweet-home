@@ -6,6 +6,8 @@ import dev.iot.yandexservice.dto.CapabilityState;
 import dev.iot.yandexservice.dto.DeviceGroupActionRequest;
 import dev.iot.yandexservice.dto.DeviceGroupActionResponse;
 import io.grpc.stub.StreamObserver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import yandex.Yandex;
 import yandex.YandexServiceGrpc;
@@ -14,6 +16,8 @@ import java.util.List;
 
 @Service
 public class GrpcServerService extends YandexServiceGrpc.YandexServiceImplBase {
+
+    private static final Logger logger = LoggerFactory.getLogger(GrpcServerService.class);
 
     private final YandexRestClient client;
     private final YandexProperties yandexProperties;
@@ -49,6 +53,7 @@ public class GrpcServerService extends YandexServiceGrpc.YandexServiceImplBase {
             responseObserver.onCompleted();
 
         } catch (Exception e) {
+            logger.error("turnOnOffLamp failed (turnOn={})", request.getTurnOn(), e);
             responseObserver.onError(e);
         }
     }
