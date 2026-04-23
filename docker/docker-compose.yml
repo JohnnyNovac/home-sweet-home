@@ -94,6 +94,9 @@ services:
       dockerfile: docker/Dockerfile
       args:
         JAR_FILE: yandex-service/build/libs/yandex-service-0.0.1-SNAPSHOT.jar
+    environment:
+      - YANDEX_OAUTH_TOKEN=${YANDEX_OAUTH_TOKEN}
+      - YANDEX_CHANDELIER_ID=${YANDEX_CHANDELIER_ID}
     restart: unless-stopped
     networks:
       - homesweethome_net
