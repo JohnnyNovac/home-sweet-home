@@ -1,29 +1,124 @@
-# Arduino
+**Русский** · [English](README.en.md)
 
-D0 - green LED on frame
-D1 - radar OUT
-D2 - red LED on board
-D3 -
-D4 -
-D5 - PIR-sensor OUT
-D6 - MOSFET-switch
-D7 - mode-switch
-D8 - red LED on frame
+# Home Sweet Home
 
+Распределённая система управления умным домом на базе Arduino-датчиков, MQTT и Spring Boot микросервисов. Собирает
+телеметрию из комнаты (температура, влажность, присутствие), сохраняет её, передаёт в Home Assistant для визуализации на
+дашборде и автоматически управляет освещением через Yandex Smart Home API.
 
-Перед началом работы убедитесь, что на вашей машине выполнено следующее:
+## Архитектура
 
-1. Установлена Java 21
-2. Установлен Docker и обеспечена возможность работать с ним без sudo
-   sudo groupadd docker
-   sudo usermod -aG docker $USER
-   sudo usermod -aG docker gitlab-runner
-3. Установлен GitLab Runner и добавлен в группу docker
-4. Установлен Gradle
-5. Добавлены CI/CD Variables через UI - для RabbitMQ, MongoDB
-6. В HomeAssistant создан аккаунт и настроена интеграция MQTT. Также нужно СОХРАНЯТЬ значение топика
-   homeassistant/status для того, чтобы сервис мог получить состояние HA
-   при старте
-7. Установить активный профиль для локальной разработки local
+```mermaid
+flowchart LR
+    subgraph Hardware["🔌 Hardware"]
+        MB[MultiBox<br/>температура / влажность]
+        ESP[ESP-01<br/>WiFi-мост]
+        PB[PresenceBox<br/>присутствие]
+        MB -->|Serial| ESP
+    end
 
+    BROKER[(RabbitMQ<br/>MQTT/AMQP)]
 
+    subgraph Backend["⚙️ Backend"]
+        ES[event-service]
+        PS[presence-service]
+        YS[yandex-service]
+    end
+
+    MONGO[(MongoDB)]
+
+    subgraph External["🌐 External"]
+        HA[Home Assistant]
+        YAPI[Yandex Smart Home API]
+        LIGHTNING[💡 Освещение]
+    end
+
+    ESP -->|MQTT| BROKER
+    PB -->|MQTT| BROKER
+    BROKER -->|AMQP| ES
+    BROKER -->|AMQP| PS
+    ES --> MONGO
+    ES -->|MQTT| HA
+    PS -->|gRPC| YS
+    YS -->|HTTPS| YAPI
+    YAPI --> LIGHTNING
+```
+
+Поток данных:
+
+1. **MultiBox** (Arduino Uno с датчиком температуры/влажности) по serial передаёт показания на **ESP-01**, который
+   публикует их в брокер по MQTT. **PresenceBox** (NodeMCU с PIR-датчиком + радаром) публикует данные о присутствии в
+   брокер напрямую по MQTT.
+2. Брокер — RabbitMQ с MQTT-плагином — принимает сообщения по MQTT и раздаёт их подписчикам через AMQP-очереди.
+3. **event-service** забирает все сенсорные события из AMQP-очередей для датчиков, сохраняет в MongoDB и ретранслирует в
+   Home Assistant по MQTT — для визуализации на дашборде (графики температуры/влажности, индикатор присутствия и
+   состояния лампы). **presence-service** параллельно получает данные PresenceBox из своей AMQP-очереди.
+4. **presence-service** принимает решение о включении/выключении света и вызывает **yandex-service** по gRPC.
+5. **yandex-service** вызывает Yandex Smart Home API и переключает освещение.
+
+## Стек
+
+**Backend**
+
+- Java 21, Spring Boot 4.0
+- Spring WebFlux + Reactive MongoDB (event-service)
+- Spring AMQP (RabbitMQ) — межсервисная шина
+- Spring gRPC — синхронные вызовы между presence-service и yandex-service
+- Eclipse Paho — MQTT-клиент
+
+**Hardware / IoT**
+
+- Arduino (Arduino Uno, ESP-01, NodeMCU)
+- Датчики: DHT (температура/влажность), PIR-датчик + микроволновый радар (присутствие), светодиоды
+
+**Инфраструктура**
+
+- Docker / Docker Compose
+- RabbitMQ, MongoDB
+- GitLab CI/CD
+- Home Assistant (внешняя интеграция)
+
+**Тестирование**
+
+- JUnit 5, Mockito, AssertJ
+- Testcontainers (MongoDB, RabbitMQ)
+- Reactor Test
+
+## Модули
+
+| Модуль             | Назначение                                                              |
+|--------------------|-------------------------------------------------------------------------|
+| `event-service`    | Приём MQTT-событий, сохранение в MongoDB, ретрансляция в Home Assistant |
+| `presence-service` | Логика автоматизации по присутствию, gRPC-клиент к yandex-service       |
+| `yandex-service`   | gRPC-сервер, прокси к Yandex Smart Home API                             |
+| `grpc-api`         | Общие protobuf-контракты                                                |
+| `shared`           | Общие DTO и парсеры                                                     |
+| `arduino/`         | Прошивки для `MultiBox`, `ESP-01` (WiFi-мост) и `PresenceBox`           |
+| `docker/`          | docker-compose для запуска инфраструктуры                               |
+
+## Hardware
+
+Распиновка PresenceBox и прочие рабочие заметки — в [NOTES.md](NOTES.md).
+
+## Запуск
+
+Требования: Java 21, Docker, Gradle, аккаунт Home Assistant с MQTT-интеграцией.
+Полный чек-лист и переменные CI/CD — в [NOTES.md](NOTES.md).
+
+```bash
+# поднять инфраструктуру
+docker compose -f docker/docker-compose.yml up -d
+```
+
+## Тесты
+
+Подробнее о структуре автотестов — в [docs/testing.md](docs/testing.md).
+
+## Планы
+
+- **notification-service** — нотификации о событиях (Telegram-бот: алерты по температуре, тревоги по присутствию, статус
+  сервисов).
+- **REST API** — управление и доступ к данным: история показаний сенсоров, ручное переключение света, текущее состояние
+  комнаты.
+- **voice-service** — собственное голосовое управление, без интеграции с Алисой.
+- **Датчик освещённости** — задействовать luminance-сенсор, уже установленный в MultiBox.
