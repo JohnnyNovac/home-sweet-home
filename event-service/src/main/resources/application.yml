@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: event-service
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: ${RABBITMQ_DEFAULT_USER}
+    password: ${RABBITMQ_DEFAULT_PASS}
+  mongodb:
+    uri: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/events?authSource=admin
+
+server:
+  port: 8081
+
+app:
+  rabbitmq:
+    event-queue: event-service
+    service-availability-queue: event-service-availability
+    esp01:
+      availability-queue: esp-01-availability
+    nodemcu:
+      availability-queue: nodemcu-availability
+  ha:
+    service-availability-topic: homeassistant/event-service/availability
+    status-topic: homeassistant/status
+    expire-after: 60
+    esp01:
+      availability-topic: homeassistant/sensor/esp01/availability
+      state-topic: homeassistant/sensor/esp01/state
+      discovery-temp-topic: homeassistant/sensor/esp01_temp/config
+      discovery-hum-topic: homeassistant/sensor/esp01_hum/config
+    nodemcu:
+      availability-topic: homeassistant/binary_sensor/nodemcu/availability
+      state-topic: homeassistant/binary_sensor/nodemcu/state
+      discovery-presence-topic: homeassistant/binary_sensor/nodemcu_presence/config
+      discovery-lamp-state-topic: homeassistant/binary_sensor/nodemcu_lamp_state/config
+
+logging:
+  level:
+    dev.iot.eventservice: DEBUG
