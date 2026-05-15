@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: yandex-service
+
+yandex:
+  oauth-token: ${YANDEX_OAUTH_TOKEN}
+  base-url: https://api.iot.yandex.net
+  group-action-path: /v1.0/groups/{group_id}/actions
+  chandelier-id: ${YANDEX_CHANDELIER_ID}

@@ -36,17 +36,17 @@
 
 ## Configuration
 
-Each service has its own `src/test/resources/application.properties`. The general approach: **external dependencies are
+Each service has its own `src/test/resources/application.yml`. The general approach: **external dependencies are
 disabled at the auto-configuration level rather than mocked through stubbed clients** — otherwise `@RabbitListener` /
 MQTT clients try to reach a real broker on context startup.
 
 - **RabbitMQ** — excluded via
-  `spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration`. Listeners don't
+  `spring.autoconfigure.exclude: org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration`. Listeners don't
   start; their handlers are exercised by direct method calls.
 - **MQTT (event-service)** — `MqttConfig` is gated by `@ConditionalOnProperty("app.mqtt.enabled")`; tests set
   `app.mqtt.enabled=false`, and `MqttTestConfig` provides a mocked `MqttClient` and `MqttPublisher`.
 - **MongoDB (event-service)** — `MongoDBTestContainerConfig` starts a `mongo:latest` container and exposes the mapped
-  port via the `mongodb.container.port` system property, which the test `application.properties` picks up via
+  port via the `mongodb.container.port` system property, which the test `application.yml` picks up via
   `${mongodb.container.port}`.
 
 ## Running

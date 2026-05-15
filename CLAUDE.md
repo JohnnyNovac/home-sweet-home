@@ -28,7 +28,7 @@ docker compose -f docker/docker-compose.yml up -d     # infrastructure (RabbitMQ
 `grpc-api` generates Java stubs from `grpc-api/src/main/proto/yandex.proto` via the protobuf plugin — regenerate with
 `./gradlew :grpc-api:generateProto` (runs automatically as part of `build`).
 
-Local dev uses the `local` Spring profile (`application-local.properties` in each service) — see `NOTES.md`. Docker/CI
+Local dev uses the `local` Spring profile (`application-local.yml` in each service) — see `NOTES.md`. Docker/CI
 reads RabbitMQ / Mongo / Yandex credentials from env vars (`RABBITMQ_DEFAULT_USER/PASS`,
 `MONGO_INITDB_ROOT_USERNAME/PASSWORD`, `YANDEX_OAUTH_TOKEN`, `YANDEX_CHANDELIER_ID`).
 
@@ -37,7 +37,7 @@ reads RabbitMQ / Mongo / Yandex credentials from env vars (`RABBITMQ_DEFAULT_USE
 **Message routing.** RabbitMQ is the single broker for both MQTT (port 1883, from Arduino) and AMQP (to services). MQTT
 topics are routed to AMQP queues by RabbitMQ definitions in `docker/rabbitmq/`. Each service binds to its own queue via
 `@RabbitListener(queues = "${app.rabbitmq.*-queue}")` — the queue name is always externalised to
-`application.properties`.
+`application.yml`.
 
 **Sensor handler dispatch (event-service).** `EventRunner` is a `CommandLineRunner` that listens to the event queue and
 dispatches each message by `sensorId` to a `SensorHandler` implementation via `SensorHandlerFactory` (Spring auto-wires
@@ -48,7 +48,7 @@ picks it up automatically. `EventRunner` also gates all processing on Home Assis
 
 **Lamp control path.** `presence-service` → parses `lampState` measurement out of the PresenceBox JSON → calls
 `yandex-service` via the gRPC stub declared in `grpc-api/src/main/proto/yandex.proto` (`YandexService.TurnOnOffLamp`).
-Client channel is configured in `presence-service/application.properties` as
+Client channel is configured in `presence-service/application.yml` as
 `spring.grpc.client.channels.yandex-service.address`. `yandex-service` (`GrpcServerService`) translates the call into a
 Yandex Smart Home "group action" HTTP request via `YandexRestClient`.
 
@@ -63,13 +63,13 @@ parser live in `shared/` (`JsonDtoParser`, `EventDTO`, `MeasurementDTO`).
 
 - JUnit 5 + Mockito + AssertJ; Reactor Test for WebFlux/Mongo reactive code; Testcontainers for MongoDB (see
   `MongoDBTestContainerConfig`, which exposes the mapped port via `System.setProperty("mongodb.container.port", …)` so
-  `application.properties` in `src/test/resources` can reference it).
+  `application.yml` in `src/test/resources` can reference it).
 - Mockito runs via a java agent wired in the root `build.gradle` (`configurations.mockitoAgent` + `-javaagent:` jvm
   arg). Do not switch to `mockito-inline` or change this wiring without updating the root build.
 - External infrastructure is disabled in tests rather than mocked ad-hoc:
     - RabbitMQ autoconfig is excluded via
-      `spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration` in the test
-      `application.properties` (commit 79a80d4).
+      `spring.autoconfigure.exclude: org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration` in the test
+      `application.yml` (commit 79a80d4).
     - `MqttConfig` is gated on `app.mqtt.enabled` (default true) and tests set it to `false`; a `MqttTestConfig`
       provides a mock `MqttClient`/`MqttPublisher` (commit 64b41db). Preserve both properties when editing test
       configs — listeners will otherwise try to reach a real broker and fail.

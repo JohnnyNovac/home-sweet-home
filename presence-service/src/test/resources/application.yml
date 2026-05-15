@@ -1,0 +1,19 @@
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: test
+    password: test
+    listener:
+      simple:
+        auto-startup: false
+      direct:
+        auto-startup: false
+
+app:
+  rabbitmq:
+    presence-queue: presence-service
+
+logging:
+  level:
+    dev.iot: DEBUG

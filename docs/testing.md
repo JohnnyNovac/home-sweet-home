@@ -36,17 +36,17 @@
 
 ## Конфигурация
 
-У каждого сервиса свой `src/test/resources/application.properties`. Общая схема: **внешние зависимости отключаются на
+У каждого сервиса свой `src/test/resources/application.yml`. Общая схема: **внешние зависимости отключаются на
 уровне автоконфигурации, а не мокируются через замоканные клиенты** — иначе `@RabbitListener`/MQTT-клиенты пытаются
 подключиться к реальному брокеру при старте контекста.
 
 - **RabbitMQ** — исключается через
-  `spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration`. Листенеры не
+  `spring.autoconfigure.exclude: org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration`. Листенеры не
   поднимаются, их хендлеры проверяются прямыми вызовами.
 - **MQTT (event-service)** — `MqttConfig` помечен `@ConditionalOnProperty("app.mqtt.enabled")`; в тестах
   `app.mqtt.enabled=false`, а `MqttTestConfig` предоставляет мок `MqttClient` и `MqttPublisher`.
 - **MongoDB (event-service)** — `MongoDBTestContainerConfig` запускает контейнер `mongo:latest` и записывает mapped-порт
-  в системное свойство `mongodb.container.port`, которое тестовый `application.properties` читает через
+  в системное свойство `mongodb.container.port`, которое тестовый `application.yml` читает через
   `${mongodb.container.port}`.
 
 ## Запуск

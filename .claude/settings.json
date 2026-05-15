@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"E:\\projects\\home-sweet-home\\.claude\\hooks\\doc-reminder.ps1\""
+          }
+        ]
+      }
+    ]
+  }
+}

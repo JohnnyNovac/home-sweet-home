@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: presence-service
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: ${RABBITMQ_DEFAULT_USER}
+    password: ${RABBITMQ_DEFAULT_PASS}
+  grpc:
+    client:
+      channels:
+        yandex-service:
+          address: yandex-service:9090
+
+server:
+  port: 8082
+
+app:
+  rabbitmq:
+    presence-queue: presence-service
+  measurements:
+    radar-presence:
+      name: radarPresence
+    pir-sensor-presence:
+      name: pirSensorPresence
+    lamp-state:
+      name: lampState
