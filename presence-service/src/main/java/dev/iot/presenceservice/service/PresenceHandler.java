@@ -26,28 +26,14 @@ public class PresenceHandler {
         this.measurementsProperties = measurementsProperties;
     }
 
-    /**
-     * Обрабатывает полученные от датчика присутствия данные.
-     *
-     * @param jsonData строка JSON с данными измерений
-     * @return обработанный объект {@link EventDTO}
-     */
-    public EventDTO handleIncomingData(String jsonData) {
-        // Skip non-JSON service messages like "online" / "offline"
-        if ("online".equalsIgnoreCase(jsonData) || "offline".equalsIgnoreCase(jsonData)) {
-            logger.debug("Skip service message: {}", jsonData);
-            return null;
-        }
-
+    public EventDTO handleIncomingData(String deviceId, String jsonData) {
         validateJsonFormat(jsonData);
 
-        EventDTO eventDTO = JsonDtoParser.parseJson(jsonData);
+        EventDTO eventDTO = new EventDTO(deviceId, JsonDtoParser.parseMeasurements(jsonData));
         eventDTO.measurements().stream()
                 .filter(m -> m.type().equals(measurementsProperties.getLampState().getName()))
                 .findFirst()
-                .ifPresent(m ->
-                        turnOnOffLamp((Boolean) m.value())
-                );
+                .ifPresent(m -> turnOnOffLamp((Boolean) m.value()));
         return eventDTO;
     }
 
@@ -76,7 +62,7 @@ public class PresenceHandler {
         if (!measurements.has(measurementsProperties.getRadarPresence().getName())
             || !measurements.has(measurementsProperties.getPirSensorPresence().getName())
             || !measurements.has(measurementsProperties.getLampState().getName())) {
-            throw new IllegalArgumentException("NodeMCU requires radarPresence, pirSensorPresence and lampState measurements");
+            throw new IllegalArgumentException("presence sensor requires radarPresence, pirSensorPresence and lampState measurements");
         }
     }
 }

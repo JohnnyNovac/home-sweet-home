@@ -18,12 +18,19 @@ public class JsonDtoParser {
     }
 
     public static EventDTO parseJson(String jsonData) {
-
         JsonNode root = objectMapper.readTree(jsonData);
         String sensorId = root.get("sensorId").asString();
+        return new EventDTO(sensorId, parseMeasurements(jsonData));
+    }
 
-        List<MeasurementDTO> measurementDTOs = new ArrayList<>();
+    public static List<MeasurementDTO> parseMeasurements(String jsonData) {
+        JsonNode root = objectMapper.readTree(jsonData);
         JsonNode measurementsNode = root.get("measurements");
+        return extractMeasurements(measurementsNode);
+    }
+
+    private static List<MeasurementDTO> extractMeasurements(JsonNode measurementsNode) {
+        List<MeasurementDTO> measurementDTOs = new ArrayList<>();
 
         measurementsNode.properties().forEach(entry -> {
             String type = entry.getKey();
@@ -45,8 +52,6 @@ public class JsonDtoParser {
             measurementDTOs.add(new MeasurementDTO(type, value));
         });
 
-        return new EventDTO(sensorId, measurementDTOs);
+        return measurementDTOs;
     }
-
-
 }

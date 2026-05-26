@@ -1,8 +1,10 @@
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h>
+#include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <MQTT.h>
-#include <ArduinoJson.h>
 #include "secrets.h"
 
 #define MAX_LOG_SIZE 2000
@@ -28,10 +30,10 @@ bool activeMode = true;
 
 bool first = true;
 
-volatile bool radarIsActive = false;  // Флаг активности радара
+volatile bool radarIsActive = false;  // Radar activity flag
 
-unsigned long lowLevelRadarTime;                    // Время начала низкого уровня на радаре
-const unsigned long lowLevelRadarDuration = 10000;  // Длительность низкого уровня на радаре (10 секунд)
+unsigned long lowLevelRadarTime;                    // When the radar level went low
+const unsigned long lowLevelRadarDuration = 10000;  // How long the radar stays low (10 seconds)
 
 WiFiClient net;
 ESP8266WebServer server(8008);
@@ -39,40 +41,40 @@ MQTTClient mqttClient;
 
 String logData = "Presence Box logs: \n\n";
 
-const char* MQTT_BROKER_IP = "192.168.1.77";  // ← сюда свой IP брокера
-const char* SENSOR_ID = "NodeMCU";
-const char* AVAILABILITY_TOPIC = "home/nodemcu/availability";
-const char* LAMP_STATE_TOPIC = "home/nodemcu/lampstate";
-const char* DATA_TOPIC = "home/nodemcu/data";
-const char* DEVICE_NAME = "PresenceBox";  // уникальное имя устройства
+const char* MQTT_BROKER_IP = "192.168.1.77";  // ← your broker IP here
+const char* DEVICE_ID = "NodeMCU-1";
+const char* AVAILABILITY_TOPIC = "home/availability/nodemcu1";
+const char* LAMP_STATE_TOPIC = "home/presence/nodemcu1/lampstate";
+const char* DATA_TOPIC = "home/presence/nodemcu1/data";
+const char* DEVICE_NAME = "PresenceBox";  // unique device name
 
 void log(String message) {
   Serial.println(message);
 
   logData += message + "\n";
 
-  // Если размер буфера с логами превышает MAX_LOG_SIZE, обрезаем, не трогая заголовок
+  // If the log buffer exceeds MAX_LOG_SIZE, trim it without touching the header
   if (logData.length() > MAX_LOG_SIZE) {
-    logData = logData.substring(logData.indexOf("\n") + 1);  // Убираем первую строку заголовка
+    logData = logData.substring(logData.indexOf("\n") + 1);  // Dropping the first (header) line
     if (logData.length() > MAX_LOG_SIZE) {
-      logData = logData.substring(logData.length() - MAX_LOG_SIZE);  // Оставляем последние записи
+      logData = logData.substring(logData.length() - MAX_LOG_SIZE);  // Keeping the most recent entries
     }
   }
 }
 
-//Функция для обработки запроса на главной странице сервера
+// Handles requests to the server's root page
 void handleRoot() {
-  server.send(200, "text/plain", logData);
+  server.send(200, "text/plain; charset=utf-8", logData);
 }
 
 bool connectToMQTT() {
   const int maxAttempts = 5;
   int attempt = 0;
 
-  while (!mqttClient.connect(SENSOR_ID, MQTT_USER, MQTT_PASS) && attempt < maxAttempts) {
+  while (!mqttClient.connect(DEVICE_ID, MQTT_USER, MQTT_PASS) && attempt < maxAttempts) {
     log("MQTT connect failed, retrying...");
     delay(1000);
-    ArduinoOTA.handle();  // поддержка OTA во время ожидания
+    ArduinoOTA.handle();  // keeping OTA responsive while waiting
     attempt++;
   }
 
@@ -112,14 +114,14 @@ void setup() {
 
   turnOnRadar();
   if (digitalRead(RADAR_PIN) == HIGH && !currentLampState) {
-    currentLampState = true;  //Включаем люстру, если при инициализации обнаружено присутствие
+    currentLampState = true;  // Turning on the chandelier if presence is detected at init
     sendData(radarPresence, pirSensorPresence, currentLampState);
   }
   yield();
   log("Waiting one minute for PIR-sensor calibration...");
-  for (int i = 0; i < 60; i++) {  //Ждем минуту для калибровки PIR-сенсора
-    delay(1000);                  // Задержка в 1 секунду
-    yield();                      // Сбрасываем Watchdog
+  for (int i = 0; i < 60; i++) {  // Waiting a minute for PIR sensor calibration
+    delay(1000);                  // 1 second delay
+    yield();                      // Resetting the watchdog
   }
   attachInterrupt(digitalPinToInterrupt(PIR_SENSOR_PIN), detectPirSensorPresence, RISING);
 
@@ -155,13 +157,13 @@ void loop() {
       log("Detected movement by radar");
     } else if (lowLevelRadarTime > 0) {
       unsigned long currentLowLevelRadarDuration = millis() - lowLevelRadarTime;
-      if (currentLowLevelRadarDuration >= lowLevelRadarDuration) {  // Проверка, прошел ли заданный интервал времени для радара
+      if (currentLowLevelRadarDuration >= lowLevelRadarDuration) {  // Checking whether the configured radar interval has elapsed
         log(String("Current low level radar duration - ") + String(currentLowLevelRadarDuration / 1000) + " seconds");
         turnOffRadar();
         currentLampState = false;
         sendData(radarPresence, pirSensorPresence, currentLampState);
 
-        lowLevelRadarTime = 0;  // Сбрасываем время
+        lowLevelRadarTime = 0;  // Resetting the timer
 
         log("Radar deactivated, PIR-sensor activated");
       }
@@ -178,6 +180,22 @@ void loop() {
 
     log("Radar activated");
   }
+}
+
+void initWiFi() {
+  log(String("Connecting to ") + STASSID);
+  WiFi.persistent(false);  // don't store the connection each time to save wear on the flash
+  WiFi.mode(WIFI_STA);
+  WiFi.setOutputPower(17.5);  // REQUIRED! OTHERWISE THERE WILL BE CONSTANT WDT RESETS
+  WiFi.begin(STASSID, STAPSK);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(400);
+    // Serial.print(".");
+    yield();
+  }
+  log("WiFi connected!");
+  log("IP address: " + WiFi.localIP().toString());
+  yield();
 }
 
 void initWebServer() {
@@ -242,11 +260,11 @@ IRAM_ATTR void detectPirSensorPresence() {
 
 IRAM_ATTR void detectRadarSignalChange() {
   if (digitalRead(RADAR_PIN) == LOW) {
-    // Если уровень низкий, начинаем отсчет времени
+    // If the level is low, start the timer
     lowLevelRadarTime = millis();
     radarPresence = false;
   } else {
-    // Если уровень высокий, сбрасываем отсчет
+    // If the level is high, reset the timer
     lowLevelRadarTime = 0;
     radarPresence = true;
   }
@@ -272,7 +290,7 @@ void lightSleepWithInterrupt() {
   gpio_pin_wakeup_enable(GPIO_ID_PIN(PIR_SENSOR_PIN), GPIO_PIN_INTR_HILEVEL);
   wifi_fpm_set_wakeup_cb(wakeUp);  // Set wakeup callback (optional)
   wifi_fpm_open();
-  int sleepStatus = wifi_fpm_do_sleep(0xFFFFFFF);  //Проверяем статус - должен быть 0, если всё ОК
+  int sleepStatus = wifi_fpm_do_sleep(0xFFFFFFF);  // Checking the status - should be 0 if everything is OK
   log("Sleep status: " + sleepStatus);
 }
 
@@ -283,26 +301,10 @@ void wakeUp() {
   first = false;
 }
 
-void initWiFi() {
-  log(String("Connecting to ") + STASSID);
-  WiFi.persistent(false);  // don't store the connection each time to save wear on the flash
-  WiFi.mode(WIFI_STA);
-  WiFi.setOutputPower(17.5);  //ОБЯЗАТЕЛЬНО! ИНАЧЕ БУДЕТ ПОСТОЯННЫЙ WDT RESET
-  WiFi.begin(STASSID, STAPSK);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(400);
-    // Serial.print(".");
-    yield();
-  }
-  log("WiFi connected!");
-  log("IP address: " + WiFi.localIP().toString());
-  yield();
-}
-
 void turnOnRadar() {
   radarIsActive = true;
   log("Turning ON radar...");
-  digitalWrite(RELAY_PIN, true);  //Активируем радар через реле
+  digitalWrite(RELAY_PIN, true);  // Activating the radar via the relay
   delay(3000);
   attachInterrupt(digitalPinToInterrupt(RADAR_PIN), detectRadarSignalChange, CHANGE);
 
@@ -313,7 +315,7 @@ void turnOnRadar() {
 void turnOffRadar() {
   radarIsActive = false;
   log("Turning OFF radar...");
-  digitalWrite(RELAY_PIN, false);  //Деактивируем радар через реле
+  digitalWrite(RELAY_PIN, false);  // Deactivating the radar via the relay
   detachInterrupt(digitalPinToInterrupt(RADAR_PIN));
 
   digitalWrite(RED_LED_PIN, true);
@@ -324,7 +326,7 @@ void messageReceived(String& topic, String& payload) {
   log("incoming: " + topic + " - " + payload);
 
   currentLampState = payload == "true";
-  lampStateUpdated = true;  // СИГНАЛ: значение пришло
+  lampStateUpdated = true;  // SIGNAL: value has arrived
 
   // Note: Do not use the client in the callback to publish, subscribe or
   // unsubscribe as it may cause deadlocks when other things arrive while
@@ -336,13 +338,13 @@ void updateCurrentLampState() {
   const int maxAttempts = 5;
   int attempt = 0;
 
-  lampStateUpdated = false;  // сброс флага, ждём новое сообщение
+  lampStateUpdated = false;  // resetting the flag, waiting for a new message
 
   log("Waiting for lamp state...");
 
-  // ждём пока messageReceived() не обновит состояние
+  // Waiting until messageReceived() updates the state
   while (!lampStateUpdated && attempt < maxAttempts) {
-    mqttClient.loop();  // обязательно для получения MQTT сообщений
+    mqttClient.loop();  // required to receive MQTT messages
     delay(1000);
     attempt++;
   }
@@ -355,9 +357,8 @@ void updateCurrentLampState() {
 }
 
 void sendData(bool radarPresence, bool pirSensorPresence, bool lampState) {
-  // Формируем JSON
+  // Building the JSON
   DynamicJsonDocument doc(128);
-  doc["sensorId"] = SENSOR_ID;
   JsonObject measurements = doc.createNestedObject("measurements");
   measurements["radarPresence"] = radarPresence;
   measurements["pirSensorPresence"] = pirSensorPresence;

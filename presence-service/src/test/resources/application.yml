@@ -12,7 +12,7 @@ spring:
 
 app:
   rabbitmq:
-    presence-queue: presence-service
+    presence-data-queue: presence-data
 
 logging:
   level:

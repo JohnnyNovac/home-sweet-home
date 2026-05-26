@@ -18,6 +18,8 @@ import static org.assertj.core.api.AssertionsForClassTypes.tuple;
 @ExtendWith(MockitoExtension.class)
 class PresenceHandlerTest {
 
+    private static final String DEVICE_ID = "presence-1";
+
     private PresenceHandler presenceHandler;
 
     @Mock
@@ -48,7 +50,6 @@ class PresenceHandlerTest {
     void shouldHandlePresenceData() {
         String jsonData = """
                 {
-                    "sensorId": "NodeMCU",
                     "measurements": {
                         "radarPresence": true,
                         "pirSensorPresence": false,
@@ -57,9 +58,10 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        var eventDTO = presenceHandler.handleIncomingData(jsonData);
+        var eventDTO = presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
 
         assertThat(eventDTO).isNotNull();
+        assertThat(eventDTO.sensorId()).isEqualTo(DEVICE_ID);
         assertThat(eventDTO.measurements()).hasSize(3);
         assertThat(eventDTO.measurements())
                 .extracting(MeasurementDTO::type, MeasurementDTO::value)
@@ -75,7 +77,7 @@ class PresenceHandlerTest {
     void shouldRejectDataWithoutRequiredFields() {
         String invalidJsonData = "{}";
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(invalidJsonData))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, invalidJsonData))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -84,7 +86,6 @@ class PresenceHandlerTest {
     void shouldExtractMeasurementTypes() {
         String jsonData = """
                 {
-                    "sensorId": "NodeMCU",
                     "measurements": {
                         "radarPresence": true,
                         "pirSensorPresence": false,
@@ -93,7 +94,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        var eventDTO = presenceHandler.handleIncomingData(jsonData);
+        var eventDTO = presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
 
         assertThat(eventDTO).isNotNull();
         assertThat(eventDTO.measurements())
@@ -102,27 +103,17 @@ class PresenceHandlerTest {
     }
 
     @Test
-    @DisplayName("Should skip service messages")
-    void shouldSkipServiceMessages() {
-        assertThat(presenceHandler.handleIncomingData("online")).isNull();
-        assertThat(presenceHandler.handleIncomingData("offline")).isNull();
-        assertThat(presenceHandler.handleIncomingData("ONLINE")).isNull();
-        assertThat(presenceHandler.handleIncomingData("OFFLINE")).isNull();
-    }
-
-    @Test
     @DisplayName("Should throw exception when required measurements are missing")
     void shouldThrowExceptionWhenRequiredMeasurementsAreMissing() {
         String invalidJsonData = """
                 {
-                    "sensorId": "NodeMCU",
                     "measurements": {
                         "radarPresence": true
                     }
                 }
                 """;
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(invalidJsonData))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, invalidJsonData))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

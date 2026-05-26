@@ -9,5 +9,4 @@ class YandexServiceApplicationTests {
     @Test
     void contextLoads() {
     }
-
 }

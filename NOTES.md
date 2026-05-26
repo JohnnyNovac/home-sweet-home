@@ -26,6 +26,33 @@ WiFi-мост между MultiBox и брокером: принимает пок
 
 Если OTA не подхватывается — поменять версию mdns-discovery.
 
+## MQTT-топики устройств
+
+Все устройства публикуют в неймспейс `home/...`. Пространство `homeassistant/...` зарезервировано под auto-discovery
+и state-топики, которые публикует event-service.
+
+| Топик                                | Назначение                                                    |
+|--------------------------------------|---------------------------------------------------------------|
+| `home/<sensorType>/<deviceId>/data`  | JSON с измерениями                                            |
+| `home/availability/<deviceId>`       | `online` / `offline` (MQTT LWT непосредственно от устройства) |
+| `home/presence/<deviceId>/lampstate` | Состояние лампы от PresenceBox                                |
+
+`sensorType` — `climate` или `presence`. `deviceId` задаётся константой `DEVICE_ID` в прошивке `.ino`.
+
+## Назначение комнаты устройству
+
+При первом сообщении устройство автоматически добавляется в коллекцию `devices` (Mongo, БД `events`). Чтобы Home
+Assistant отображал датчики в нужной комнате, поле `room` нужно задать вручную через `mongosh`:
+
+```bash
+docker exec -it mongodb mongosh -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD
+> use events
+> db.devices.updateOne({_id: "esp01"}, {$set: {room: "bedroom"}})
+```
+
+После этого нужно перезапустить Home Assistant: event-service подписан на `homeassistant/status` и при переходе в
+`online` повторно публикует discovery с актуальным значением `suggested_area`.
+
 ## Чек-лист перед запуском
 
 1. Установлена Java 21.

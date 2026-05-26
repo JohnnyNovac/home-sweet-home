@@ -36,5 +36,4 @@ public class SensorData {
     public List<Measurement> getMeasurements() {
         return measurements;
     }
-
 }

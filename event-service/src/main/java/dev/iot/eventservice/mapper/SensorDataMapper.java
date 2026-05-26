@@ -22,5 +22,4 @@ public class SensorDataMapper {
                 dto.measurements().stream().map(measurementMapper::toEntity).toList()
         );
     }
-
 }

@@ -2,8 +2,8 @@ package dev.iot.eventservice.mapper;
 
 import dev.iot.eventservice.model.Measurement;
 import dev.iot.shared.dto.MeasurementDTO;
-import org.springframework.stereotype.Component;
 import dev.iot.shared.utils.Units;
+import org.springframework.stereotype.Component;
 
 @Component
 public class MeasurementMapper {
@@ -15,5 +15,4 @@ public class MeasurementMapper {
                 Units.getUnit(dto.type())
         );
     }
-
 }

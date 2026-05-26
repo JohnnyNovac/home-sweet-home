@@ -16,10 +16,13 @@ import reactor.test.StepVerifier;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SensorDataServiceImplTest {
+
+    private static final String DEVICE_ID = "climate-1";
 
     @Mock
     private SensorDataRepository repository;
@@ -37,10 +40,8 @@ class SensorDataServiceImplTest {
     @Test
     @DisplayName("Should save sensor data to MongoDB")
     void shouldSaveIncomingData() {
-        String sensorId = "ESP-01";
         String jsonData = """
                 {
-                    "sensorId": "ESP-01",
                     "measurements": {
                         "temperature": 22.5,
                         "humidity": 65
@@ -48,12 +49,12 @@ class SensorDataServiceImplTest {
                 }
                 """;
 
-        SensorData expectedSensorData = new SensorData(sensorId, null, List.of());
+        SensorData expectedSensorData = new SensorData(DEVICE_ID, null, List.of());
 
         when(sensorDataMapper.toDocument(any(EventDTO.class))).thenReturn(expectedSensorData);
         when(repository.save(any(SensorData.class))).thenReturn(Mono.just(expectedSensorData));
 
-        StepVerifier.create(sensorService.saveIncomingData(jsonData))
+        StepVerifier.create(sensorService.saveIncomingData(DEVICE_ID, jsonData))
                 .expectNext(expectedSensorData)
                 .verifyComplete();
 
@@ -64,10 +65,8 @@ class SensorDataServiceImplTest {
     @Test
     @DisplayName("Should handle save errors")
     void shouldHandleSaveErrors() {
-        String sensorId = "ESP-01";
         String jsonData = """
                 {
-                    "sensorId": "ESP-01",
                     "measurements": {
                         "temperature": 22.5,
                         "humidity": 65
@@ -75,12 +74,12 @@ class SensorDataServiceImplTest {
                 }
                 """;
 
-        SensorData expectedSensorData = new SensorData(sensorId, null, List.of());
+        SensorData expectedSensorData = new SensorData(DEVICE_ID, null, List.of());
 
         when(sensorDataMapper.toDocument(any(EventDTO.class))).thenReturn(expectedSensorData);
         when(repository.save(any(SensorData.class))).thenReturn(Mono.error(new RuntimeException("Database error")));
 
-        StepVerifier.create(sensorService.saveIncomingData(jsonData))
+        StepVerifier.create(sensorService.saveIncomingData(DEVICE_ID, jsonData))
                 .expectError(RuntimeException.class)
                 .verify();
     }

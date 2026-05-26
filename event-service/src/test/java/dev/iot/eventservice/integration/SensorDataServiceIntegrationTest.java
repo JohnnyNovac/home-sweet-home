@@ -27,10 +27,9 @@ class SensorDataServiceIntegrationTest {
     @Test
     @DisplayName("Should save sensor data to MongoDB")
     void shouldSaveDataToMongoDB() {
-        String sensorId = "ESP-01";
+        String deviceId = "climate-1";
         String jsonData = """
                 {
-                    "sensorId": "ESP-01",
                     "measurements": {
                         "temperature": 22.5,
                         "humidity": 65
@@ -38,12 +37,11 @@ class SensorDataServiceIntegrationTest {
                 }
                 """;
 
-        StepVerifier.create(sensorDataService.saveIncomingData(jsonData))
+        StepVerifier.create(sensorDataService.saveIncomingData(deviceId, jsonData))
                 .assertNext(savedData -> {
-                    assertThat(savedData.getSensorId()).isEqualTo(sensorId);
+                    assertThat(savedData.getSensorId()).isEqualTo(deviceId);
                     assertThat(savedData.getMeasurements()).hasSize(2);
                 })
                 .verifyComplete();
     }
-
 }
