@@ -17,7 +17,7 @@ server:
 
 app:
   rabbitmq:
-    presence-queue: presence-service
+    presence-data-queue: presence-data
   measurements:
     radar-presence:
       name: radarPresence

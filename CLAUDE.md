@@ -37,14 +37,48 @@ reads RabbitMQ / Mongo / Yandex credentials from env vars (`RABBITMQ_DEFAULT_USE
 **Message routing.** RabbitMQ is the single broker for both MQTT (port 1883, from Arduino) and AMQP (to services). MQTT
 topics are routed to AMQP queues by RabbitMQ definitions in `docker/rabbitmq/`. Each service binds to its own queue via
 `@RabbitListener(queues = "${app.rabbitmq.*-queue}")` — the queue name is always externalised to
-`application.yml`.
+`application.yml`. The MQTT plugin maps each `/` in an MQTT topic to a `.` in the AMQP routing key.
+
+**Topic / routing-key convention.** All Arduino devices publish under a `home/...` namespace; `homeassistant/...` is
+reserved for HA auto-discovery and HA-facing state topics published by event-service.
+
+| MQTT topic                           | AMQP routing key                     | Purpose                                       |
+|--------------------------------------|--------------------------------------|-----------------------------------------------|
+| `home/<sensorType>/<deviceId>/data`  | `home.<sensorType>.<deviceId>.data`  | Sensor measurements (JSON in `measurements`)  |
+| `home/availability/<deviceId>`       | `home.availability.<deviceId>`       | `online`/`offline` (MQTT LWT from the device) |
+| `home/presence/<deviceId>/lampstate` | `home.presence.<deviceId>.lampstate` | Lamp state echo (PresenceBox only)            |
+
+Bindings in `docker/rabbitmq/definitions.json`:
+
+- `home.*.*.data` → `event-data` (consumed by `EventRunner`)
+- `home.presence.*.data` → `presence-data` (consumed by `presence-service`)
+- `home.availability.*` → `device-availability` (consumed by `AvailabilityHandler`)
+
+`deviceId` lives only in the routing key — never in the JSON payload. Adding a new physical device = flash firmware with
+its own `DEVICE_ID` and matching topics; no service-side config or code changes are needed.
 
 **Sensor handler dispatch (event-service).** `EventRunner` is a `CommandLineRunner` that listens to the event queue and
-dispatches each message by `sensorId` to a `SensorHandler` implementation via `SensorHandlerFactory` (Spring auto-wires
-the `List<SensorHandler>` and keys by `getType()`). Adding a new sensor type = new `SensorHandler` bean; the factory
-picks it up automatically. `EventRunner` also gates all processing on Home Assistant's online status — it subscribes to
-`app.ha.status-topic` over MQTT and drops incoming events until HA reports `online`, at which point every handler's
-`sendDiscoveryMessage()` is called to (re-)publish HA auto-discovery configs.
+dispatches each message by `sensorType` (parsed from the AMQP routing key — `parts[1]`) to a `SensorHandler` via
+`SensorHandlerFactory` (Spring auto-wires the `List<SensorHandler>` and keys by `getType()`). Current types: `climate`
+(DHT temperature/humidity) and `presence` (PIR + radar + lamp state). Adding a new sensor type = new `SensorHandler`
+bean returning the new type from `getType()` + matching routing-key value from firmware. `EventRunner` also gates all
+processing on Home Assistant's online status — it subscribes to `app.ha.status-topic` over MQTT and drops incoming
+events until HA reports `online`, at which point every handler's `sendDiscoveryForAll()` is called to (re-)publish HA
+auto-discovery configs for every device the handler has seen so far (tracked in `knownDeviceIds`).
+
+**Device availability.** Each Arduino sets an MQTT LWT pointing at `home/availability/<deviceId>` with payload
+`offline`, and publishes `online` to the same topic right after connect. HA reads device availability from this topic
+directly — it is referenced in the `avty` array of every discovery payload, alongside the service-level
+`app.ha.service-availability-topic`. `AvailabilityHandler` in event-service is a passive consumer: it only updates
+`lastSeenAt` in the device registry, it never republishes anything to HA.
+
+**Device registry.** `DeviceRegistry` maintains the `devices` MongoDB collection (fields: `deviceId` as `_id`,
+`sensorType`, `room`, `lastSeenAt`). `recordSeen(deviceId, sensorType)` is called on every data message (from
+`EventRunner`) and every availability message (from `AvailabilityHandler`, with `sensorType = null`) — upserts the
+device, updates `lastSeenAt`, fills `sensorType` lazily on the first data message. `roomFor(deviceId)` is consumed by
+handlers when building HA discovery payloads; if `room` is set, `suggested_area` is added so HA places the entity in the
+right room. Rooms are assigned manually via `mongosh` — see `NOTES.md`. A room change takes effect after HA restart
+(handlers re-publish discovery for every known device when `homeassistant/status` flips to `online`).
 
 **Lamp control path.** `presence-service` → parses `lampState` measurement out of the PresenceBox JSON → calls
 `yandex-service` via the gRPC stub declared in `grpc-api/src/main/proto/yandex.proto` (`YandexService.TurnOnOffLamp`).

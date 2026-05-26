@@ -23,8 +23,8 @@ public class SensorDataServiceImpl implements SensorDataService {
     }
 
     @Override
-    public Mono<SensorData> saveIncomingData(String jsonData) {
-        EventDTO eventDTO = JsonDtoParser.parseJson(jsonData);
+    public Mono<SensorData> saveIncomingData(String deviceId, String jsonData) {
+        EventDTO eventDTO = new EventDTO(deviceId, JsonDtoParser.parseMeasurements(jsonData));
         return repository.save(sensorDataMapper.toDocument(eventDTO));
     }
 }

@@ -27,6 +27,33 @@ the Arduino). Firmware lives in `arduino/ESP-01/`, secrets are in `arduino/ESP-0
 
 If OTA isn't picked up — bump the mdns-discovery version.
 
+## Device MQTT topics
+
+All devices publish under the `home/...` namespace. The `homeassistant/...` namespace is reserved for auto-discovery
+and state topics published by event-service.
+
+| Topic                                | Purpose                                         |
+|--------------------------------------|-------------------------------------------------|
+| `home/<sensorType>/<deviceId>/data`  | JSON with measurements                          |
+| `home/availability/<deviceId>`       | `online` / `offline` (MQTT LWT from the device) |
+| `home/presence/<deviceId>/lampstate` | Lamp state from PresenceBox                     |
+
+`sensorType` is either `climate` or `presence`. `deviceId` is set by the `DEVICE_ID` constant in the `.ino` firmware.
+
+## Assigning a room to a device
+
+On the first message the device is automatically added to the `devices` collection (Mongo, database `events`). To make
+Home Assistant display sensors in the correct room, the `room` field must be set manually via `mongosh`:
+
+```bash
+docker exec -it mongodb mongosh -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD
+> use events
+> db.devices.updateOne({_id: "esp01"}, {$set: {room: "bedroom"}})
+```
+
+Restart Home Assistant afterwards: event-service is subscribed to `homeassistant/status` and re-publishes discovery with
+the updated `suggested_area` when HA transitions to `online`.
+
 ## Pre-flight checklist
 
 1. Java 21 installed.

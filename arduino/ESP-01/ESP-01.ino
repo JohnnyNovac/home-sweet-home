@@ -4,23 +4,22 @@
 #include <ESP8266WebServer.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-#include "secrets.h"
 #include <MQTT.h>
+#include "secrets.h"
 
 #define MAX_LOG_SIZE 2000
 
-ESP8266WebServer server(8009);
 WiFiClient net;
+ESP8266WebServer server(8009);
 MQTTClient mqttClient;
 
 String logData = "ESP-01 Box logs: \n\n";
 
-const char* MQTT_BROKER_IP = "192.168.1.77";  // ← сюда свой IP брокера
-const char* SENSOR_ID = "ESP-01";
-const char* AVAILABILITY_TOPIC = "home/esp01/availability";
-const char* DATA_TOPIC = "home/esp01/data";
+const char* MQTT_BROKER_IP = "192.168.1.77";  // ← your broker IP here
+const char* DEVICE_ID = "ESP-01";
+const char* AVAILABILITY_TOPIC = "home/availability/esp01";
+const char* DATA_TOPIC = "home/climate/esp01/data";
 
-bool isMqttConnected = false;  // Флаг подключения к MQTT
 bool isFirstValuePublished = false;
 
 void log(String message) {
@@ -28,33 +27,28 @@ void log(String message) {
 
   logData += message + "\n";
 
-  // Если размер буфера с логами превышает MAX_LOG_SIZE, обрезаем, не трогая заголовок
+  // If the log buffer exceeds MAX_LOG_SIZE, trim it without touching the header
   if (logData.length() > MAX_LOG_SIZE) {
-    logData = logData.substring(logData.indexOf("\n") + 1);  // Убираем первую строку заголовка
+    logData = logData.substring(logData.indexOf("\n") + 1);  // Dropping the first (header) line
     if (logData.length() > MAX_LOG_SIZE) {
-      logData = logData.substring(logData.length() - MAX_LOG_SIZE);  // Оставляем последние записи
+      logData = logData.substring(logData.length() - MAX_LOG_SIZE);  // Keeping the most recent entries
     }
   }
 }
 
-//Функция для обработки запроса на главной странице сервера
+// Handles requests to the server's root page
 void handleRoot() {
-  server.send(200, "text/plain", logData);
-}
-
-void initWebServer() {
-  server.on("/", handleRoot);
-  server.begin();
+  server.send(200, "text/plain; charset=utf-8", logData);
 }
 
 bool connectToMQTT() {
   const int maxAttempts = 5;
   int attempt = 0;
 
-  while (!mqttClient.connect(SENSOR_ID, MQTT_USER, MQTT_PASS) && attempt < maxAttempts) {
+  while (!mqttClient.connect(DEVICE_ID, MQTT_USER, MQTT_PASS) && attempt < maxAttempts) {
     log("MQTT connect failed, retrying...");
     delay(1000);
-    ArduinoOTA.handle();  // поддержка OTA во время ожидания
+    ArduinoOTA.handle();  // keeping OTA responsive while waiting
     attempt++;
   }
 
@@ -70,9 +64,57 @@ bool connectToMQTT() {
 
 void setup() {
   Serial.begin(9600);
-  log("Booting...");
+  log("Reset reason = " + ESP.getResetReason());
+
+  initWiFi();
+  initWebServer();
+
+  mqttClient.begin(MQTT_BROKER_IP, net);
+  mqttClient.setWill(AVAILABILITY_TOPIC, "offline");
+  connectToMQTT();
+
+  initOTA();
+
+  log("Setup finished!");
+}
+
+void loop() {
+  mqttClient.loop();
+  delay(10);  // <- fixes some issues with WiFi stability
+
+  server.handleClient();
+  ArduinoOTA.handle();
+
+  if (!Serial.available()) return;
+
+  String receivedData = Serial.readStringUntil('\n');  // Reading until the \n character
+  Serial.println(receivedData);
+  log("Received data: " + receivedData);
+
+  receivedData.trim();
+  if (receivedData == "RESET") {
+    ESP.restart();  // software reset of ESP
+  }
+
+  if (!mqttClient.connected()) {
+    if (!connectToMQTT()) {
+      log("Unable to connect to the MQTT broker. Trying again...");
+      return;
+    }
+  }
+
+  int commaIndex = receivedData.indexOf(',');
+  if (commaIndex > 0) {
+    float temperature = receivedData.substring(0, commaIndex).toFloat();
+    float humidity = receivedData.substring(commaIndex + 1).toFloat();
+
+    sendData(temperature, humidity);
+  }
+}
+
+void initWiFi() {
   WiFi.mode(WIFI_STA);
-  WiFi.setOutputPower(17.5);  //ОБЯЗАТЕЛЬНО! ИНАЧЕ БУДЕТ ПОСТОЯННЫЙ WDT RESET
+  WiFi.setOutputPower(17.5);  // REQUIRED! OTHERWISE THERE WILL BE CONSTANT WDT RESETS
   WiFi.begin(STASSID, STAPSK);
   log("Connecting to Wi-Fi...");
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
@@ -81,17 +123,19 @@ void setup() {
     ESP.restart();
   }
   log("Wi-Fi connected!");
+  log("IP address: " + WiFi.localIP().toString());
+}
 
-  initWebServer();
+void initWebServer() {
+  server.on("/", handleRoot);
+  server.begin();
+}
 
-  mqttClient.begin(MQTT_BROKER_IP, net);
-  mqttClient.setWill(AVAILABILITY_TOPIC, "offline");
-  connectToMQTT();
-
+void initOTA() {
   // Port defaults to 8266
-  // ArduinoOTA.setPort(8266);
+  //ArduinoOTA.setPort(8266);
 
-  //Hostname defaults to esp8266-[ChipID]
+  // Hostname defaults to esp8266-[ChipID]
   ArduinoOTA.setHostname("myESP01");
 
   // No authentication by default
@@ -133,53 +177,22 @@ void setup() {
     }
   });
   ArduinoOTA.begin();
-  log("OTA is ready!");
+  log("OTA is ready");
 }
 
-void loop() {
-  mqttClient.loop();
-  delay(10);  // <- fixes some issues with WiFi stability
+void sendData(float temperature, float humidity) {
+  // Building the JSON
+  DynamicJsonDocument doc(128);
+  JsonObject measurements = doc.createNestedObject("measurements");
+  measurements["temperature"] = temperature;
+  measurements["humidity"] = humidity;
 
-  server.handleClient();
-  ArduinoOTA.handle();
-
-  if (!Serial.available()) return;
-
-  String receivedData = Serial.readStringUntil('\n');  // Читаем до символа \n    // log(receivedData);
-  Serial.println(receivedData);
-  log("Received data: " + receivedData);
-
-  receivedData.trim();
-  if (receivedData == "RESET") {
-    ESP.restart();  // software reset of ESP
+  char payload[128];
+  serializeJson(doc, payload);
+  if (!isFirstValuePublished) {
+    mqttClient.publish(AVAILABILITY_TOPIC, "online");
+    isFirstValuePublished = true;
   }
-
-  if (!mqttClient.connected()) {
-    if (!connectToMQTT()) {
-      log("Unable to connect to the MQTT broker. Trying again...");
-      return;
-    }
-  }
-
-  int commaIndex = receivedData.indexOf(',');
-  if (commaIndex > 0) {
-    float temperature = receivedData.substring(0, commaIndex).toFloat();
-    float humidity = receivedData.substring(commaIndex + 1).toFloat();
-
-    // Формируем JSON
-    DynamicJsonDocument doc(128);
-    doc["sensorId"] = SENSOR_ID;
-    JsonObject measurements = doc.createNestedObject("measurements");
-    measurements["temperature"] = temperature;
-    measurements["humidity"] = humidity;
-
-    char payload[128];
-    serializeJson(doc, payload);
-    if (!isFirstValuePublished) {
-      mqttClient.publish(AVAILABILITY_TOPIC, "online");
-      isFirstValuePublished = true;
-    }
-    mqttClient.publish(DATA_TOPIC, payload);
-    log("Publishing sensor data - Temperature: " + String(temperature) + "°C, Humidity: " + String(humidity) + "%");
-  }
+  mqttClient.publish(DATA_TOPIC, payload);
+  log("Publishing sensor data - Temperature: " + String(temperature) + "°C, Humidity: " + String(humidity) + "%");
 }

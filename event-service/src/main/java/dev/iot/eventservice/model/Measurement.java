@@ -23,5 +23,4 @@ public class Measurement {
     public String getUnit() {
         return unit;
     }
-
 }

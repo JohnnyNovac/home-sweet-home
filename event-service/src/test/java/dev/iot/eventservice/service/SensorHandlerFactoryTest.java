@@ -16,7 +16,7 @@ import static org.mockito.Mockito.when;
 class SensorHandlerFactoryTest {
 
     @Mock
-    private SensorHandler esp01Handler;
+    private SensorHandler climateHandler;
 
     @Mock
     private SensorHandler presenceHandler;
@@ -25,19 +25,19 @@ class SensorHandlerFactoryTest {
 
     @BeforeEach
     void setUp() {
-        when(esp01Handler.getType()).thenReturn("ESP-01");
-        when(presenceHandler.getType()).thenReturn("NodeMCU");
+        when(climateHandler.getType()).thenReturn("climate");
+        when(presenceHandler.getType()).thenReturn("presence");
 
-        factory = new SensorHandlerFactory(List.of(esp01Handler, presenceHandler));
+        factory = new SensorHandlerFactory(List.of(climateHandler, presenceHandler));
     }
 
     @Test
     @DisplayName("Should return correct handler by type")
     void shouldReturnCorrectHandlerByType() {
-        SensorHandler result = factory.getHandler("ESP-01");
-        assertThat(result).isEqualTo(esp01Handler);
+        SensorHandler result = factory.getHandler("climate");
+        assertThat(result).isEqualTo(climateHandler);
 
-        result = factory.getHandler("NodeMCU");
+        result = factory.getHandler("presence");
         assertThat(result).isEqualTo(presenceHandler);
     }
 
@@ -53,6 +53,6 @@ class SensorHandlerFactoryTest {
     void shouldReturnAllHandlers() {
         List<SensorHandler> handlers = factory.getHandlers();
         assertThat(handlers).hasSize(2);
-        assertThat(handlers).containsExactlyInAnyOrder(esp01Handler, presenceHandler);
+        assertThat(handlers).containsExactlyInAnyOrder(climateHandler, presenceHandler);
     }
 }
