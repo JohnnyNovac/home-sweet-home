@@ -2,6 +2,8 @@ package dev.iot.eventservice.service;
 
 import dev.iot.eventservice.model.Device;
 import dev.iot.eventservice.repository.DeviceRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -10,6 +12,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -19,6 +22,10 @@ import java.util.Optional;
  */
 @Service
 public class DeviceRegistry {
+
+    private static final Logger logger = LoggerFactory.getLogger(DeviceRegistry.class);
+
+    private static final Duration ROOM_LOOKUP_TIMEOUT = Duration.ofSeconds(3);
 
     private final ReactiveMongoTemplate mongoTemplate;
     private final DeviceRepository repository;
@@ -53,12 +60,22 @@ public class DeviceRegistry {
     }
 
     /**
+     * Возвращает назначенную устройству комнату для проставления {@code suggested_area} в
+     * discovery-конфиге. Вызывается из синхронного построения discovery, поэтому реактивное чтение
+     * мостится через {@code block} с тайм-аутом: если Mongo медлит или вернула ошибку, отдаём
+     * {@link Optional#empty()} — discovery публикуется без {@code suggested_area}, а комната
+     * подхватится при следующем перезапуске HA.
+     *
      * @param deviceId идентификатор устройства
-     * @return назначенная устройству комната или {@link Optional#empty()}, если она не задана.
-     * Используется при сборке discovery-конфига для проставления {@code suggested_area}.
+     * @return назначенная комната или {@link Optional#empty()}, если она не задана либо недоступна
      */
     public Optional<String> roomFor(String deviceId) {
-        Device device = repository.findById(deviceId).block();
-        return device == null ? Optional.empty() : Optional.ofNullable(device.getRoom());
+        try {
+            Device device = repository.findById(deviceId).block(ROOM_LOOKUP_TIMEOUT);
+            return device == null ? Optional.empty() : Optional.ofNullable(device.getRoom());
+        } catch (RuntimeException e) {
+            logger.warn("Room lookup for {} failed, publishing discovery without suggested_area", deviceId, e);
+            return Optional.empty();
+        }
     }
 }
