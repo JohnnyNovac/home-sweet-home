@@ -57,6 +57,14 @@ Bindings in `docker/rabbitmq/definitions.json`:
 `deviceId` lives only in the routing key — never in the JSON payload. Adding a new physical device = flash firmware with
 its own `DEVICE_ID` and matching topics; no service-side config or code changes are needed.
 
+**Poison-message handling / dead-lettering.** Each work queue (`event-data`, `presence-data`, `device-availability`) is
+declared with `x-dead-letter-exchange: dlx` and routes to a matching `*.dlq` queue (`definitions.json`). Listeners
+classify failures: unrecoverable data errors (malformed JSON, missing required measurement, unexpected routing key —
+`JacksonException` / `IllegalArgumentException` / `ClassCastException`) are wrapped in
+`AmqpRejectAndDontRequeueException`, so the broker dead-letters them to `*.dlq` instead of requeuing forever; temporary
+failures (e.g. `MqttPublisherException` when MQTT is briefly down) propagate unchanged and are requeued for a later
+retry. Without this split a single bad device payload would loop on the queue head indefinitely.
+
 **Sensor handler dispatch (event-service).** `EventRunner` is a `CommandLineRunner` that listens to the event queue and
 dispatches each message by `sensorType` (parsed from the AMQP routing key — `parts[1]`) to a `SensorHandler` via
 `SensorHandlerFactory` (Spring auto-wires the `List<SensorHandler>` and keys by `getType()`). Current types: `climate`

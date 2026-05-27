@@ -1,21 +1,62 @@
 {
+  "exchanges": [
+    {
+      "name": "dlx",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
   "queues": [
     {
       "name": "event-data",
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
-      "arguments": {}
+      "arguments": {
+        "x-dead-letter-exchange": "dlx",
+        "x-dead-letter-routing-key": "event-data.dlq"
+      }
     },
     {
       "name": "presence-data",
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
-      "arguments": {}
+      "arguments": {
+        "x-dead-letter-exchange": "dlx",
+        "x-dead-letter-routing-key": "presence-data.dlq"
+      }
     },
     {
       "name": "device-availability",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "dlx",
+        "x-dead-letter-routing-key": "device-availability.dlq"
+      }
+    },
+    {
+      "name": "event-data.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "presence-data.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "device-availability.dlq",
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
@@ -45,6 +86,30 @@
       "destination": "device-availability",
       "destination_type": "queue",
       "routing_key": "home.availability.*",
+      "arguments": {}
+    },
+    {
+      "source": "dlx",
+      "vhost": "/",
+      "destination": "event-data.dlq",
+      "destination_type": "queue",
+      "routing_key": "event-data.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "dlx",
+      "vhost": "/",
+      "destination": "presence-data.dlq",
+      "destination_type": "queue",
+      "routing_key": "presence-data.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "dlx",
+      "vhost": "/",
+      "destination": "device-availability.dlq",
+      "destination_type": "queue",
+      "routing_key": "device-availability.dlq",
       "arguments": {}
     }
   ]

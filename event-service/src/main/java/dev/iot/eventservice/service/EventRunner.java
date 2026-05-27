@@ -4,10 +4,12 @@ import dev.iot.eventservice.config.HAConfigProperties;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -81,7 +83,12 @@ public class EventRunner implements CommandLineRunner {
                         error -> logger.error("Failed to upsert device {}", deviceId, error)
                 );
 
-        handler.handleIncomingData(deviceId, json);
+        try {
+            handler.handleIncomingData(deviceId, json);
+        } catch (JacksonException | IllegalArgumentException | ClassCastException e) {
+            logger.error("Discarding unprocessable message, routingKey={}, payload={}", routingKey, json, e);
+            throw new AmqpRejectAndDontRequeueException("Unprocessable event message: " + routingKey, e);
+        }
     }
 
     private void subscribeToHAStatus() throws MqttException {
