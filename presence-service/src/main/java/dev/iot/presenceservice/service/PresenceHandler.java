@@ -38,7 +38,13 @@ public class PresenceHandler {
         eventDTO.measurements().stream()
                 .filter(m -> m.type().equals(measurementsProperties.getLampState().getName()))
                 .findFirst()
-                .ifPresent(m -> turnOnOffLamp((Boolean) m.value()));
+                .ifPresent(m -> {
+                    if (m.value() instanceof Boolean lampOn) {
+                        turnOnOffLamp(lampOn);
+                    } else {
+                        throw new IllegalArgumentException("lampState must be a boolean, got: " + m.value());
+                    }
+                });
         return eventDTO;
     }
 
