@@ -1,6 +1,7 @@
 package dev.iot.eventservice.integration;
 
 import dev.iot.eventservice.config.MqttTestConfig;
+import dev.iot.eventservice.model.SensorData;
 import dev.iot.eventservice.service.SensorDataService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -8,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import reactor.test.StepVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,11 +37,9 @@ class SensorDataServiceIntegrationTest {
                 }
                 """;
 
-        StepVerifier.create(sensorDataService.saveIncomingData(deviceId, jsonData))
-                .assertNext(savedData -> {
-                    assertThat(savedData.getSensorId()).isEqualTo(deviceId);
-                    assertThat(savedData.getMeasurements()).hasSize(2);
-                })
-                .verifyComplete();
+        SensorData savedData = sensorDataService.saveIncomingData(deviceId, jsonData);
+
+        assertThat(savedData.getSensorId()).isEqualTo(deviceId);
+        assertThat(savedData.getMeasurements()).hasSize(2);
     }
 }

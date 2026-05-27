@@ -35,12 +35,11 @@ public class AvailabilityHandler {
         }
         logger.info("Device {} is {}", deviceId, body);
 
-        deviceRegistry.recordSeen(deviceId, null)
-                .subscribe(
-                        device -> {
-                        },
-                        error -> logger.error("Failed to upsert device {}", deviceId, error)
-                );
+        try {
+            deviceRegistry.recordSeen(deviceId, null);
+        } catch (RuntimeException e) {
+            logger.error("Failed to upsert device {}", deviceId, e);
+        }
     }
 
     private String parseDeviceId(String routingKey) {

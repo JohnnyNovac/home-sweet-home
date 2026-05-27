@@ -61,7 +61,7 @@ flowchart LR
 **Backend**
 
 - Java 21, Spring Boot 4.0
-- Spring WebFlux + Reactive MongoDB (event-service)
+- Spring Data MongoDB (event-service)
 - Spring AMQP (RabbitMQ) — межсервисная шина
 - Spring gRPC — синхронные вызовы между presence-service и yandex-service
 - Eclipse Paho — MQTT-клиент
@@ -82,7 +82,6 @@ flowchart LR
 
 - JUnit 5, Mockito, AssertJ
 - Testcontainers (MongoDB, RabbitMQ)
-- Reactor Test
 
 ## Модули
 

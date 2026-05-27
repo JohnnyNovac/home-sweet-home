@@ -1,12 +1,10 @@
 package dev.iot.eventservice.config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.mongodb.MongoDBContainer;
 
 @Configuration
-@EnableMongoRepositories
 public class MongoDBTestContainerConfig {
 
     @Container

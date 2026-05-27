@@ -9,7 +9,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -64,7 +63,7 @@ class ClimateHandlerTest {
         when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
         when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
-                .thenReturn(Mono.just(new SensorData(DEVICE_ID, null, List.of())));
+                .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
         handler.handleIncomingData(DEVICE_ID, jsonData);
 
@@ -98,7 +97,7 @@ class ClimateHandlerTest {
         when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
         when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.of("bedroom"));
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
-                .thenReturn(Mono.just(new SensorData(DEVICE_ID, null, List.of())));
+                .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
         handler.handleIncomingData(DEVICE_ID, jsonData);
 
@@ -123,6 +122,26 @@ class ClimateHandlerTest {
 
         assertThatThrownBy(() -> handler.handleIncomingData(DEVICE_ID, invalidJsonData))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("Should propagate a save failure so the message is not acknowledged")
+    void shouldPropagateSaveFailure() {
+        String jsonData = """
+                {
+                    "measurements": {
+                        "temperature": 22.5,
+                        "humidity": 65
+                    }
+                }
+                """;
+
+        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
+                .thenThrow(new RuntimeException("mongo down"));
+
+        assertThatThrownBy(() -> handler.handleIncomingData(DEVICE_ID, jsonData))
+                .isInstanceOf(RuntimeException.class);
     }
 
     @Test

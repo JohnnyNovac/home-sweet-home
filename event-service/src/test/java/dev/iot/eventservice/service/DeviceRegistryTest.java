@@ -8,9 +8,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -30,7 +30,7 @@ class DeviceRegistryTest {
     @DisplayName("roomFor returns the assigned room when the device has one")
     void roomForReturnsRoom() {
         when(repository.findById(DEVICE_ID))
-                .thenReturn(Mono.just(new Device(DEVICE_ID, "climate", "bedroom", Instant.now())));
+                .thenReturn(Optional.of(new Device(DEVICE_ID, "climate", "bedroom", Instant.now())));
 
         assertThat(deviceRegistry.roomFor(DEVICE_ID)).contains("bedroom");
     }
@@ -38,7 +38,7 @@ class DeviceRegistryTest {
     @Test
     @DisplayName("roomFor returns empty when the device is unknown")
     void roomForReturnsEmptyWhenUnknown() {
-        when(repository.findById(DEVICE_ID)).thenReturn(Mono.empty());
+        when(repository.findById(DEVICE_ID)).thenReturn(Optional.empty());
 
         assertThat(deviceRegistry.roomFor(DEVICE_ID)).isEmpty();
     }
@@ -46,7 +46,7 @@ class DeviceRegistryTest {
     @Test
     @DisplayName("roomFor degrades to empty when the lookup fails instead of propagating")
     void roomForDegradesOnError() {
-        when(repository.findById(DEVICE_ID)).thenReturn(Mono.error(new RuntimeException("mongo down")));
+        when(repository.findById(DEVICE_ID)).thenThrow(new RuntimeException("mongo down"));
 
         assertThat(deviceRegistry.roomFor(DEVICE_ID)).isEmpty();
     }

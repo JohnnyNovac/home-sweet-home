@@ -31,7 +31,7 @@
 ## Стек
 
 - **JUnit 5**, **Mockito** (через javaagent — настроено в корневом `build.gradle`), **AssertJ**
-- **Spring Boot Test**, **Reactor Test** (для реактивного стэка в `event-service`)
+- **Spring Boot Test**
 - **Testcontainers** — MongoDB в `event-service`
 
 ## Конфигурация

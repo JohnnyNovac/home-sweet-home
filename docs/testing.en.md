@@ -31,7 +31,7 @@
 ## Stack
 
 - **JUnit 5**, **Mockito** (via javaagent — wired in the root `build.gradle`), **AssertJ**
-- **Spring Boot Test**, **Reactor Test** (for the reactive stack in `event-service`)
+- **Spring Boot Test**
 - **Testcontainers** — MongoDB in `event-service`
 
 ## Configuration

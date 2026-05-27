@@ -65,6 +65,15 @@ classify failures: unrecoverable data errors (malformed JSON, missing required m
 failures (e.g. `MqttPublisherException` when MQTT is briefly down) propagate unchanged and are requeued for a later
 retry. Without this split a single bad device payload would loop on the queue head indefinitely.
 
+**Persistence durability.** Messages are consumed by blocking `@RabbitListener`s, and event-service uses the blocking
+MongoDB driver (`MongoRepository` / `MongoTemplate`), not reactive — the listener is sequential and blocking, so a
+reactive stack would buy nothing here and only force `block()` bridges. Persistence is therefore synchronous: the
+listener waits for the write before the message is acked, and a failed write throws so the broker requeues the message
+for a later retry (at-least-once). The Mongo driver timeouts in the connection URI (`serverSelectionTimeoutMS`,
+`connectTimeoutMS`, `socketTimeoutMS`) bound how long a slow or unavailable Mongo can block the listener. The
+device-registry `lastSeenAt` upsert is the one exception — best-effort, logged on failure but not retried, since a
+missed heartbeat is not data loss.
+
 **Sensor handler dispatch (event-service).** `EventRunner` is a `CommandLineRunner` that listens to the event queue and
 dispatches each message by `sensorType` (parsed from the AMQP routing key — `parts[1]`) to a `SensorHandler` via
 `SensorHandlerFactory` (Spring auto-wires the `List<SensorHandler>` and keys by `getType()`). Current types: `climate`
@@ -94,9 +103,9 @@ while availability messages omit `sensorType` from the update so they never blan
 touches only the named fields (no full-document replace), concurrent data + availability messages for the same device
 can't lose each other's fields, and a manually assigned `room` is never clobbered. `roomFor(deviceId)` is consumed by
 handlers when building HA discovery payloads; if `room` is set, `suggested_area` is added so HA places the entity in the
-right room. It is a synchronous bridge over the reactive query (`block` with a timeout): discovery is built on the
-listener / MQTT-callback thread, so a slow or unavailable Mongo degrades to no `suggested_area` rather than blocking
-discovery indefinitely — the room is picked up on the next HA restart. Rooms are assigned manually via `mongosh` — see
+right room. The lookup is a plain blocking query; its wait is bounded by the MongoDB driver timeouts set in the
+connection URI, and if Mongo is slow or unavailable it degrades to no `suggested_area` rather than failing discovery —
+the room is picked up on the next HA restart. Rooms are assigned manually via `mongosh` — see
 `NOTES.md`. A room change takes effect after HA restart (handlers re-publish discovery for every known device when
 `homeassistant/status` flips to `online`).
 
@@ -121,7 +130,7 @@ parser live in `shared/` (`JsonDtoParser`, `EventDTO`, `MeasurementDTO`).
 
 ## Testing
 
-- JUnit 5 + Mockito + AssertJ; Reactor Test for WebFlux/Mongo reactive code; Testcontainers for MongoDB (see
+- JUnit 5 + Mockito + AssertJ; Testcontainers for MongoDB (see
   `MongoDBTestContainerConfig`, which exposes the mapped port via `System.setProperty("mongodb.container.port", …)` so
   `application.yml` in `src/test/resources` can reference it).
 - Mockito runs via a java agent wired in the root `build.gradle` (`configurations.mockitoAgent` + `-javaagent:` jvm

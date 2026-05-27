@@ -6,7 +6,6 @@ import dev.iot.eventservice.repository.SensorDataRepository;
 import dev.iot.shared.dto.EventDTO;
 import dev.iot.shared.utils.JsonDtoParser;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
 
 @Service
 public class SensorDataServiceImpl implements SensorDataService {
@@ -23,7 +22,7 @@ public class SensorDataServiceImpl implements SensorDataService {
     }
 
     @Override
-    public Mono<SensorData> saveIncomingData(String deviceId, String jsonData) {
+    public SensorData saveIncomingData(String deviceId, String jsonData) {
         EventDTO eventDTO = new EventDTO(deviceId, JsonDtoParser.parseMeasurements(jsonData));
         return repository.save(sensorDataMapper.toDocument(eventDTO));
     }
