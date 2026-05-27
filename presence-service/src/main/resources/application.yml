@@ -18,6 +18,8 @@ server:
 app:
   rabbitmq:
     presence-data-queue: presence-data
+  grpc:
+    lamp-deadline: 8s
   measurements:
     radar-presence:
       name: radarPresence

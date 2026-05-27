@@ -7,3 +7,5 @@ yandex:
   base-url: https://api.iot.yandex.net
   group-action-path: /v1.0/groups/{group_id}/actions
   chandelier-id: ${YANDEX_CHANDELIER_ID}
+  connect-timeout: 3s
+  read-timeout: 5s
