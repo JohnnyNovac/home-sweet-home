@@ -87,8 +87,12 @@ registry, it never republishes anything to HA.
 
 **Device registry.** `DeviceRegistry` maintains the `devices` MongoDB collection (fields: `deviceId` as `_id`,
 `sensorType`, `room`, `lastSeenAt`). `recordSeen(deviceId, sensorType)` is called on every data message (from
-`EventRunner`) and every availability message (from `AvailabilityHandler`, with `sensorType = null`) — upserts the
-device, updates `lastSeenAt`, fills `sensorType` lazily on the first data message. `roomFor(deviceId)` is consumed by
+`EventRunner`) and every availability message (from `AvailabilityHandler`, with `sensorType = null`). It is a single
+atomic field-level upsert (`findAndModify` with `$set`), not a read-modify-write: it always sets `lastSeenAt` and
+creates the row if missing; data messages also set `sensorType` (they always carry the device's fixed, correct type),
+while availability messages omit `sensorType` from the update so they never blank a known type. Because the update
+touches only the named fields (no full-document replace), concurrent data + availability messages for the same device
+can't lose each other's fields, and a manually assigned `room` is never clobbered. `roomFor(deviceId)` is consumed by
 handlers when building HA discovery payloads; if `room` is set, `suggested_area` is added so HA places the entity in the
 right room. Rooms are assigned manually via `mongosh` — see `NOTES.md`. A room change takes effect after HA restart
 (handlers re-publish discovery for every known device when `homeassistant/status` flips to `online`).
