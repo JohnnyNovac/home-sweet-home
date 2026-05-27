@@ -1,5 +1,6 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.config.GrpcClientProperties;
 import dev.iot.presenceservice.config.MeasurementsProperties;
 import dev.iot.shared.dto.MeasurementDTO;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +15,9 @@ import yandex.YandexServiceGrpc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForClassTypes.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PresenceHandlerTest {
@@ -42,12 +46,14 @@ class PresenceHandlerTest {
         measurementsProperties.setRadarPresence(radarPresence);
         measurementsProperties.setPirSensorPresence(pirSensorPresence);
 
-        presenceHandler = new PresenceHandler(new ObjectMapper(), yandexServiceStub, measurementsProperties);
+        presenceHandler = new PresenceHandler(new ObjectMapper(), yandexServiceStub, measurementsProperties, new GrpcClientProperties());
     }
 
     @Test
     @DisplayName("Should handle presence sensor data")
     void shouldHandlePresenceData() {
+        when(yandexServiceStub.withDeadlineAfter(anyLong(), any())).thenReturn(yandexServiceStub);
+
         String jsonData = """
                 {
                     "measurements": {
@@ -84,6 +90,8 @@ class PresenceHandlerTest {
     @Test
     @DisplayName("Should extract measurement types from sensor data")
     void shouldExtractMeasurementTypes() {
+        when(yandexServiceStub.withDeadlineAfter(anyLong(), any())).thenReturn(yandexServiceStub);
+
         String jsonData = """
                 {
                     "measurements": {

@@ -97,7 +97,13 @@ right room. Rooms are assigned manually via `mongosh` — see `NOTES.md`. A room
 `yandex-service` via the gRPC stub declared in `grpc-api/src/main/proto/yandex.proto` (`YandexService.TurnOnOffLamp`).
 Client channel is configured in `presence-service/application.yml` as
 `spring.grpc.client.channels.yandex-service.address`. `yandex-service` (`GrpcServerService`) translates the call into a
-Yandex Smart Home "group action" HTTP request via `YandexRestClient`.
+Yandex Smart Home "group action" HTTP request via `YandexRestClient`. The whole chain is time-bounded so a slow or
+hung Yandex cloud cannot block the single `presence-data` listener thread indefinitely: `PresenceHandler` applies a
+gRPC deadline (`app.grpc.lamp-deadline`, default 8s) per call, and the `RestClient` in `YandexClientConfig` is built
+with connect/read timeouts (`yandex.connect-timeout` 3s / `yandex.read-timeout` 5s). The HTTP timeout frees the
+yandex-service thread; the gRPC deadline frees the presence-service listener even if yandex-service itself is wedged —
+both are needed. A timed-out lamp command is logged and the message is acked (not requeued), since a stale real-time
+toggle is not worth retrying.
 
 **JSON parsing.** Uses Jackson 3 (`tools.jackson.*`, not `com.fasterxml.jackson.*`). Shared DTOs and the sensor-payload
 parser live in `shared/` (`JsonDtoParser`, `EventDTO`, `MeasurementDTO`).

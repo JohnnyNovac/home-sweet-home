@@ -1,5 +1,6 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.config.GrpcClientProperties;
 import dev.iot.presenceservice.config.MeasurementsProperties;
 import dev.iot.shared.dto.EventDTO;
 import dev.iot.shared.utils.JsonDtoParser;
@@ -11,6 +12,8 @@ import tools.jackson.databind.ObjectMapper;
 import yandex.Yandex;
 import yandex.YandexServiceGrpc;
 
+import java.util.concurrent.TimeUnit;
+
 @Service
 public class PresenceHandler {
 
@@ -18,12 +21,14 @@ public class PresenceHandler {
 
     private final ObjectMapper objectMapper;
     private final MeasurementsProperties measurementsProperties;
+    private final GrpcClientProperties grpcClientProperties;
     private final YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub;
 
-    public PresenceHandler(ObjectMapper objectMapper, YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub, MeasurementsProperties measurementsProperties) {
+    public PresenceHandler(ObjectMapper objectMapper, YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub, MeasurementsProperties measurementsProperties, GrpcClientProperties grpcClientProperties) {
         this.objectMapper = objectMapper;
         this.yandexServiceStub = yandexServiceStub;
         this.measurementsProperties = measurementsProperties;
+        this.grpcClientProperties = grpcClientProperties;
     }
 
     public EventDTO handleIncomingData(String deviceId, String jsonData) {
@@ -45,8 +50,9 @@ public class PresenceHandler {
         logger.info("Setting lamp state to {}", turnOn ? "ON" : "OFF");
 
         try {
-            Yandex.TurnOnOffLampResponse response =
-                    yandexServiceStub.turnOnOffLamp(request);
+            Yandex.TurnOnOffLampResponse response = yandexServiceStub
+                    .withDeadlineAfter(grpcClientProperties.getLampDeadline().toMillis(), TimeUnit.MILLISECONDS)
+                    .turnOnOffLamp(request);
 
             logger.info("Lamp state changed: {}", response);
 
