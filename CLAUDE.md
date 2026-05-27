@@ -94,8 +94,11 @@ while availability messages omit `sensorType` from the update so they never blan
 touches only the named fields (no full-document replace), concurrent data + availability messages for the same device
 can't lose each other's fields, and a manually assigned `room` is never clobbered. `roomFor(deviceId)` is consumed by
 handlers when building HA discovery payloads; if `room` is set, `suggested_area` is added so HA places the entity in the
-right room. Rooms are assigned manually via `mongosh` — see `NOTES.md`. A room change takes effect after HA restart
-(handlers re-publish discovery for every known device when `homeassistant/status` flips to `online`).
+right room. It is a synchronous bridge over the reactive query (`block` with a timeout): discovery is built on the
+listener / MQTT-callback thread, so a slow or unavailable Mongo degrades to no `suggested_area` rather than blocking
+discovery indefinitely — the room is picked up on the next HA restart. Rooms are assigned manually via `mongosh` — see
+`NOTES.md`. A room change takes effect after HA restart (handlers re-publish discovery for every known device when
+`homeassistant/status` flips to `online`).
 
 **Lamp control path.** `presence-service` → parses `lampState` measurement out of the PresenceBox JSON → calls
 `yandex-service` via the gRPC stub declared in `grpc-api/src/main/proto/yandex.proto` (`YandexService.TurnOnOffLamp`).
