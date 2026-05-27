@@ -124,4 +124,34 @@ class PresenceHandlerTest {
         assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, invalidJsonData))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("Should reject non-boolean lampState instead of throwing NPE/ClassCastException")
+    void shouldRejectNonBooleanLampState() {
+        String nullLampState = """
+                {
+                    "measurements": {
+                        "radarPresence": true,
+                        "pirSensorPresence": false,
+                        "lampState": null
+                    }
+                }
+                """;
+
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, nullLampState))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        String stringLampState = """
+                {
+                    "measurements": {
+                        "radarPresence": true,
+                        "pirSensorPresence": false,
+                        "lampState": "on"
+                    }
+                }
+                """;
+
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, stringLampState))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
