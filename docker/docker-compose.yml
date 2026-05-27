@@ -7,6 +7,7 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+      - "15692:15692"
       - "1883:1883"
     healthcheck:
       test: rabbitmq-diagnostics -q check_running
@@ -101,12 +102,51 @@ services:
     networks:
       - homesweethome_net
 
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9091:9090"
+    restart: unless-stopped
+    depends_on:
+      - event-service
+      - presence-service
+      - yandex-service
+    networks:
+      - homesweethome_net
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    networks:
+      - homesweethome_net
+
 
 volumes:
   rabbitmq-lib:
   rabbitmq-log:
   homeassistant-config:
   mongodb_data:
+  prometheus_data:
+  grafana_data:
 
 
 networks:

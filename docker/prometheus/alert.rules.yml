@@ -1,0 +1,29 @@
+groups:
+  - name: home-sweet-home
+    rules:
+      - alert: ServiceDown
+        expr: up{job=~"event-service|presence-service|yandex-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: "Prometheus cannot scrape {{ $labels.job }} ({{ $labels.instance }}) for over 1 minute."
+
+      - alert: DeadLetterQueueNotEmpty
+        expr: rabbitmq_queue_messages{queue=~".+[.]dlq"} > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dead-letter queue {{ $labels.queue }} is not empty"
+          description: "{{ $labels.queue }} holds {{ $value }} dead-lettered message(s) — a device is likely sending an unprocessable payload."
+
+      - alert: WorkQueueBacklog
+        expr: rabbitmq_queue_messages_ready{queue=~"event-data|presence-data|device-availability"} > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backlog building on {{ $labels.queue }}"
+          description: "{{ $labels.queue }} has {{ $value }} ready messages — a consumer may be stuck or a downstream dependency (MongoDB) slow."

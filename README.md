@@ -65,6 +65,7 @@ flowchart LR
 - Spring AMQP (RabbitMQ) — межсервисная шина
 - Spring gRPC — синхронные вызовы между presence-service и yandex-service
 - Eclipse Paho — MQTT-клиент
+- Spring Boot Actuator + Micrometer — метрики (экспорт в Prometheus)
 
 **Hardware / IoT**
 
@@ -75,6 +76,7 @@ flowchart LR
 
 - Docker / Docker Compose
 - RabbitMQ, MongoDB
+- Prometheus, Grafana — метрики и дашборды
 - GitLab CI/CD
 - Home Assistant (внешняя интеграция)
 
@@ -112,6 +114,12 @@ docker compose -f docker/docker-compose.yml up -d
 ## Тесты
 
 Подробнее о структуре автотестов — в [docs/testing.md](docs/testing.md).
+
+## Мониторинг
+
+Метрики сервисов и RabbitMQ собирает Prometheus, дашборды — в Grafana (оба поднимаются тем же docker-compose). Grafana —
+на http://localhost:3000, Prometheus — на http://localhost:9091. Подробнее (порты, дашборды, правила оповещений) — в
+[NOTES.md](NOTES.md).
 
 ## Планы
 

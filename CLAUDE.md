@@ -22,15 +22,15 @@ per-module wrappers.
 ./gradlew :event-service:test              # tests for one module
 ./gradlew :event-service:test --tests "*SensorDataServiceImplTest.methodName"
 
-docker compose -f docker/docker-compose.yml up -d     # infrastructure (RabbitMQ, MongoDB, Home Assistant) + services
+docker compose -f docker/docker-compose.yml up -d     # infrastructure (RabbitMQ, MongoDB, Home Assistant, Prometheus, Grafana) + services
 ```
 
 `grpc-api` generates Java stubs from `grpc-api/src/main/proto/yandex.proto` via the protobuf plugin — regenerate with
 `./gradlew :grpc-api:generateProto` (runs automatically as part of `build`).
 
 Local dev uses the `local` Spring profile (`application-local.yml` in each service) — see `NOTES.md`. Docker/CI
-reads RabbitMQ / Mongo / Yandex credentials from env vars (`RABBITMQ_DEFAULT_USER/PASS`,
-`MONGO_INITDB_ROOT_USERNAME/PASSWORD`, `YANDEX_OAUTH_TOKEN`, `YANDEX_CHANDELIER_ID`).
+reads RabbitMQ / Mongo / Yandex / Grafana credentials from env vars (`RABBITMQ_DEFAULT_USER/PASS`,
+`MONGO_INITDB_ROOT_USERNAME/PASSWORD`, `YANDEX_OAUTH_TOKEN`, `YANDEX_CHANDELIER_ID`, `GRAFANA_ADMIN_USER/PASSWORD`).
 
 ## Architecture notes that span multiple files
 
@@ -120,6 +120,17 @@ with connect/read timeouts (`yandex.connect-timeout` 3s / `yandex.read-timeout` 
 yandex-service thread; the gRPC deadline frees the presence-service listener even if yandex-service itself is wedged —
 both are needed. A timed-out lamp command is logged and the message is acked (not requeued), since a stale real-time
 toggle is not worth retrying.
+
+**Observability.** Each service exposes Spring Boot Actuator with a Micrometer/Prometheus registry at
+`/actuator/prometheus` (event-service 8081, presence-service 8082, yandex-service 8083 — the HTTP port, separate from
+yandex-service's gRPC server on 9090). RabbitMQ exposes the `rabbitmq_prometheus` plugin on 15692; the scrape uses
+`/metrics/per-object` so per-queue series (`rabbitmq_queue_messages{queue=...}`) are available — the key signals are
+per-queue (a non-empty `*.dlq`, a per-queue backlog), which the aggregated default `/metrics` hides. Prometheus
+(`docker/prometheus/`) scrapes all four targets and evaluates `alert.rules.yml` (service down, non-empty DLQ, work-queue
+backlog). Grafana (`docker/grafana/`) is provisioned from files: the datasource (uid `prometheus`) and a dashboards
+folder with the project overview plus the community JVM and RabbitMQ dashboards. yandex-service keeps
+`spring-boot-starter-web` only for the outbound `RestClient` and this scrape endpoint — its embedded Tomcat hosts no
+controllers (inbound is gRPC).
 
 **JSON parsing.** Uses Jackson 3 (`tools.jackson.*`, not `com.fasterxml.jackson.*`). Shared DTOs and the sensor-payload
 parser live in `shared/` (`JsonDtoParser`, `EventDTO`, `MeasurementDTO`).
