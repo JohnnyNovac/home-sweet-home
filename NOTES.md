@@ -53,6 +53,27 @@ docker exec -it mongodb mongosh -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_
 После этого нужно перезапустить Home Assistant: event-service подписан на `homeassistant/status` и при переходе в
 `online` повторно публикует discovery с актуальным значением `suggested_area`.
 
+## Мониторинг
+
+Метрики собирает Prometheus, отображает Grafana — оба поднимаются тем же docker-compose.
+
+| Сервис     | Адрес                 | Назначение                           |
+|------------|-----------------------|--------------------------------------|
+| Grafana    | http://localhost:3000 | дашборды; логин и пароль — из `.env` |
+| Prometheus | http://localhost:9091 | хранилище метрик, вкладка Alerts     |
+
+Каждый сервис отдаёт метрики через Spring Boot Actuator по пути `/actuator/prometheus` (event-service — порт 8081,
+presence-service — 8082, yandex-service — 8083). RabbitMQ отдаёт метрики плагином `rabbitmq_prometheus` на порту 15692
+(путь `/metrics/per-object` — с разбивкой по очередям).
+
+Источник данных и дашборды Grafana задаются файлами в `docker/grafana/provisioning`, сами дашборды — в
+`docker/grafana/dashboards`: обзорный `home-sweet-home`, а также community-дашборды JVM (Micrometer) и RabbitMQ. Чтобы
+добавить свой дашборд, положите его JSON в эту папку; источник данных привязывается по uid `prometheus`.
+
+Правила оповещений — в `docker/prometheus/alert.rules.yml`: недоступность сервиса, непустая очередь `*.dlq` (устройство
+прислало сообщение, которое не удалось обработать) и накопление рабочей очереди. Оповещения видны во вкладке Alerts в
+Prometheus; рассылка (например, в Telegram) пока не настроена.
+
 ## Чек-лист перед запуском
 
 1. Установлена Java 21.
@@ -64,7 +85,7 @@ docker exec -it mongodb mongosh -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_
    ```
 3. Установлен GitLab Runner, добавлен в группу `docker`.
 4. Установлен Gradle.
-5. Через UI добавлены CI/CD Variables — для RabbitMQ и MongoDB.
+5. Через UI добавлены CI/CD Variables — для RabbitMQ, MongoDB, Yandex и Grafana (логин и пароль администратора).
 6. В Home Assistant создан аккаунт и настроена MQTT-интеграция. Топик `homeassistant/status` должен быть retained —
    `event-service` читает его при старте, чтобы понять состояние HA.
 7. Для локальной разработки активен Spring-профиль `local`.

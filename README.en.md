@@ -66,6 +66,7 @@ Data flow:
 - Spring AMQP (RabbitMQ) — inter-service bus
 - Spring gRPC — synchronous calls between presence-service and yandex-service
 - Eclipse Paho — MQTT client
+- Spring Boot Actuator + Micrometer — metrics (exported to Prometheus)
 
 **Hardware / IoT**
 
@@ -76,6 +77,7 @@ Data flow:
 
 - Docker / Docker Compose
 - RabbitMQ, MongoDB
+- Prometheus, Grafana — metrics and dashboards
 - GitLab CI/CD
 - Home Assistant (external integration)
 
@@ -113,6 +115,12 @@ docker compose -f docker/docker-compose.yml up -d
 ## Tests
 
 See [docs/testing.en.md](docs/testing.en.md) for the autotest layout.
+
+## Monitoring
+
+Prometheus collects metrics from the services and RabbitMQ; Grafana renders the dashboards (both come up with the same
+docker-compose). Grafana is at http://localhost:3000, Prometheus at http://localhost:9091. More detail (ports,
+dashboards, alert rules) — see [NOTES.en.md](NOTES.en.md).
 
 ## Roadmap
 
