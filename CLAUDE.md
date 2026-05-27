@@ -69,10 +69,12 @@ retry. Without this split a single bad device payload would loop on the queue he
 dispatches each message by `sensorType` (parsed from the AMQP routing key — `parts[1]`) to a `SensorHandler` via
 `SensorHandlerFactory` (Spring auto-wires the `List<SensorHandler>` and keys by `getType()`). Current types: `climate`
 (DHT temperature/humidity) and `presence` (PIR + radar + lamp state). Adding a new sensor type = new `SensorHandler`
-bean returning the new type from `getType()` + matching routing-key value from firmware. `EventRunner` also gates all
-processing on Home Assistant's online status — it subscribes to `app.ha.status-topic` over MQTT and drops incoming
-events until HA reports `online`, at which point every handler's `sendDiscoveryForAll()` is called to (re-)publish HA
-auto-discovery configs for every device the handler has seen so far (tracked in `knownDeviceIds`).
+bean returning the new type from `getType()` + matching routing-key value from firmware. Processing and persistence do
+not depend on Home Assistant being up — incoming data is always handled and saved. `EventRunner` still subscribes to
+`app.ha.status-topic` over MQTT, but only to react to HA (re)starts: when HA reports `online`, every handler's
+`sendDiscoveryForAll()` is called to (re-)publish HA auto-discovery configs for every device the handler has seen so far
+(tracked in `knownDeviceIds`). Discovery published while HA is offline is simply missed and re-sent on the next
+`online`; state published before discovery exists is ignored by HA — so nothing is gated on HA status.
 
 **Device availability.** Each Arduino sets an MQTT LWT pointing at `home/availability/<deviceId>` with payload
 `offline`, and publishes `online` to the same topic right after connect. HA reads device availability from this topic

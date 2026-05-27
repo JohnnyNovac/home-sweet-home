@@ -11,14 +11,12 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
  * Точка входа потока данных event-service. Слушает очередь данных, разбирает routing key и
  * диспетчеризует сообщение по {@code sensorType} в нужный {@link SensorHandler} через
- * {@link SensorHandlerFactory}, попутно обновляя {@link DeviceRegistry}. Пока Home Assistant
- * не в online, входящие сообщения отбрасываются; при переходе HA в online все обработчики
- * повторно публикуют discovery-конфиги.
+ * {@link SensorHandlerFactory}, попутно обновляя {@link DeviceRegistry}. Обработка и сохранение
+ * данных не зависят от состояния Home Assistant; подписка на {@code app.ha.status-topic} нужна
+ * только для того, чтобы при переходе HA в online повторно опубликовать discovery-конфиги.
  */
 @Component
 public class EventRunner implements CommandLineRunner {
@@ -29,8 +27,6 @@ public class EventRunner implements CommandLineRunner {
     private final HAConfigProperties haProperties;
     private final SensorHandlerFactory sensorHandlerFactory;
     private final DeviceRegistry deviceRegistry;
-
-    private final AtomicBoolean isHAOnline = new AtomicBoolean(false);
 
     public EventRunner(
             MqttPublisher mqttPublisher,
@@ -51,11 +47,6 @@ public class EventRunner implements CommandLineRunner {
 
     @RabbitListener(queues = "${app.rabbitmq.event-data-queue}")
     public void handleEventMessage(String json, @Header("amqp_receivedRoutingKey") String routingKey) {
-        if (!isHAOnline.get()) {
-            logger.debug("Home Assistant offline — skipping {}", routingKey);
-            return;
-        }
-
         String[] parts = routingKey.split("\\.");
         if (parts.length < 4) {
             logger.warn("Unexpected data routing key: {}", routingKey);
@@ -90,9 +81,8 @@ public class EventRunner implements CommandLineRunner {
         mqttPublisher.client().subscribe(haProperties.getStatusTopic(), (topic, message) -> {
             String status = new String(message.getPayload());
             logger.debug("Received Home Assistant status: {}", status);
-            boolean online = "online".equals(status);
-            isHAOnline.set(online);
-            if (online) {
+            if ("online".equals(status)) {
+                logger.info("Home Assistant online — re-publishing discovery for all known devices");
                 sensorHandlerFactory.getHandlers().forEach(SensorHandler::sendDiscoveryForAll);
             }
         });

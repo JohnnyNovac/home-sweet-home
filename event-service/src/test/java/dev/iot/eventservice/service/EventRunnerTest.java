@@ -81,8 +81,7 @@ class EventRunnerTest {
 
     @Test
     @DisplayName("Should reject without requeue (route to DLQ) on unrecoverable data error")
-    void shouldDeadLetterOnUnrecoverableError() throws Exception {
-        bringHAOnline();
+    void shouldDeadLetterOnUnrecoverableError() {
         SensorHandler handler = mock(SensorHandler.class);
         when(sensorHandlerFactory.getHandler("climate")).thenReturn(handler);
         when(deviceRegistry.recordSeen("esp01", "climate"))
@@ -96,8 +95,7 @@ class EventRunnerTest {
 
     @Test
     @DisplayName("Should propagate (requeue) when publishing fails temporarily")
-    void shouldRequeueOnTemporaryFailure() throws Exception {
-        bringHAOnline();
+    void shouldRequeueOnTemporaryFailure() {
         SensorHandler handler = mock(SensorHandler.class);
         when(sensorHandlerFactory.getHandler("climate")).thenReturn(handler);
         when(deviceRegistry.recordSeen("esp01", "climate"))
@@ -107,18 +105,5 @@ class EventRunnerTest {
 
         assertThatThrownBy(() -> eventRunner.handleEventMessage("{}", "home.climate.esp01.data"))
                 .isInstanceOf(MqttPublisherException.class);
-    }
-
-    private void bringHAOnline() throws Exception {
-        MqttClient mqttClient = mock(MqttClient.class);
-        when(mqttPublisher.client()).thenReturn(mqttClient);
-        when(haProps.getStatusTopic()).thenReturn(HA_STATUS_TOPIC);
-        when(sensorHandlerFactory.getHandlers()).thenReturn(List.of());
-        doAnswer(invocation -> {
-            IMqttMessageListener listener = invocation.getArgument(1);
-            listener.messageArrived(HA_STATUS_TOPIC, new MqttMessage("online".getBytes(StandardCharsets.UTF_8)));
-            return null;
-        }).when(mqttClient).subscribe(eq(HA_STATUS_TOPIC), any(IMqttMessageListener.class));
-        eventRunner.run();
     }
 }
