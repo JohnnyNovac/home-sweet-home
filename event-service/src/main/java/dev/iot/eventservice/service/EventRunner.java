@@ -31,7 +31,6 @@ public class EventRunner implements CommandLineRunner {
     private final DeviceRegistry deviceRegistry;
 
     private final AtomicBoolean isHAOnline = new AtomicBoolean(false);
-    private final AtomicBoolean serviceAvailabilityPublished = new AtomicBoolean(false);
 
     public EventRunner(
             MqttPublisher mqttPublisher,
@@ -70,10 +69,6 @@ public class EventRunner implements CommandLineRunner {
         if (handler == null) {
             logger.warn("No handler for sensorType: {}", sensorType);
             return;
-        }
-
-        if (serviceAvailabilityPublished.compareAndSet(false, true)) {
-            mqttPublisher.publish(haProperties.getServiceAvailabilityTopic(), "online");
         }
 
         deviceRegistry.recordSeen(deviceId, sensorType)

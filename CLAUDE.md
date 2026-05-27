@@ -77,8 +77,11 @@ auto-discovery configs for every device the handler has seen so far (tracked in 
 **Device availability.** Each Arduino sets an MQTT LWT pointing at `home/availability/<deviceId>` with payload
 `offline`, and publishes `online` to the same topic right after connect. HA reads device availability from this topic
 directly — it is referenced in the `avty` array of every discovery payload, alongside the service-level
-`app.ha.service-availability-topic`. `AvailabilityHandler` in event-service is a passive consumer: it only updates
-`lastSeenAt` in the device registry, it never republishes anything to HA.
+`app.ha.service-availability-topic`. event-service publishes its own availability on that service-level topic the same
+way: a retained `offline` LWT, and a retained `online` re-published on every (re)connect from the MQTT
+`connectComplete` callback (`MqttConfig`) — so after a broker blip and automatic reconnect HA still sees the service as
+online. `AvailabilityHandler` in event-service is a passive consumer: it only updates `lastSeenAt` in the device
+registry, it never republishes anything to HA.
 
 **Device registry.** `DeviceRegistry` maintains the `devices` MongoDB collection (fields: `deviceId` as `_id`,
 `sensorType`, `room`, `lastSeenAt`). `recordSeen(deviceId, sensorType)` is called on every data message (from

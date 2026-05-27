@@ -1,9 +1,7 @@
 package dev.iot.eventservice.config;
 
 import dev.iot.eventservice.service.MqttPublisher;
-import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +34,30 @@ public class MqttConfig {
     public MqttClient mqttClient() throws MqttException {
         String brokerUrl = String.format("tcp://%s:1883", brokerHost);
         MqttClient client = new MqttClient(brokerUrl, "event-service");
+
+        client.setCallback(new MqttCallbackExtended() {
+            @Override
+            public void connectComplete(boolean reconnect, String serverURI) {
+                // Fires on the first connect and after every automatic reconnect.
+                // Re-publish retained "online" to override the retained "offline" the
+                // broker published from our LWT when the connection dropped.
+                publishServiceOnline(client);
+            }
+
+            @Override
+            public void connectionLost(Throwable cause) {
+                logger.warn("MQTT connection lost, automatic reconnect will retry", cause);
+            }
+
+            @Override
+            public void messageArrived(String topic, MqttMessage message) {
+                // Per-topic listeners (see EventRunner) handle subscriptions; nothing to do here.
+            }
+
+            @Override
+            public void deliveryComplete(IMqttDeliveryToken token) {
+            }
+        });
 
         MqttConnectOptions options = new MqttConnectOptions();
         options.setUserName(user);
@@ -79,6 +101,18 @@ public class MqttConfig {
     @Bean
     public MqttPublisher mqttPublisher(MqttClient mqttClient) {
         return new MqttPublisher(mqttClient);
+    }
+
+    private void publishServiceOnline(MqttClient client) {
+        try {
+            MqttMessage online = new MqttMessage("online".getBytes());
+            online.setQos(1);
+            online.setRetained(true);
+            client.publish(haTopics.getServiceAvailabilityTopic(), online);
+            logger.info("Published service availability 'online' to {}", haTopics.getServiceAvailabilityTopic());
+        } catch (MqttException e) {
+            logger.error("Failed to publish service availability 'online'", e);
+        }
     }
 
 }
