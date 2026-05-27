@@ -16,6 +16,7 @@ import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,6 +35,9 @@ class EventRunnerTest {
 
     @Mock
     private SensorHandlerFactory sensorHandlerFactory;
+
+    @Mock
+    private DeviceRegistry deviceRegistry;
 
     @InjectMocks
     private EventRunner eventRunner;
@@ -95,5 +99,38 @@ class EventRunnerTest {
 
         assertThatThrownBy(() -> eventRunner.handleEventMessage("{}", "home.climate.esp01.data"))
                 .isInstanceOf(MqttPublisherException.class);
+    }
+
+    @Test
+    @DisplayName("Should ignore a malformed routing key without dispatching or throwing")
+    void shouldIgnoreMalformedRoutingKey() {
+        assertThatCode(() -> eventRunner.handleEventMessage("{}", "home.climate"))
+                .doesNotThrowAnyException();
+
+        verifyNoInteractions(sensorHandlerFactory, deviceRegistry);
+    }
+
+    @Test
+    @DisplayName("Should ignore an unknown sensorType without recording or throwing")
+    void shouldIgnoreUnknownSensorType() {
+        when(sensorHandlerFactory.getHandler("unknown")).thenReturn(null);
+
+        assertThatCode(() -> eventRunner.handleEventMessage("{}", "home.unknown.esp01.data"))
+                .doesNotThrowAnyException();
+
+        verifyNoInteractions(deviceRegistry);
+    }
+
+    @Test
+    @DisplayName("Should still handle data when the device-registry upsert fails")
+    void shouldHandleDataWhenRecordSeenFails() {
+        SensorHandler handler = mock(SensorHandler.class);
+        when(sensorHandlerFactory.getHandler("climate")).thenReturn(handler);
+        doThrow(new RuntimeException("mongo down"))
+                .when(deviceRegistry).recordSeen("esp01", "climate");
+
+        eventRunner.handleEventMessage("{}", "home.climate.esp01.data");
+
+        verify(handler).handleIncomingData("esp01", "{}");
     }
 }

@@ -8,12 +8,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import yandex.Yandex;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -40,7 +42,7 @@ class GrpcServerServiceTest {
     }
 
     @Test
-    @DisplayName("Should turn on lamp successfully")
+    @DisplayName("Should turn the lamp on and forward turnOn=true to Yandex")
     void shouldTurnOnLampSuccessfully() {
         Yandex.TurnOnOffLampRequest request = Yandex.TurnOnOffLampRequest.newBuilder()
                 .setTurnOn(true)
@@ -52,19 +54,20 @@ class GrpcServerServiceTest {
 
         grpcServerService.turnOnOffLamp(request, responseObserver);
 
-        verify(responseObserver).onNext(argThat(resp ->
-                resp.getStatus().equals("OK")
-        ));
+        ArgumentCaptor<DeviceGroupActionRequest> requestCaptor = ArgumentCaptor.forClass(DeviceGroupActionRequest.class);
+        verify(yandexRestClient).sendGroupAction(requestCaptor.capture(), eq(CHANDELIER_ID));
+        assertThat(requestCaptor.getValue().actions().getFirst().state().value()).isEqualTo(true);
 
+        verify(responseObserver).onNext(argThat(resp -> resp.getStatus().equals("OK")));
         verify(responseObserver).onCompleted();
         verify(responseObserver, never()).onError(any());
     }
 
     @Test
-    @DisplayName("Should turn off lamp successfully")
+    @DisplayName("Should turn the lamp off and forward turnOn=false to Yandex")
     void shouldTurnOffLampSuccessfully() {
         Yandex.TurnOnOffLampRequest request = Yandex.TurnOnOffLampRequest.newBuilder()
-                .setTurnOn(true)
+                .setTurnOn(false)
                 .build();
 
         DeviceGroupActionResponse response = new DeviceGroupActionResponse("id", "ok", List.of());
@@ -73,10 +76,11 @@ class GrpcServerServiceTest {
 
         grpcServerService.turnOnOffLamp(request, responseObserver);
 
-        verify(responseObserver).onNext(argThat(resp ->
-                resp.getStatus().equals("OK")
-        ));
+        ArgumentCaptor<DeviceGroupActionRequest> requestCaptor = ArgumentCaptor.forClass(DeviceGroupActionRequest.class);
+        verify(yandexRestClient).sendGroupAction(requestCaptor.capture(), eq(CHANDELIER_ID));
+        assertThat(requestCaptor.getValue().actions().getFirst().state().value()).isEqualTo(false);
 
+        verify(responseObserver).onNext(argThat(resp -> resp.getStatus().equals("OK")));
         verify(responseObserver).onCompleted();
         verify(responseObserver, never()).onError(any());
     }
@@ -99,4 +103,3 @@ class GrpcServerServiceTest {
         verify(responseObserver, never()).onCompleted();
     }
 }
-

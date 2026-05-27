@@ -2,7 +2,9 @@ package dev.iot.presenceservice.service;
 
 import dev.iot.presenceservice.config.GrpcClientProperties;
 import dev.iot.presenceservice.config.MeasurementsProperties;
+import dev.iot.shared.dto.EventDTO;
 import dev.iot.shared.dto.MeasurementDTO;
+import io.grpc.StatusException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,13 +12,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
+import yandex.Yandex;
 import yandex.YandexServiceGrpc;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.api.AssertionsForClassTypes.tuple;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,8 +52,8 @@ class PresenceHandlerTest {
     }
 
     @Test
-    @DisplayName("Should handle presence sensor data")
-    void shouldHandlePresenceData() {
+    @DisplayName("Should parse presence data and switch the lamp on when lampState is true")
+    void shouldHandlePresenceData() throws StatusException {
         when(yandexServiceStub.withDeadlineAfter(anyLong(), any())).thenReturn(yandexServiceStub);
 
         String jsonData = """
@@ -64,7 +66,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        var eventDTO = presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
+        EventDTO eventDTO = presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
 
         assertThat(eventDTO).isNotNull();
         assertThat(eventDTO.sensorId()).isEqualTo(DEVICE_ID);
@@ -76,21 +78,35 @@ class PresenceHandlerTest {
                         tuple("pirSensorPresence", false),
                         tuple("lampState", true)
                 );
+
+        verify(yandexServiceStub).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
     }
 
     @Test
-    @DisplayName("Should reject data without required fields")
-    void shouldRejectDataWithoutRequiredFields() {
-        String invalidJsonData = "{}";
-
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, invalidJsonData))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    @DisplayName("Should extract measurement types from sensor data")
-    void shouldExtractMeasurementTypes() {
+    @DisplayName("Should switch the lamp off when lampState is false")
+    void shouldSwitchLampOffWhenLampStateFalse() throws StatusException {
         when(yandexServiceStub.withDeadlineAfter(anyLong(), any())).thenReturn(yandexServiceStub);
+
+        String jsonData = """
+                {
+                    "measurements": {
+                        "radarPresence": true,
+                        "pirSensorPresence": false,
+                        "lampState": false
+                    }
+                }
+                """;
+
+        presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
+
+        verify(yandexServiceStub).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+    }
+
+    @Test
+    @DisplayName("Should swallow a gRPC failure so the message is acknowledged")
+    void shouldSwallowGrpcFailure() throws StatusException {
+        when(yandexServiceStub.withDeadlineAfter(anyLong(), any())).thenReturn(yandexServiceStub);
+        when(yandexServiceStub.turnOnOffLamp(any())).thenThrow(new RuntimeException("yandex-service down"));
 
         String jsonData = """
                 {
@@ -102,12 +118,17 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        var eventDTO = presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
+        assertThatCode(() -> presenceHandler.handleIncomingData(DEVICE_ID, jsonData))
+                .doesNotThrowAnyException();
+    }
 
-        assertThat(eventDTO).isNotNull();
-        assertThat(eventDTO.measurements())
-                .extracting(MeasurementDTO::type)
-                .containsExactlyInAnyOrder("radarPresence", "pirSensorPresence", "lampState");
+    @Test
+    @DisplayName("Should reject data without required fields")
+    void shouldRejectDataWithoutRequiredFields() {
+        String invalidJsonData = "{}";
+
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, invalidJsonData))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
