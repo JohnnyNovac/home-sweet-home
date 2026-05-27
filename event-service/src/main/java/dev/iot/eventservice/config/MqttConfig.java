@@ -35,29 +35,7 @@ public class MqttConfig {
         String brokerUrl = String.format("tcp://%s:1883", brokerHost);
         MqttClient client = new MqttClient(brokerUrl, "event-service");
 
-        client.setCallback(new MqttCallbackExtended() {
-            @Override
-            public void connectComplete(boolean reconnect, String serverURI) {
-                // Fires on the first connect and after every automatic reconnect.
-                // Re-publish retained "online" to override the retained "offline" the
-                // broker published from our LWT when the connection dropped.
-                publishServiceOnline(client);
-            }
-
-            @Override
-            public void connectionLost(Throwable cause) {
-                logger.warn("MQTT connection lost, automatic reconnect will retry", cause);
-            }
-
-            @Override
-            public void messageArrived(String topic, MqttMessage message) {
-                // Per-topic listeners (see EventRunner) handle subscriptions; nothing to do here.
-            }
-
-            @Override
-            public void deliveryComplete(IMqttDeliveryToken token) {
-            }
-        });
+        setCallback(client);
 
         MqttConnectOptions options = new MqttConnectOptions();
         options.setUserName(user);
@@ -96,6 +74,32 @@ public class MqttConfig {
         }
 
         throw new IllegalStateException("MQTT broker is unavailable after " + maxAttempts + " attempts");
+    }
+
+    private void setCallback(MqttClient client) {
+        client.setCallback(new MqttCallbackExtended() {
+            @Override
+            public void connectComplete(boolean reconnect, String serverURI) {
+                // Fires on the first connect and after every automatic reconnect.
+                // Re-publish retained "online" to override the retained "offline" the
+                // broker published from our LWT when the connection dropped.
+                publishServiceOnline(client);
+            }
+
+            @Override
+            public void connectionLost(Throwable cause) {
+                logger.warn("MQTT connection lost, automatic reconnect will retry", cause);
+            }
+
+            @Override
+            public void messageArrived(String topic, MqttMessage message) {
+                // Per-topic listeners (see EventRunner) handle subscriptions; nothing to do here.
+            }
+
+            @Override
+            public void deliveryComplete(IMqttDeliveryToken token) {
+            }
+        });
     }
 
     @Bean

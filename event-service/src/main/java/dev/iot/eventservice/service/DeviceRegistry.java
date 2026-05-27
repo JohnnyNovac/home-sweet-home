@@ -2,6 +2,11 @@ package dev.iot.eventservice.service;
 
 import dev.iot.eventservice.model.Device;
 import dev.iot.eventservice.repository.DeviceRepository;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -15,33 +20,36 @@ import java.util.Optional;
 @Service
 public class DeviceRegistry {
 
+    private final ReactiveMongoTemplate mongoTemplate;
     private final DeviceRepository repository;
 
-    public DeviceRegistry(DeviceRepository repository) {
+    public DeviceRegistry(ReactiveMongoTemplate mongoTemplate, DeviceRepository repository) {
+        this.mongoTemplate = mongoTemplate;
         this.repository = repository;
     }
 
     /**
-     * Регистрирует факт получения сообщения от устройства (upsert). Обновляет {@code lastSeenAt},
-     * а при первом обращении создаёт запись. {@code sensorType} проставляется лениво — только если
-     * он ещё не задан и пришедшее значение не {@code null}; поэтому availability-сообщения передают
-     * {@code null} и не затирают уже известный тип, а заполняют его data-сообщения.
+     * Регистрирует факт получения сообщения от устройства одним атомарным upsert: обновляет
+     * {@code lastSeenAt} и создаёт запись, если её ещё нет. {@code sensorType} записывают только
+     * data-сообщения (они всегда несут правильный тип); availability-сообщение передаёт {@code null}
+     * и поле {@code sensorType} не трогает, поэтому известный тип не затирается. Обновление меняет
+     * только перечисленные поля (не заменяет документ целиком), так что {@code room} и параллельные
+     * сообщения от того же устройства ничего не теряют.
      *
      * @param deviceId   идентификатор устройства
      * @param sensorType тип сенсора из data-сообщения либо {@code null} для availability-канала
      * @return сохранённое устройство
      */
     public Mono<Device> recordSeen(String deviceId, String sensorType) {
-        Instant now = Instant.now();
-        return repository.findById(deviceId)
-                .switchIfEmpty(Mono.defer(() -> Mono.just(new Device(deviceId, sensorType, null, now))))
-                .doOnNext(device -> {
-                    device.setLastSeenAt(now);
-                    if (device.getSensorType() == null && sensorType != null) {
-                        device.setSensorType(sensorType);
-                    }
-                })
-                .flatMap(repository::save);
+        Query byId = Query.query(Criteria.where("_id").is(deviceId));
+
+        Update update = new Update().set("lastSeenAt", Instant.now());
+        if (sensorType != null) {
+            update.set("sensorType", sensorType);
+        }
+
+        FindAndModifyOptions options = FindAndModifyOptions.options().upsert(true).returnNew(true);
+        return mongoTemplate.findAndModify(byId, update, options, Device.class);
     }
 
     /**
