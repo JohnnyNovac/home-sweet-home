@@ -62,12 +62,11 @@ public class EventRunner implements CommandLineRunner {
             return;
         }
 
-        deviceRegistry.recordSeen(deviceId, sensorType)
-                .subscribe(
-                        device -> {
-                        },
-                        error -> logger.error("Failed to upsert device {}", deviceId, error)
-                );
+        try {
+            deviceRegistry.recordSeen(deviceId, sensorType);
+        } catch (RuntimeException e) {
+            logger.error("Failed to upsert device {}", deviceId, e);
+        }
 
         try {
             handler.handleIncomingData(deviceId, json);

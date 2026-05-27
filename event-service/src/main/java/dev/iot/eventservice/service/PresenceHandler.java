@@ -1,6 +1,7 @@
 package dev.iot.eventservice.service;
 
 import dev.iot.eventservice.config.HAConfigProperties;
+import dev.iot.eventservice.model.SensorData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -52,11 +53,8 @@ public class PresenceHandler implements SensorHandler {
         }
 
         sendDataToHA(deviceId, jsonData);
-        sensorDataService.saveIncomingData(deviceId, jsonData)
-                .subscribe(
-                        sensorData -> logger.debug("Saved presence data for {}: {}", deviceId, sensorData),
-                        error -> logger.error("Error saving presence data for {}", deviceId, error)
-                );
+        SensorData savedData = sensorDataService.saveIncomingData(deviceId, jsonData);
+        logger.debug("Saved presence data for {}: {}", deviceId, savedData);
     }
 
     @Override

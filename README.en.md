@@ -62,7 +62,7 @@ Data flow:
 **Backend**
 
 - Java 21, Spring Boot 4.0
-- Spring WebFlux + Reactive MongoDB (event-service)
+- Spring Data MongoDB (event-service)
 - Spring AMQP (RabbitMQ) — inter-service bus
 - Spring gRPC — synchronous calls between presence-service and yandex-service
 - Eclipse Paho — MQTT client
@@ -83,7 +83,6 @@ Data flow:
 
 - JUnit 5, Mockito, AssertJ
 - Testcontainers (MongoDB, RabbitMQ)
-- Reactor Test
 
 ## Modules
 

@@ -10,11 +10,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,18 +52,17 @@ class SensorDataServiceImplTest {
         SensorData expectedSensorData = new SensorData(DEVICE_ID, null, List.of());
 
         when(sensorDataMapper.toDocument(any(EventDTO.class))).thenReturn(expectedSensorData);
-        when(repository.save(any(SensorData.class))).thenReturn(Mono.just(expectedSensorData));
+        when(repository.save(any(SensorData.class))).thenReturn(expectedSensorData);
 
-        StepVerifier.create(sensorService.saveIncomingData(DEVICE_ID, jsonData))
-                .expectNext(expectedSensorData)
-                .verifyComplete();
+        SensorData result = sensorService.saveIncomingData(DEVICE_ID, jsonData);
 
+        assertThat(result).isEqualTo(expectedSensorData);
         verify(sensorDataMapper).toDocument(any(EventDTO.class));
         verify(repository).save(expectedSensorData);
     }
 
     @Test
-    @DisplayName("Should handle save errors")
+    @DisplayName("Should propagate save errors")
     void shouldHandleSaveErrors() {
         String jsonData = """
                 {
@@ -77,10 +76,9 @@ class SensorDataServiceImplTest {
         SensorData expectedSensorData = new SensorData(DEVICE_ID, null, List.of());
 
         when(sensorDataMapper.toDocument(any(EventDTO.class))).thenReturn(expectedSensorData);
-        when(repository.save(any(SensorData.class))).thenReturn(Mono.error(new RuntimeException("Database error")));
+        when(repository.save(any(SensorData.class))).thenThrow(new RuntimeException("Database error"));
 
-        StepVerifier.create(sensorService.saveIncomingData(DEVICE_ID, jsonData))
-                .expectError(RuntimeException.class)
-                .verify();
+        assertThatThrownBy(() -> sensorService.saveIncomingData(DEVICE_ID, jsonData))
+                .isInstanceOf(RuntimeException.class);
     }
 }

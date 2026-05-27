@@ -2,7 +2,6 @@ package dev.iot.eventservice.service;
 
 import dev.iot.eventservice.config.HAConfigProperties;
 import dev.iot.eventservice.exception.MqttPublisherException;
-import dev.iot.eventservice.model.Device;
 import org.eclipse.paho.client.mqttv3.IMqttMessageListener;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
@@ -13,10 +12,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
-import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,9 +34,6 @@ class EventRunnerTest {
 
     @Mock
     private SensorHandlerFactory sensorHandlerFactory;
-
-    @Mock
-    private DeviceRegistry deviceRegistry;
 
     @InjectMocks
     private EventRunner eventRunner;
@@ -84,8 +78,6 @@ class EventRunnerTest {
     void shouldDeadLetterOnUnrecoverableError() {
         SensorHandler handler = mock(SensorHandler.class);
         when(sensorHandlerFactory.getHandler("climate")).thenReturn(handler);
-        when(deviceRegistry.recordSeen("esp01", "climate"))
-                .thenReturn(Mono.just(new Device("esp01", "climate", null, Instant.now())));
         doThrow(new IllegalArgumentException("missing temperature"))
                 .when(handler).handleIncomingData("esp01", "{}");
 
@@ -98,8 +90,6 @@ class EventRunnerTest {
     void shouldRequeueOnTemporaryFailure() {
         SensorHandler handler = mock(SensorHandler.class);
         when(sensorHandlerFactory.getHandler("climate")).thenReturn(handler);
-        when(deviceRegistry.recordSeen("esp01", "climate"))
-                .thenReturn(Mono.just(new Device("esp01", "climate", null, Instant.now())));
         doThrow(new MqttPublisherException("broker down", null))
                 .when(handler).handleIncomingData("esp01", "{}");
 
