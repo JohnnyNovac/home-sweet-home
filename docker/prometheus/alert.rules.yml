@@ -27,12 +27,3 @@ groups:
         annotations:
           summary: "Backlog building on {{ $labels.queue }}"
           description: "{{ $labels.queue }} has {{ $value }} ready messages — a consumer may be stuck or a downstream dependency (MongoDB) slow."
-
-      - alert: DeviceDown
-        expr: device_up == 0
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Arduino module {{ $labels.deviceId }} is offline"
-          description: "{{ $labels.deviceId }} reported offline via its availability topic for over 2m."
