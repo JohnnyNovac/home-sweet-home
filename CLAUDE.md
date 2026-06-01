@@ -131,7 +131,7 @@ availability is exposed by event-service as a custom `device_up` gauge (1/0, tag
 `AvailabilityHandler` from each device's `online`/`offline` availability message — it tracks the same signal HA reads
 and resets to no series for a device until the next message after an event-service restart. Prometheus
 (`docker/prometheus/`) scrapes all four targets and evaluates `alert.rules.yml` (service down, non-empty DLQ, work-queue
-backlog, device offline). Grafana (`docker/grafana/`) is provisioned from files: the datasource (uid `prometheus`) and a
+backlog). Grafana (`docker/grafana/`) is provisioned from files: the datasource (uid `prometheus`) and a
 dashboards folder with the project overview (service and Arduino-module availability, queues, JVM, CPU) plus the
 community JVM and RabbitMQ dashboards. yandex-service keeps
 `spring-boot-starter-web` only for the outbound `RestClient` and this scrape endpoint — its embedded Tomcat hosts no

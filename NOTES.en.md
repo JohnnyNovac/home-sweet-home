@@ -73,9 +73,8 @@ RabbitMQ dashboards. To add your own dashboard, drop its JSON into that folder; 
 `prometheus`.
 
 Alert rules live in `docker/prometheus/alert.rules.yml`: service unavailable, a non-empty `*.dlq` queue (a device sent a
-message that could not be processed), a building work-queue backlog, and a device offline (a module reported `offline`
-to its availability topic). Alerts show up in the Prometheus Alerts tab; delivery (e.g. to Telegram) is not wired up
-yet.
+message that could not be processed), and a building work-queue backlog. Alerts show up in the Prometheus Alerts tab;
+delivery (e.g. to Telegram) is not wired up yet.
 
 ## Pre-flight checklist
 
