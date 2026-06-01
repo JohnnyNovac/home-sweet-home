@@ -91,8 +91,9 @@ directly — it is referenced in the `avty` array of every discovery payload, al
 `app.ha.service-availability-topic`. event-service publishes its own availability on that service-level topic the same
 way: a retained `offline` LWT, and a retained `online` re-published on every (re)connect from the MQTT
 `connectComplete` callback (`MqttConfig`) — so after a broker blip and automatic reconnect HA still sees the service as
-online. `AvailabilityHandler` in event-service is a passive consumer: it only updates `lastSeenAt` in the device
-registry, it never republishes anything to HA.
+online. `AvailabilityHandler` in event-service never republishes anything to HA — it only updates `lastSeenAt` in the
+device registry and sets the `device_up` gauge (1 for `online`, 0 for `offline`, tagged by `deviceId`) for the
+availability monitoring described under **Observability**.
 
 **Device registry.** `DeviceRegistry` maintains the `devices` MongoDB collection (fields: `deviceId` as `_id`,
 `sensorType`, `room`, `lastSeenAt`). `recordSeen(deviceId, sensorType)` is called on every data message (from
@@ -125,10 +126,14 @@ toggle is not worth retrying.
 `/actuator/prometheus` (event-service 8081, presence-service 8082, yandex-service 8083 — the HTTP port, separate from
 yandex-service's gRPC server on 9090). RabbitMQ exposes the `rabbitmq_prometheus` plugin on 15692; the scrape uses
 `/metrics/per-object` so per-queue series (`rabbitmq_queue_messages{queue=...}`) are available — the key signals are
-per-queue (a non-empty `*.dlq`, a per-queue backlog), which the aggregated default `/metrics` hides. Prometheus
+per-queue (a non-empty `*.dlq`, a per-queue backlog), which the aggregated default `/metrics` hides. Device
+availability is exposed by event-service as a custom `device_up` gauge (1/0, tagged by `deviceId`), set by
+`AvailabilityHandler` from each device's `online`/`offline` availability message — it tracks the same signal HA reads
+and resets to no series for a device until the next message after an event-service restart. Prometheus
 (`docker/prometheus/`) scrapes all four targets and evaluates `alert.rules.yml` (service down, non-empty DLQ, work-queue
-backlog). Grafana (`docker/grafana/`) is provisioned from files: the datasource (uid `prometheus`) and a dashboards
-folder with the project overview plus the community JVM and RabbitMQ dashboards. yandex-service keeps
+backlog, device offline). Grafana (`docker/grafana/`) is provisioned from files: the datasource (uid `prometheus`) and a
+dashboards folder with the project overview (service and Arduino-module availability, queues, JVM, CPU) plus the
+community JVM and RabbitMQ dashboards. yandex-service keeps
 `spring-boot-starter-web` only for the outbound `RestClient` and this scrape endpoint — its embedded Tomcat hosts no
 controllers (inbound is gRPC).
 
