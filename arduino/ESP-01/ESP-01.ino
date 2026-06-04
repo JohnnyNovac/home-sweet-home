@@ -19,10 +19,15 @@ const char* MQTT_BROKER_IP = "192.168.1.77";  // ← your broker IP here
 const char* DEVICE_ID = "ESP-01";
 const char* AVAILABILITY_TOPIC = "home/availability/esp01";
 const char* DATA_TOPIC = "home/climate/esp01/data";
+const char* LOG_TOPIC = "home/logs/esp01";
 
 bool isFirstValuePublished = false;
 
 void log(String message) {
+  log(message, "info");
+}
+
+void log(String message, const char* level) {
   Serial.println(message);
 
   logData += message + "\n";
@@ -33,6 +38,16 @@ void log(String message) {
     if (logData.length() > MAX_LOG_SIZE) {
       logData = logData.substring(logData.length() - MAX_LOG_SIZE);  // Keeping the most recent entries
     }
+  }
+
+  // Centralised logs go out over MQTT only when the broker is reachable
+  if (mqttClient.connected()) {
+    DynamicJsonDocument doc(384);
+    doc["level"] = level;
+    doc["msg"] = message;
+    char payload[384];
+    serializeJson(doc, payload);
+    mqttClient.publish(LOG_TOPIC, payload);
   }
 }
 

@@ -23,6 +23,9 @@ bool radarPresence = false;
 
 volatile bool lampStateUpdated = false;
 
+bool hasIncomingLog = false;
+String incomingLogMessage;
+
 bool switchedToActiveMode = false;
 bool switchedToLightSleepMode = false;
 
@@ -46,9 +49,29 @@ const char* DEVICE_ID = "NodeMCU-1";
 const char* AVAILABILITY_TOPIC = "home/availability/nodemcu1";
 const char* LAMP_STATE_TOPIC = "home/presence/nodemcu1/lampstate";
 const char* DATA_TOPIC = "home/presence/nodemcu1/data";
+const char* LOG_TOPIC = "home/logs/nodemcu1";
 const char* DEVICE_NAME = "PresenceBox";  // unique device name
 
 void log(String message) {
+  log(message, "info");
+}
+
+void log(String message, const char* level) {
+  logLocal(message);
+
+  // Centralised logs go out over MQTT only when the broker is reachable
+  if (mqttClient.connected()) {
+    DynamicJsonDocument doc(384);
+    doc["level"] = level;
+    doc["msg"] = message;
+    char payload[384];
+    serializeJson(doc, payload);
+    mqttClient.publish(LOG_TOPIC, payload);
+  }
+}
+
+// Writes to Serial and the web buffer only — safe to call from the MQTT callback (does not publish)
+void logLocal(String message) {
   Serial.println(message);
 
   logData += message + "\n";
@@ -138,6 +161,12 @@ void loop() {
 
   if (!mqttClient.connected()) {
     if (!connectToMQTT()) return;
+  }
+
+  // Deferred log of an incoming message — see messageReceived()
+  if (hasIncomingLog) {
+    hasIncomingLog = false;
+    log(incomingLogMessage);
   }
 
   if (switchedToActiveMode) {
@@ -323,7 +352,9 @@ void turnOffRadar() {
 }
 
 void messageReceived(String& topic, String& payload) {
-  log("incoming: " + topic + " - " + payload);
+  // Defer logging to loop(): publishing over MQTT from inside the callback can deadlock
+  incomingLogMessage = "incoming: " + topic + " - " + payload;
+  hasIncomingLog = true;
 
   currentLampState = payload == "true";
   lampStateUpdated = true;  // SIGNAL: value has arrived

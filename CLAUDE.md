@@ -47,12 +47,14 @@ reserved for HA auto-discovery and HA-facing state topics published by event-ser
 | `home/<sensorType>/<deviceId>/data`  | `home.<sensorType>.<deviceId>.data`  | Sensor measurements (JSON in `measurements`)  |
 | `home/availability/<deviceId>`       | `home.availability.<deviceId>`       | `online`/`offline` (MQTT LWT from the device) |
 | `home/presence/<deviceId>/lampstate` | `home.presence.<deviceId>.lampstate` | Lamp state echo (PresenceBox only)            |
+| `home/logs/<deviceId>`               | `home.logs.<deviceId>`               | Device diagnostic logs (JSON `{level,msg}`)   |
 
 Bindings in `docker/rabbitmq/definitions.json`:
 
 - `home.*.*.data` → `event-data` (consumed by `EventRunner`)
 - `home.presence.*.data` → `presence-data` (consumed by `presence-service`)
 - `home.availability.*` → `device-availability` (consumed by `AvailabilityHandler`)
+- `home.logs.*` → `device-logs` (consumed by Vector, forwarded to Loki — see **Observability**)
 
 `deviceId` lives only in the routing key — never in the JSON payload. Adding a new physical device = flash firmware with
 its own `DEVICE_ID` and matching topics; no service-side config or code changes are needed.
@@ -131,11 +133,21 @@ availability is exposed by event-service as a custom `device_up` gauge (1/0, tag
 `AvailabilityHandler` from each device's `online`/`offline` availability message — it tracks the same signal HA reads
 and resets to no series for a device until the next message after an event-service restart. Prometheus
 (`docker/prometheus/`) scrapes all four targets and evaluates `alert.rules.yml` (service down, non-empty DLQ, work-queue
-backlog). Grafana (`docker/grafana/`) is provisioned from files: the datasource (uid `prometheus`) and a
-dashboards folder with the project overview (service and Arduino-module availability, queues, JVM, CPU) plus the
-community JVM and RabbitMQ dashboards. yandex-service keeps
+backlog). Grafana (`docker/grafana/`) is provisioned from files: two datasources (uid `prometheus` for metrics and
+uid `loki` for logs) and a dashboards folder with the project overview (service and Arduino-module availability, queues,
+JVM, CPU) plus the community JVM and RabbitMQ dashboards. yandex-service keeps
 `spring-boot-starter-web` only for the outbound `RestClient` and this scrape endpoint — its embedded Tomcat hosts no
 controllers (inbound is gRPC).
+
+**Device logs.** Each Arduino's `log()` publishes diagnostic lines as JSON (`{level,msg}`) to `home/logs/<deviceId>`
+(routing key `home.logs.<deviceId>`), bound to the `device-logs` queue. Publishing is best-effort and only happens while
+the MQTT broker is reachable — lines are always kept in the device's Serial output and the small in-RAM web-page buffer,
+so a broker outage loses central delivery but not local visibility. Vector (`docker/vector/`) consumes `device-logs`
+over
+AMQP, parses the JSON and derives `deviceId` from the routing key, and forwards the lines to Loki (`docker/loki/`,
+single-binary, filesystem storage, 30-day retention) with `deviceId`/`level` labels — so device logs are searchable in
+Grafana alongside the metrics. PresenceBox is subscribed to its lamp-state topic, so its MQTT message callback must not
+publish (deadlock risk): it defers that one log line to `loop()` via a flag (`hasIncomingLog`).
 
 **JSON parsing.** Uses Jackson 3 (`tools.jackson.*`, not `com.fasterxml.jackson.*`). Shared DTOs and the sensor-payload
 parser live in `shared/` (`JsonDtoParser`, `EventDTO`, `MeasurementDTO`).

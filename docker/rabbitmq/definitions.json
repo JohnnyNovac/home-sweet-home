@@ -42,6 +42,16 @@
       }
     },
     {
+      "name": "device-logs",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "dlx",
+        "x-dead-letter-routing-key": "device-logs.dlq"
+      }
+    },
+    {
       "name": "event-data.dlq",
       "vhost": "/",
       "durable": true,
@@ -57,6 +67,13 @@
     },
     {
       "name": "device-availability.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "device-logs.dlq",
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
@@ -89,6 +106,14 @@
       "arguments": {}
     },
     {
+      "source": "amq.topic",
+      "vhost": "/",
+      "destination": "device-logs",
+      "destination_type": "queue",
+      "routing_key": "home.logs.*",
+      "arguments": {}
+    },
+    {
       "source": "dlx",
       "vhost": "/",
       "destination": "event-data.dlq",
@@ -110,6 +135,14 @@
       "destination": "device-availability.dlq",
       "destination_type": "queue",
       "routing_key": "device-availability.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "dlx",
+      "vhost": "/",
+      "destination": "device-logs.dlq",
+      "destination_type": "queue",
+      "routing_key": "device-logs.dlq",
       "arguments": {}
     }
   ]
