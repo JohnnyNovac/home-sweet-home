@@ -22,6 +22,9 @@
         </appender>
     </springProfile>
 
+    <!-- Логи самих сервисов (обработка и передача данных) на уровне DEBUG -->
+    <logger name="dev.iot" level="DEBUG"/>
+
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <springProfile name="docker">

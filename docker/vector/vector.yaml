@@ -17,7 +17,7 @@ transforms:
       parsed = parse_json!(.message)
       # deviceId берём из ключа маршрутизации home.logs.<deviceId>
       parts = split(to_string!(.routing_key), ".")
-      .deviceId = parts[2] ?? "unknown"
+      .deviceId = parts[2]
       .level = parsed.level
       .message = parsed.msg
 
