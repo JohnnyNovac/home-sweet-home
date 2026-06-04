@@ -77,7 +77,7 @@ flowchart LR
 - Docker / Docker Compose
 - RabbitMQ, MongoDB
 - Prometheus, Grafana — метрики и дашборды
-- Loki, Vector — сбор логов устройств
+- Loki, Vector — сбор логов устройств и сервисов
 - GitLab CI/CD
 - Home Assistant (внешняя интеграция)
 
@@ -119,8 +119,9 @@ docker compose -f docker/docker-compose.yml up -d
 ## Мониторинг
 
 Метрики сервисов и RabbitMQ собирает Prometheus, дашборды — в Grafana (оба поднимаются тем же docker-compose). Grafana —
-на http://localhost:3000, Prometheus — на http://localhost:9091. Логи устройств собирает Vector и хранит Loki — они
-доступны в той же Grafana. Подробнее (порты, дашборды, правила оповещений) — в [NOTES.md](NOTES.md).
+на http://localhost:3000, Prometheus — на http://localhost:9091. Логи устройств собирает Vector, а логи сервисов
+отправляются в Loki напрямую через logback; хранит всё Loki — логи доступны в той же Grafana. Подробнее (порты,
+дашборды, правила оповещений) — в [NOTES.md](NOTES.md).
 
 ## Планы
 

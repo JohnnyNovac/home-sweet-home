@@ -78,6 +78,7 @@ Data flow:
 - Docker / Docker Compose
 - RabbitMQ, MongoDB
 - Prometheus, Grafana — metrics and dashboards
+- Loki, Vector — device and service logs
 - GitLab CI/CD
 - Home Assistant (external integration)
 
@@ -119,8 +120,9 @@ See [docs/testing.en.md](docs/testing.en.md) for the autotest layout.
 ## Monitoring
 
 Prometheus collects metrics from the services and RabbitMQ; Grafana renders the dashboards (both come up with the same
-docker-compose). Grafana is at http://localhost:3000, Prometheus at http://localhost:9091. More detail (ports,
-dashboards, alert rules) — see [NOTES.en.md](NOTES.en.md).
+docker-compose). Grafana is at http://localhost:3000, Prometheus at http://localhost:9091. Vector collects device logs
+and the services send their logs to Loki directly via logback; Loki stores everything — the logs are available in the
+same Grafana. More detail (ports, dashboards, alert rules) — see [NOTES.en.md](NOTES.en.md).
 
 ## Roadmap
 
