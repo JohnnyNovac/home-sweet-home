@@ -8,6 +8,7 @@ description = 'yandex-service'
 def springGrpcVersion = project.properties['springGrpcVersion'] ?: '1.0.2'
 
 dependencies {
+    implementation project(':shared')
     implementation project(':grpc-api')
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.grpc:spring-grpc-spring-boot-starter'

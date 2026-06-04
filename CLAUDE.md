@@ -152,6 +152,16 @@ single-binary, filesystem storage, 30-day retention) with `deviceId`/`level` lab
 Grafana alongside the metrics. PresenceBox is subscribed to its lamp-state topic, so its MQTT message callback must not
 publish (deadlock risk): it defers that one log line to `loop()` via a flag (`hasIncomingLog`).
 
+**Service logs.** The three Spring Boot services ship their logs to the same Loki via the `loki-logback-appender`
+(loki4j) — the appender, dependency and a single shared `logback-spring.xml` live in `shared/` (so yandex-service, which
+otherwise only depends on `grpc-api`, depends on `shared` for this). The console stays the normal human-readable Spring
+Boot format; the Loki appender sends the log body as structured JSON (`JsonLayout`: `level`, `logger_name`,
+`thread_name`, `message`) with labels `source=service` and `service=<spring.application.name>`. It is gated on the
+`docker` Spring profile (`<springProfile name="docker">`), activated by `SPRING_PROFILES_ACTIVE=docker` on each service
+in `docker-compose.yml` — so it only runs inside the compose stack where Loki is reachable, never under the `local`
+profile (`bootRun`) or in tests. Device logs (`source=arduino`, via Vector) and service logs (`source=service`, via
+loki4j) share the `source` label, so the overview dashboard's logs panel shows both with `{source=~"arduino|service"}`.
+
 **JSON parsing.** Uses Jackson 3 (`tools.jackson.*`, not `com.fasterxml.jackson.*`). Shared DTOs and the sensor-payload
 parser live in `shared/` (`JsonDtoParser`, `EventDTO`, `MeasurementDTO`).
 

@@ -6,5 +6,6 @@ description = 'shared'
 
 dependencies {
     implementation 'tools.jackson.core:jackson-databind:3.0.2'
+    implementation 'com.github.loki4j:loki-logback-appender:2.0.3'
     testImplementation 'org.assertj:assertj-core:3.27.6'
 }

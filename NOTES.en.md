@@ -37,26 +37,31 @@ and state topics published by event-service.
 | `home/<sensorType>/<deviceId>/data`  | JSON with measurements                          |
 | `home/availability/<deviceId>`       | `online` / `offline` (MQTT LWT from the device) |
 | `home/presence/<deviceId>/lampstate` | Lamp state from PresenceBox                     |
+| `home/logs/<deviceId>`               | Device diagnostic logs (JSON `{level,msg}`)     |
 
 `sensorType` is either `climate` or `presence`. `deviceId` is set by the `DEVICE_ID` constant in the `.ino` firmware.
 
-## Assigning a room to a device
+## Assigning a room and name to a device
 
-On the first message the device is automatically added to the `devices` collection (Mongo, database `events`). To make
-Home Assistant display sensors in the correct room, the `room` field must be set manually via `mongosh`:
+On the first message the device is automatically added to the `devices` collection (Mongo, database `events`). The
+`room` field (the room in Home Assistant) and the `name` field (the device's display name in Home Assistant) are set
+manually via `mongosh`:
 
 ```bash
 docker exec -it mongodb mongosh -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD
 > use events
-> db.devices.updateOne({_id: "esp01"}, {$set: {room: "bedroom"}})
+> db.devices.updateOne({_id: "esp-01-1"}, {$set: {room: "bedroom", name: "ESP-01-1"}})
 ```
 
-Restart Home Assistant afterwards: event-service is subscribed to `homeassistant/status` and re-publishes discovery with
-the updated `suggested_area` when HA transitions to `online`.
+If `name` is not set, Home Assistant shows the device by its `deviceId`. Restart Home Assistant afterwards:
+event-service
+is subscribed to `homeassistant/status` and re-publishes discovery with the updated `suggested_area` and name when HA
+transitions to `online`.
 
 ## Monitoring
 
-Prometheus collects metrics and Grafana displays them — both come up with the same docker-compose.
+Prometheus collects metrics, Loki stores logs, and Grafana displays everything — all come up with the same
+docker-compose.
 
 | Service    | Address               | Purpose                                       |
 |------------|-----------------------|-----------------------------------------------|
@@ -69,12 +74,24 @@ presence-service on 8082, yandex-service on 8083). RabbitMQ exposes metrics via 
 
 Grafana's data source and dashboards are defined by the files in `docker/grafana/provisioning`; the dashboards
 themselves live in `docker/grafana/dashboards`: the overview `home-sweet-home` plus the community JVM (Micrometer) and
-RabbitMQ dashboards. To add your own dashboard, drop its JSON into that folder; the data source binds by the uid
-`prometheus`.
+RabbitMQ dashboards. To add your own dashboard, drop its JSON into that folder; data sources bind by the uid
+`prometheus` (metrics) and `loki` (logs).
 
 Alert rules live in `docker/prometheus/alert.rules.yml`: service unavailable, a non-empty `*.dlq` queue (a device sent a
 message that could not be processed), and a building work-queue backlog. Alerts show up in the Prometheus Alerts tab;
 delivery (e.g. to Telegram) is not wired up yet.
+
+Device logs are a separate stream. The firmware publishes diagnostic lines to `home/logs/<deviceId>`, Vector reads the
+`device-logs` queue and forwards them to Loki (30-day retention). The logs are available in Grafana through the `loki`
+data source — filtered by `deviceId` and level. Publishing from a device happens only while the broker is reachable;
+either way the lines stay in the Serial output and on the device's web page.
+
+Logs from the three microservices land in the same Loki via `loki-logback-appender` (the dependency and a shared
+`logback-spring.xml` live in the `shared` module). The console keeps the normal human-readable format, while the logs
+sent to Loki are structured JSON with the labels `source=service` and `service=<service name>`. Sending to Loki is
+enabled only under the `docker` profile (set in `docker-compose.yml`), so nothing is sent to Loki during local `bootRun`
+runs or in tests. Device logs (`source=arduino`) and service logs (`source=service`) share the `source` label, so the
+logs panel on the overview dashboard shows them together with `{source=~"arduino|service"}`.
 
 ## Pre-flight checklist
 

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Консоль остаётся в обычном читаемом виде — это дефолтные настройки Spring Boot -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- Имя сервиса для метки Loki берём из spring.application.name -->
+    <springProperty scope="context" name="appName" source="spring.application.name"/>
+
+    <!-- В Loki шлём только в развёрнутом стенде (профиль docker): не локально и не в тестах -->
+    <springProfile name="docker">
+        <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+            <http>
+                <url>http://loki:3100/loki/api/v1/push</url>
+            </http>
+            <labels>
+                source = service
+                service = ${appName}
+            </labels>
+            <!-- Тело лога — структурным JSON: level, logger_name, thread_name, message -->
+            <message class="com.github.loki4j.logback.JsonLayout"/>
+        </appender>
+    </springProfile>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <springProfile name="docker">
+            <appender-ref ref="LOKI"/>
+        </springProfile>
+    </root>
+</configuration>

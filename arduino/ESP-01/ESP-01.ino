@@ -8,12 +8,22 @@
 #include "secrets.h"
 
 #define MAX_LOG_SIZE 2000
+#define MAX_PENDING_LOGS 16
 
 WiFiClient net;
 ESP8266WebServer server(8009);
 MQTTClient mqttClient;
 
 String logData = "ESP-01 Box logs: \n\n";
+
+// Сообщения, записанные до подключения к брокеру, копятся здесь и уходят в MQTT
+// сразу после соединения — иначе логи из setup() теряются для централизованных логов
+struct PendingLog {
+  String msg;
+  String level;
+};
+PendingLog pendingLogs[MAX_PENDING_LOGS];
+int pendingCount = 0;
 
 const char* MQTT_BROKER_IP = "192.168.1.77";  // ← your broker IP here
 const char* DEVICE_ID = "ESP-01";
@@ -22,6 +32,25 @@ const char* DATA_TOPIC = "home/climate/esp-01-1/data";
 const char* LOG_TOPIC = "home/logs/esp-01-1";
 
 bool isFirstValuePublished = false;
+
+void publishLog(const String& message, const char* level) {
+  DynamicJsonDocument doc(384);
+  doc["level"] = level;
+  doc["msg"] = message;
+  char payload[384];
+  serializeJson(doc, payload);
+  mqttClient.publish(LOG_TOPIC, payload);
+}
+
+// Отправляет накопленные до подключения сообщения и очищает буфер
+void flushPendingLogs() {
+  for (int i = 0; i < pendingCount; i++) {
+    publishLog(pendingLogs[i].msg, pendingLogs[i].level.c_str());
+    pendingLogs[i].msg = "";
+    pendingLogs[i].level = "";
+  }
+  pendingCount = 0;
+}
 
 void log(String message) {
   log(message, "info");
@@ -40,14 +69,13 @@ void log(String message, const char* level) {
     }
   }
 
-  // Centralised logs go out over MQTT only when the broker is reachable
+  // Пока брокер недоступен, копим сообщения; они уйдут в MQTT после подключения
   if (mqttClient.connected()) {
-    DynamicJsonDocument doc(384);
-    doc["level"] = level;
-    doc["msg"] = message;
-    char payload[384];
-    serializeJson(doc, payload);
-    mqttClient.publish(LOG_TOPIC, payload);
+    publishLog(message, level);
+  } else if (pendingCount < MAX_PENDING_LOGS) {
+    pendingLogs[pendingCount].msg = message;
+    pendingLogs[pendingCount].level = level;
+    pendingCount++;
   }
 }
 
@@ -69,6 +97,7 @@ bool connectToMQTT() {
 
   if (mqttClient.connected()) {
     mqttClient.publish(AVAILABILITY_TOPIC, "online");
+    flushPendingLogs();  // отправляем то, что накопилось до подключения
     log("MQTT connected!");
     return true;
   } else {
