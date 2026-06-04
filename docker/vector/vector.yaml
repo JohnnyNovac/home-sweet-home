@@ -1,0 +1,35 @@
+# Читает логи устройств из очереди device-logs (RabbitMQ) и складывает их в Loki.
+
+sources:
+  device_logs:
+    type: amqp
+    connection_string: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/%2f?timeout=10"
+    queue: device-logs
+    routing_key_field: routing_key
+
+transforms:
+  parse:
+    type: remap
+    inputs:
+      - device_logs
+    source: |
+      # тело сообщения от ESP — JSON вида {"level":"info","msg":"..."}
+      parsed = parse_json!(.message)
+      # deviceId берём из ключа маршрутизации home.logs.<deviceId>
+      parts = split(to_string!(.routing_key), ".")
+      .deviceId = parts[2] ?? "unknown"
+      .level = parsed.level
+      .message = parsed.msg
+
+sinks:
+  loki:
+    type: loki
+    inputs:
+      - parse
+    endpoint: http://loki:3100
+    labels:
+      source: arduino
+      deviceId: "{{ deviceId }}"
+      level: "{{ level }}"
+    encoding:
+      codec: text
