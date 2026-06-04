@@ -16,7 +16,7 @@ import java.util.Optional;
 
 /**
  * Реестр устройств: ведёт коллекцию {@code devices} в MongoDB, где ключ — {@code deviceId},
- * а также хранятся {@code sensorType}, {@code room} и {@code lastSeenAt}.
+ * а также хранятся {@code sensorType}, {@code room}, {@code name} и {@code lastSeenAt}.
  */
 @Service
 public class DeviceRegistry {
@@ -69,6 +69,24 @@ public class DeviceRegistry {
             return repository.findById(deviceId).map(Device::getRoom);
         } catch (RuntimeException e) {
             logger.warn("Room lookup for {} failed, publishing discovery without suggested_area", deviceId, e);
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Возвращает заданное вручную отображаемое имя устройства для поля {@code name} в discovery-конфиге HA.
+     * Если имя не задано или запрос к Mongo завершился ошибкой, отдаём {@link Optional#empty()} — в discovery
+     * вместо имени попадает сам {@code deviceId}. Ожидание ограничено тайм-аутами драйвера MongoDB в строке
+     * подключения.
+     *
+     * @param deviceId идентификатор устройства
+     * @return отображаемое имя или {@link Optional#empty()}, если оно не задано либо недоступно
+     */
+    public Optional<String> nameFor(String deviceId) {
+        try {
+            return repository.findById(deviceId).map(Device::getName);
+        } catch (RuntimeException e) {
+            logger.warn("Name lookup for {} failed, publishing discovery with deviceId as name", deviceId, e);
             return Optional.empty();
         }
     }

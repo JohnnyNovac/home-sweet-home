@@ -46,10 +46,10 @@ String logData = "Presence Box logs: \n\n";
 
 const char* MQTT_BROKER_IP = "192.168.1.77";  // ← your broker IP here
 const char* DEVICE_ID = "NodeMCU-1";
-const char* AVAILABILITY_TOPIC = "home/availability/nodemcu1";
-const char* LAMP_STATE_TOPIC = "home/presence/nodemcu1/lampstate";
-const char* DATA_TOPIC = "home/presence/nodemcu1/data";
-const char* LOG_TOPIC = "home/logs/nodemcu1";
+const char* AVAILABILITY_TOPIC = "home/availability/nodemcu-1";
+const char* LAMP_STATE_TOPIC = "home/presence/nodemcu-1/lampstate";
+const char* DATA_TOPIC = "home/presence/nodemcu-1/data";
+const char* LOG_TOPIC = "home/logs/nodemcu-1";
 const char* DEVICE_NAME = "PresenceBox";  // unique device name
 
 void log(String message) {

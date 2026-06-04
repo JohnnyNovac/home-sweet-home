@@ -40,19 +40,20 @@ WiFi-мост между MultiBox и брокером: принимает пок
 
 `sensorType` — `climate` или `presence`. `deviceId` задаётся константой `DEVICE_ID` в прошивке `.ino`.
 
-## Назначение комнаты устройству
+## Назначение комнаты и имени устройству
 
-При первом сообщении устройство автоматически добавляется в коллекцию `devices` (Mongo, БД `events`). Чтобы Home
-Assistant отображал датчики в нужной комнате, поле `room` нужно задать вручную через `mongosh`:
+При первом сообщении устройство автоматически добавляется в коллекцию `devices` (Mongo, БД `events`). Поля `room`
+(комната в Home Assistant) и `name` (отображаемое имя устройства в Home Assistant) задаются вручную через `mongosh`:
 
 ```bash
 docker exec -it mongodb mongosh -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD
 > use events
-> db.devices.updateOne({_id: "esp01"}, {$set: {room: "bedroom"}})
+> db.devices.updateOne({_id: "esp-01-1"}, {$set: {room: "bedroom", name: "ESP-01-1"}})
 ```
 
-После этого нужно перезапустить Home Assistant: event-service подписан на `homeassistant/status` и при переходе в
-`online` повторно публикует discovery с актуальным значением `suggested_area`.
+Если `name` не задано, Home Assistant показывает устройство по его `deviceId`. После изменения нужно перезапустить Home
+Assistant: event-service подписан на `homeassistant/status` и при переходе в `online` повторно публикует discovery
+с актуальными `suggested_area` и именем.
 
 ## Мониторинг
 
