@@ -17,9 +17,9 @@ String logData = "ESP-01 Box logs: \n\n";
 
 const char* MQTT_BROKER_IP = "192.168.1.77";  // ← your broker IP here
 const char* DEVICE_ID = "ESP-01";
-const char* AVAILABILITY_TOPIC = "home/availability/esp01";
-const char* DATA_TOPIC = "home/climate/esp01/data";
-const char* LOG_TOPIC = "home/logs/esp01";
+const char* AVAILABILITY_TOPIC = "home/availability/esp-01-1";
+const char* DATA_TOPIC = "home/climate/esp-01-1/data";
+const char* LOG_TOPIC = "home/logs/esp-01-1";
 
 bool isFirstValuePublished = false;
 

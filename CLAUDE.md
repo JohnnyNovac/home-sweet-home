@@ -98,15 +98,18 @@ device registry and sets the `device_up` gauge (1 for `online`, 0 for `offline`,
 availability monitoring described under **Observability**.
 
 **Device registry.** `DeviceRegistry` maintains the `devices` MongoDB collection (fields: `deviceId` as `_id`,
-`sensorType`, `room`, `lastSeenAt`). `recordSeen(deviceId, sensorType)` is called on every data message (from
+`sensorType`, `room`, `name`, `lastSeenAt`). `recordSeen(deviceId, sensorType)` is called on every data message (from
 `EventRunner`) and every availability message (from `AvailabilityHandler`, with `sensorType = null`). It is a single
 atomic field-level upsert (`findAndModify` with `$set`), not a read-modify-write: it always sets `lastSeenAt` and
 creates the row if missing; data messages also set `sensorType` (they always carry the device's fixed, correct type),
 while availability messages omit `sensorType` from the update so they never blank a known type. Because the update
 touches only the named fields (no full-document replace), concurrent data + availability messages for the same device
-can't lose each other's fields, and a manually assigned `room` is never clobbered. `roomFor(deviceId)` is consumed by
-handlers when building HA discovery payloads; if `room` is set, `suggested_area` is added so HA places the entity in the
-right room. The lookup is a plain blocking query; its wait is bounded by the MongoDB driver timeouts set in the
+can't lose each other's fields, and a manually assigned `room` or `name` is never clobbered. `roomFor(deviceId)` is
+consumed by handlers when building HA discovery payloads; if `room` is set, `suggested_area` is added so HA places the
+entity in the right room. `nameFor(deviceId)` works the same way for the HA-facing device `name`: if a `name` is set it
+is used as the display name (e.g. `NodeMCU-1`), otherwise discovery falls back to the raw `deviceId` — so the `deviceId`
+stays lowercase in topics while HA shows a friendly name. The lookup is a plain blocking query; its wait is bounded by
+the MongoDB driver timeouts set in the
 connection URI, and if Mongo is slow or unavailable it degrades to no `suggested_area` rather than failing discovery —
 the room is picked up on the next HA restart. Rooms are assigned manually via `mongosh` — see
 `NOTES.md`. A room change takes effect after HA restart (handlers re-publish discovery for every known device when

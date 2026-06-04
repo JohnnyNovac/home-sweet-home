@@ -12,6 +12,7 @@ public class Device {
     private String deviceId;
     private String sensorType;
     private String room;
+    private String name;
     private Instant lastSeenAt;
 
     public Device() {
@@ -42,6 +43,14 @@ public class Device {
 
     public void setRoom(String room) {
         this.room = room;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public Instant getLastSeenAt() {
