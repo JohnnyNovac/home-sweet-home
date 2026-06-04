@@ -374,7 +374,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{source=~\"arduino|service\"}",
+          "expr": "{source=~\"arduino|service\"} | json | line_format \"{{ .level }} {{ if .message }}{{ .message }}{{ else }}{{ __line__ }}{{ end }}\"",
           "queryType": "range"
         }
       ]
