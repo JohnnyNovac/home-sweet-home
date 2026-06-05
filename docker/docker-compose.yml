@@ -20,8 +20,26 @@ services:
     volumes:
       - rabbitmq-lib:/var/lib/rabbitmq/
       - rabbitmq-log:/var/log/rabbitmq
-      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
     restart: unless-stopped
+    networks:
+      - homesweethome_net
+
+  # One-shot: recreates queues with current definitions, then exits.
+  # Dependents wait for it via service_completed_successfully.
+  rabbitmq-init:
+    image: my-rabbitmq
+    build:
+      context: ./rabbitmq
+    entrypoint: [ "/init.sh" ]
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
+    restart: "no"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks:
       - homesweethome_net
 
@@ -69,6 +87,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
       mongodb:
         condition: service_started
     networks:
@@ -88,6 +108,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
     networks:
       - homesweethome_net
 
@@ -168,6 +190,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
       loki:
         condition: service_started
     networks:

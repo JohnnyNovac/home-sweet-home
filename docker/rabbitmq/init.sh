@@ -1,31 +1,35 @@
 #!/bin/bash
+set -euo pipefail
 
-(
-  TIMEOUT=300  # Timeout in seconds
-  ELAPSED=0
-  INTERVAL=2
+# Recreates the queues in an already-running broker, then exits.
+# Runs as a one-shot container (rabbitmq-init) once RabbitMQ is healthy.
+# Dependent services wait for this container to finish successfully
+# (service_completed_successfully), so nothing connects while the queues
+# are being recreated.
+#
+# Uses the RabbitMQ Management HTTP API:
+# https://www.rabbitmq.com/docs/http-api-reference
 
-  # Wait until port 5672 is open or timeout reached
-  echo "Waiting for RabbitMQ to start..."
-  until nc -z localhost 5672; do
-    if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
-      echo "Timeout reached while waiting for RabbitMQ to start."
-      exit 1
-    fi
-    sleep $INTERVAL
-    ELAPSED=$((ELAPSED + INTERVAL))
-  done
+API="http://rabbitmq:15672/api"
+AUTH="${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}"
+VHOST="%2F"   # vhost '/' encoded for the URL
 
-  # Delete all queues
-  echo "Deleting all queues..."
-  for queue in $(rabbitmqctl list_queues -q name | tail -n +2); do
-      echo "Deleting queue: $queue"
-    rabbitmqctl delete_queue "$queue"
-  done
+# Wait until the broker's management API is up
+echo "Waiting for RabbitMQ management API..."
+until curl -sf -u "$AUTH" "$API/overview" >/dev/null; do
+  sleep 2
+done
 
-  # Import definitions after RabbitMQ is ready
-  rabbitmqctl import_definitions /etc/rabbitmq/definitions.json
-  echo "*** Definitions imported ***"
-) &
-# Running main process
-rabbitmq-server
+# Delete all queues in vhost '/' so changed arguments are reapplied:
+# POST /api/definitions does not modify queues that already exist.
+echo "Deleting all queues..."
+for queue in $(curl -sf -u "$AUTH" "$API/queues/$VHOST" | jq -r '.[].name'); do
+  echo "Deleting queue: $queue"
+  curl -sf -u "$AUTH" -X DELETE "$API/queues/$VHOST/$queue"
+done
+
+# Re-import the definitions
+echo "Importing definitions..."
+curl -sf -u "$AUTH" -X POST -H "content-type: application/json" \
+  --data-binary @/etc/rabbitmq/definitions.json "$API/definitions"
+echo "*** Definitions imported ***"
