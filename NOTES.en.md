@@ -87,8 +87,10 @@ data source — filtered by `deviceId` and level. Publishing from a device happe
 either way the lines stay in the Serial output and on the device's web page.
 
 Logs from the three microservices land in the same Loki via `loki-logback-appender` (the dependency and a shared
-`logback-spring.xml` live in the `shared` module). The console keeps the normal human-readable format, while the logs
-sent to Loki are structured JSON with the labels `source=service` and `service=<service name>`. Sending to Loki is
+`logback-spring.xml` live in the `shared` module). The console keeps the normal human-readable format, and the body
+sent to Loki is plain readable text too, with `level`/`logger`/`thread` attached as Loki structured metadata (so they
+stay filterable, e.g. `{source="service"} | level="ERROR"`); labels are `source=service` and `service=<service name>`.
+Sending to Loki is
 enabled only under the `docker` profile (set in `docker-compose.yml`), so nothing is sent to Loki during local `bootRun`
 runs or in tests. Device logs (`source=arduino`) and service logs (`source=service`) share the `source` label, so the
 logs panel on the overview dashboard shows them together with `{source=~"arduino|service"}`.

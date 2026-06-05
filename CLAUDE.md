@@ -155,12 +155,15 @@ publish (deadlock risk): it defers that one log line to `loop()` via a flag (`ha
 **Service logs.** The three Spring Boot services ship their logs to the same Loki via the `loki-logback-appender`
 (loki4j) — the appender, dependency and a single shared `logback-spring.xml` live in `shared/` (so yandex-service, which
 otherwise only depends on `grpc-api`, depends on `shared` for this). The console stays the normal human-readable Spring
-Boot format; the Loki appender sends the log body as structured JSON (`JsonLayout`: `level`, `logger_name`,
-`thread_name`, `message`) with labels `source=service` and `service=<spring.application.name>`. It is gated on the
-`docker` Spring profile (`<springProfile name="docker">`), activated by `SPRING_PROFILES_ACTIVE=docker` on each service
-in `docker-compose.yml` — so it only runs inside the compose stack where Loki is reachable, never under the `local`
-profile (`bootRun`) or in tests. Device logs (`source=arduino`, via Vector) and service logs (`source=service`, via
-loki4j) share the `source` label, so the overview dashboard's logs panel shows both with `{source=~"arduino|service"}`.
+Boot format; the Loki appender sends a plain readable text body (a `%-5level %logger - %msg` pattern, not JSON) and
+attaches `level`/`logger`/`thread` as Loki structured metadata (loki4j's default), with labels `source=service` and
+`service=<spring.application.name>` — so logs stay readable while still filterable by field (e.g.
+`{source="service"} | level="ERROR"`). The services' own packages (`dev.iot`) log at `DEBUG`; everything else stays at
+`INFO`. It is gated on the `docker` Spring profile (`<springProfile name="docker">`), activated by
+`SPRING_PROFILES_ACTIVE=docker` on each service in `docker-compose.yml` — so it only runs inside the compose stack where
+Loki is reachable, never under the `local` profile (`bootRun`) or in tests. Device logs (`source=arduino`, via Vector)
+and service logs (`source=service`, via loki4j) share the `source` label, so the overview dashboard's logs panel shows
+both with `{source=~"arduino|service"}`.
 
 **JSON parsing.** Uses Jackson 3 (`tools.jackson.*`, not `com.fasterxml.jackson.*`). Shared DTOs and the sensor-payload
 parser live in `shared/` (`JsonDtoParser`, `EventDTO`, `MeasurementDTO`).
