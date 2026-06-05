@@ -17,8 +17,10 @@
                 source = service
                 service = ${appName}
             </labels>
-            <!-- Тело лога — структурным JSON: level, logger_name, thread_name, message -->
-            <message class="com.github.loki4j.logback.JsonLayout"/>
+            <!-- Тело лога — обычный читаемый текст; level/logger/thread идут как structured metadata (по умолчанию) -->
+            <message>
+                <pattern>%-5level %logger{36} - %msg</pattern>
+            </message>
         </appender>
     </springProfile>
 
