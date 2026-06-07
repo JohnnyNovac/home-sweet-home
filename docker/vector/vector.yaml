@@ -18,8 +18,13 @@ transforms:
       # deviceId берём из ключа маршрутизации home.logs.<deviceId>
       parts = split(to_string!(.routing_key), ".")
       .deviceId = parts[2]
-      .level = parsed.level
-      .message = parsed.msg
+      # уровень в верхнем регистре и в начале текста — как в логах сервисов;
+      # если уровень не пришёл — подставляем INFO
+      .level = "INFO"
+      if is_string(parsed.level) && parsed.level != "" {
+        .level = upcase!(parsed.level)
+      }
+      .message = .level + " " + to_string!(.deviceId) + " - " + to_string!(parsed.msg)
 
 sinks:
   loki:
