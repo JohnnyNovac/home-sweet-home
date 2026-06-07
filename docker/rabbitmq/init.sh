@@ -20,10 +20,14 @@ until curl -sf -u "$AUTH" "$API/overview" >/dev/null; do
   sleep 2
 done
 
-# Delete all queues in vhost '/' so changed arguments are reapplied:
+# Delete our declared queues in vhost '/' so changed arguments are reapplied:
 # POST /api/definitions does not modify queues that already exist.
+# Skip mqtt-subscription-* queues: the MQTT plugin creates them as exclusive
+# queues owned by a live client connection (Home Assistant, devices) and
+# recreates them itself. The management API refuses to delete an exclusive
+# queue (HTTP 400), which would fail curl --fail and abort this script.
 echo "Deleting all queues..."
-for queue in $(curl -sf -u "$AUTH" "$API/queues/$VHOST" | jq -r '.[].name'); do
+for queue in $(curl -sf -u "$AUTH" "$API/queues/$VHOST" | jq -r '.[].name | select(startswith("mqtt-subscription-") | not)'); do
   echo "Deleting queue: $queue"
   curl -sf -u "$AUTH" -X DELETE "$API/queues/$VHOST/$queue"
 done
