@@ -135,6 +135,6 @@ public class ClimateHandler implements SensorHandler {
         newJson.set("temperature", measurements.get("temperature"));
         newJson.set("humidity", measurements.get("humidity"));
 
-        mqttPublisher.publish(stateTopicFor(deviceId), objectMapper.writeValueAsString(newJson));
+        mqttPublisher.publish(stateTopicFor(deviceId), objectMapper.writeValueAsString(newJson), true);
     }
 }
