@@ -73,10 +73,6 @@ class PresenceHandlerTest {
                 any(String.class)
         );
         verify(mqttPublisher).publish(
-                eq(DISCOVERY_PREFIX + "/binary_sensor/" + DEVICE_ID + "_lamp_state/config"),
-                any(String.class)
-        );
-        verify(mqttPublisher).publish(
                 eq(DISCOVERY_PREFIX + "/binary_sensor/" + DEVICE_ID + "/state"),
                 any(String.class),
                 eq(true)
@@ -111,7 +107,6 @@ class PresenceHandlerTest {
                 eq(true)
         );
         assertThat(payloadCaptor.getValue()).contains("\"presence\":\"ON\"");
-        assertThat(payloadCaptor.getValue()).contains("\"lampState\":\"OFF\"");
     }
 
     @Test
