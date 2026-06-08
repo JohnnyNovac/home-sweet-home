@@ -20,7 +20,7 @@ app:
     discovery-prefix: homeassistant
     service-availability-topic: homeassistant/event-service/availability
     status-topic: homeassistant/status
-    expire-after: 60
+    expire-after: 120
 
 logging:
   level:
