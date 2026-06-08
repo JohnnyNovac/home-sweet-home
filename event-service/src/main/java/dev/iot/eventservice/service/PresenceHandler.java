@@ -71,11 +71,11 @@ public class PresenceHandler implements SensorHandler {
         String stateTopic = stateTopicFor(deviceId);
 
         ObjectNode presenceDiscovery = objectMapper.createObjectNode();
-        presenceDiscovery.put("dev_cla", "motion");
+        presenceDiscovery.put("name", "Присутствие");
+        presenceDiscovery.put("dev_cla", "occupancy");
         presenceDiscovery.put("stat_t", stateTopic);
         presenceDiscovery.put("val_tpl", "{{ value_json.presence }}");
         presenceDiscovery.put("uniq_id", deviceId + "_presence");
-        presenceDiscovery.put("exp_aft", haProperties.getExpireAfter());
         addAvailability(presenceDiscovery, deviceId);
         addDevice(presenceDiscovery, deviceId);
         mqttPublisher.publish(
@@ -84,11 +84,11 @@ public class PresenceHandler implements SensorHandler {
         );
 
         ObjectNode lampStateDiscovery = objectMapper.createObjectNode();
-        lampStateDiscovery.put("dev_cla", "motion");
+        lampStateDiscovery.put("name", "Лампа");
+        lampStateDiscovery.put("dev_cla", "light");
         lampStateDiscovery.put("stat_t", stateTopic);
         lampStateDiscovery.put("val_tpl", "{{ value_json.lampState }}");
         lampStateDiscovery.put("uniq_id", deviceId + "_lamp_state");
-        lampStateDiscovery.put("exp_aft", haProperties.getExpireAfter());
         addAvailability(lampStateDiscovery, deviceId);
         addDevice(lampStateDiscovery, deviceId);
         mqttPublisher.publish(
