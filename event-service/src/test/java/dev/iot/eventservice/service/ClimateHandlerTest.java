@@ -77,7 +77,8 @@ class ClimateHandlerTest {
         );
         verify(mqttPublisher).publish(
                 eq(DISCOVERY_PREFIX + "/sensor/" + DEVICE_ID + "/state"),
-                any(String.class)
+                any(String.class),
+                eq(true)
         );
         verify(sensorDataService).saveIncomingData(DEVICE_ID, jsonData);
     }
