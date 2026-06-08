@@ -140,6 +140,6 @@ public class PresenceHandler implements SensorHandler {
         newJson.put("presence", presence);
         newJson.put("lampState", lampStateValue);
 
-        mqttPublisher.publish(stateTopicFor(deviceId), objectMapper.writeValueAsString(newJson));
+        mqttPublisher.publish(stateTopicFor(deviceId), objectMapper.writeValueAsString(newJson), true);
     }
 }

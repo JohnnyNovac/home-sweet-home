@@ -85,7 +85,11 @@ not depend on Home Assistant being up — incoming data is always handled and sa
 `app.ha.status-topic` over MQTT, but only to react to HA (re)starts: when HA reports `online`, every handler's
 `sendDiscoveryForAll()` is called to (re-)publish HA auto-discovery configs for every device the handler has seen so far
 (tracked in `knownDeviceIds`). Discovery published while HA is offline is simply missed and re-sent on the next
-`online`; state published before discovery exists is ignored by HA — so nothing is gated on HA status.
+`online`; state published before discovery exists is ignored by HA — so nothing is gated on HA status. HA state is
+published retained (`MqttPublisher.publish(topic, payload, true)`), so the broker keeps the last value and replays it to
+HA on every (re)subscribe — without this an event-driven entity (presence/lamp, which only publishes on movement or a
+lamp change) would read `unknown` after an HA restart until its next event. Discovery itself stays non-retained and is
+restored by the `sendDiscoveryForAll()` republish on `online` instead.
 
 **Device availability.** Each Arduino sets an MQTT LWT pointing at `home/availability/<deviceId>` with payload
 `offline`, and publishes `online` to the same topic right after connect. HA reads device availability from this topic
