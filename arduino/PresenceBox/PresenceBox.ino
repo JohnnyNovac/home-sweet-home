@@ -8,34 +8,25 @@
 #include "secrets.h"
 
 #define MAX_LOG_SIZE 2000
+#define MAX_PENDING_LOGS 16
 
 //Pins
 const int GREEN_LED_PIN = 16;
 const int RADAR_PIN = 5;
 const int PIR_SENSOR_PIN = 14;
 const int RELAY_PIN = 12;
-const int SWITCH_MODE_PIN = 13;
 const int RED_LED_PIN = 15;
 
 bool currentLampState = false;
-bool pirSensorPresence = false;
-bool radarPresence = false;
-
-volatile bool lampStateUpdated = false;
+volatile bool pirSensorPresence = false;
+volatile bool radarPresence = false;
 
 bool hasIncomingLog = false;
 String incomingLogMessage;
 
-bool switchedToActiveMode = false;
-bool switchedToLightSleepMode = false;
-
-bool activeMode = true;
-
-bool first = true;
-
 volatile bool radarIsActive = false;  // Radar activity flag
 
-unsigned long lowLevelRadarTime;                    // When the radar level went low
+volatile unsigned long lowLevelRadarTime;           // When the radar level went low
 const unsigned long lowLevelRadarDuration = 10000;  // How long the radar stays low (10 seconds)
 
 WiFiClient net;
@@ -43,6 +34,15 @@ ESP8266WebServer server(8008);
 MQTTClient mqttClient;
 
 String logData = "Presence Box logs: \n\n";
+
+// Messages logged before the broker connects are buffered here and flushed on connect,
+// otherwise setup() logs are lost for the centralised logs
+struct PendingLog {
+  String msg;
+  String level;
+};
+PendingLog pendingLogs[MAX_PENDING_LOGS];
+int pendingCount = 0;
 
 const char* MQTT_BROKER_IP = "192.168.1.77";  // ← your broker IP here
 const char* DEVICE_ID = "NodeMCU-1";
@@ -56,17 +56,35 @@ void log(String message) {
   log(message, "info");
 }
 
+void publishLog(const String& message, const char* level) {
+  DynamicJsonDocument doc(384);
+  doc["level"] = level;
+  doc["msg"] = message;
+  char payload[384];
+  serializeJson(doc, payload);
+  mqttClient.publish(LOG_TOPIC, payload);
+}
+
+void flushPendingLogs() {
+  for (int i = 0; i < pendingCount; i++) {
+    publishLog(pendingLogs[i].msg, pendingLogs[i].level.c_str());
+    pendingLogs[i].msg = "";
+    pendingLogs[i].level = "";
+  }
+  pendingCount = 0;
+}
+
 void log(String message, const char* level) {
   logLocal(message);
 
-  // Centralised logs go out over MQTT only when the broker is reachable
+  // Centralised logs go out over MQTT only when the broker is reachable;
+  // until then they are buffered and flushed on connect
   if (mqttClient.connected()) {
-    DynamicJsonDocument doc(384);
-    doc["level"] = level;
-    doc["msg"] = message;
-    char payload[384];
-    serializeJson(doc, payload);
-    mqttClient.publish(LOG_TOPIC, payload);
+    publishLog(message, level);
+  } else if (pendingCount < MAX_PENDING_LOGS) {
+    pendingLogs[pendingCount].msg = message;
+    pendingLogs[pendingCount].level = level;
+    pendingCount++;
   }
 }
 
@@ -104,6 +122,7 @@ bool connectToMQTT() {
   if (mqttClient.connected()) {
     mqttClient.subscribe(LAMP_STATE_TOPIC);
     mqttClient.publish(AVAILABILITY_TOPIC, "online");
+    flushPendingLogs();  // send what accumulated before connecting
     log("MQTT connected!");
     return true;
   } else {
@@ -120,7 +139,6 @@ void setup() {
   pinMode(RADAR_PIN, INPUT);
   pinMode(PIR_SENSOR_PIN, INPUT);
   pinMode(RELAY_PIN, OUTPUT);
-  pinMode(SWITCH_MODE_PIN, INPUT);
   pinMode(RED_LED_PIN, OUTPUT);
 
   initWiFi();
@@ -133,23 +151,22 @@ void setup() {
 
   initOTA();
 
-  updateCurrentLampState();
-
   turnOnRadar();
-  if (digitalRead(RADAR_PIN) == HIGH && !currentLampState) {
+  if (digitalRead(RADAR_PIN) == HIGH) {
+    radarPresence = true;     // radar already sees presence; set it before the interrupt catches the edge
     currentLampState = true;  // Turning on the chandelier if presence is detected at init
     sendData(radarPresence, pirSensorPresence, currentLampState);
   }
   yield();
   log("Waiting one minute for PIR-sensor calibration...");
   for (int i = 0; i < 60; i++) {  // Waiting a minute for PIR sensor calibration
+    mqttClient.loop();            // keep the MQTT keep-alive alive so the broker does not drop us
     delay(1000);                  // 1 second delay
     yield();                      // Resetting the watchdog
   }
   attachInterrupt(digitalPinToInterrupt(PIR_SENSOR_PIN), detectPirSensorPresence, RISING);
 
   log("Setup finished!");
-  //attachInterrupt(digitalPinToInterrupt(SWITCH_MODE_PIN), detectModeChange, CHANGE);
 }
 
 void loop() {
@@ -158,6 +175,10 @@ void loop() {
 
   server.handleClient();
   ArduinoOTA.handle();
+
+  if (WiFi.status() != WL_CONNECTED) {  // Wi-Fi dropped — restore it before touching MQTT
+    initWiFi();
+  }
 
   if (!mqttClient.connected()) {
     if (!connectToMQTT()) return;
@@ -168,16 +189,6 @@ void loop() {
     hasIncomingLog = false;
     log(incomingLogMessage);
   }
-
-  if (switchedToActiveMode) {
-    initWiFi();
-    switchedToActiveMode = false;
-  } else if (switchedToLightSleepMode) {
-    turnOffRadar();
-    // lightSleep();
-  }
-
-  if (!activeMode) return;
 
   if (radarIsActive) {
     if (radarPresence && !currentLampState) {
@@ -200,10 +211,10 @@ void loop() {
   } else if (pirSensorPresence) {
     log("Detected movement by PIR-sensor");
 
-    turnOnRadar();
-
     currentLampState = true;
     sendData(radarPresence, pirSensorPresence, currentLampState);
+
+    turnOnRadar();
 
     pirSensorPresence = false;
 
@@ -217,10 +228,14 @@ void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.setOutputPower(17.5);  // REQUIRED! OTHERWISE THERE WILL BE CONSTANT WDT RESETS
   WiFi.begin(STASSID, STAPSK);
+  unsigned long startAttempt = millis();
   while (WiFi.status() != WL_CONNECTED) {
     delay(400);
-    // Serial.print(".");
     yield();
+    if (millis() - startAttempt > 30000) {  // not connected within 30s — reboot and retry clean
+      log("Wi-Fi connection timed out, rebooting...");
+      ESP.restart();
+    }
   }
   log("WiFi connected!");
   log("IP address: " + WiFi.localIP().toString());
@@ -299,42 +314,17 @@ IRAM_ATTR void detectRadarSignalChange() {
   }
 }
 
-IRAM_ATTR void detectModeChange() {
-  switchedToActiveMode = digitalRead(SWITCH_MODE_PIN) == HIGH;
-  switchedToLightSleepMode = !switchedToActiveMode;
-}
-
-void lightSleepWithInterrupt() {
-  log("Going to light sleep...");
-
-  digitalWrite(RED_LED_PIN, false);
-  digitalWrite(GREEN_LED_PIN, false);
-
-  activeMode = false;
-  switchedToLightSleepMode = false;
-  log("Disconnecting WIFI-station...");
-  WiFi.mode(WIFI_OFF);
-  wifi_set_opmode_current(NULL_MODE);
-  wifi_fpm_set_sleep_type(LIGHT_SLEEP_T);
-  gpio_pin_wakeup_enable(GPIO_ID_PIN(PIR_SENSOR_PIN), GPIO_PIN_INTR_HILEVEL);
-  wifi_fpm_set_wakeup_cb(wakeUp);  // Set wakeup callback (optional)
-  wifi_fpm_open();
-  int sleepStatus = wifi_fpm_do_sleep(0xFFFFFFF);  // Checking the status - should be 0 if everything is OK
-  log("Sleep status: " + sleepStatus);
-}
-
-void wakeUp() {
-  log("Waking up! - this is the callback function");
-  activeMode = true;
-  switchedToActiveMode = true;
-  first = false;
-}
-
 void turnOnRadar() {
   radarIsActive = true;
   log("Turning ON radar...");
   digitalWrite(RELAY_PIN, true);  // Activating the radar via the relay
-  delay(3000);
+  // 3s radar warm-up; keep MQTT serviced so the connection and lamp commands are not stalled
+  unsigned long warmupStart = millis();
+  while (millis() - warmupStart < 3000) {
+    mqttClient.loop();
+    delay(10);
+    yield();
+  }
   attachInterrupt(digitalPinToInterrupt(RADAR_PIN), detectRadarSignalChange, CHANGE);
 
   digitalWrite(RED_LED_PIN, false);
@@ -356,35 +346,15 @@ void messageReceived(String& topic, String& payload) {
   incomingLogMessage = "incoming: " + topic + " - " + payload;
   hasIncomingLog = true;
 
-  currentLampState = payload == "true";
-  lampStateUpdated = true;  // SIGNAL: value has arrived
+  String value = payload;
+  value.trim();
+  value.toLowerCase();
+  currentLampState = (value == "true" || value == "on" || value == "1");
 
   // Note: Do not use the client in the callback to publish, subscribe or
   // unsubscribe as it may cause deadlocks when other things arrive while
   // sending and receiving acknowledgments. Instead, change a global variable,
   // or push to a queue and handle it in the loop after calling `client.loop()`.
-}
-
-void updateCurrentLampState() {
-  const int maxAttempts = 5;
-  int attempt = 0;
-
-  lampStateUpdated = false;  // resetting the flag, waiting for a new message
-
-  log("Waiting for lamp state...");
-
-  // Waiting until messageReceived() updates the state
-  while (!lampStateUpdated && attempt < maxAttempts) {
-    mqttClient.loop();  // required to receive MQTT messages
-    delay(1000);
-    attempt++;
-  }
-
-  if (lampStateUpdated) {
-    log("Lamp state received: " + String(currentLampState));
-  } else {
-    log("Lamp state has not been updated");
-  }
 }
 
 void sendData(bool radarPresence, bool pirSensorPresence, bool lampState) {
