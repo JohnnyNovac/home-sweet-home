@@ -83,19 +83,6 @@ public class PresenceHandler implements SensorHandler {
                 presenceDiscovery.toString()
         );
 
-        ObjectNode lampStateDiscovery = objectMapper.createObjectNode();
-        lampStateDiscovery.put("name", "Лампа");
-        lampStateDiscovery.put("dev_cla", "light");
-        lampStateDiscovery.put("stat_t", stateTopic);
-        lampStateDiscovery.put("val_tpl", "{{ value_json.lampState }}");
-        lampStateDiscovery.put("uniq_id", deviceId + "_lamp_state");
-        addAvailability(lampStateDiscovery, deviceId);
-        addDevice(lampStateDiscovery, deviceId);
-        mqttPublisher.publish(
-                haProperties.getDiscoveryPrefix() + "/binary_sensor/" + deviceId + "_lamp_state/config",
-                lampStateDiscovery.toString()
-        );
-
         logger.debug("Presence discovery sent for {}", deviceId);
     }
 
@@ -120,8 +107,8 @@ public class PresenceHandler implements SensorHandler {
         JsonNode root = objectMapper.readTree(jsonData);
         JsonNode measurements = root.path("measurements");
 
-        if (!measurements.has("radarPresence") || !measurements.has("pirSensorPresence") || !measurements.has("lampState")) {
-            throw new IllegalArgumentException("presence sensor requires radarPresence, pirSensorPresence and lampState measurements");
+        if (!measurements.has("radarPresence") || !measurements.has("pirSensorPresence")) {
+            throw new IllegalArgumentException("presence sensor requires radarPresence and pirSensorPresence measurements");
         }
     }
 
@@ -133,12 +120,8 @@ public class PresenceHandler implements SensorHandler {
         boolean pir = measurements.path("pirSensorPresence").asBoolean(false);
         String presence = radar || pir ? "ON" : "OFF";
 
-        boolean lampState = measurements.path("lampState").asBoolean(false);
-        String lampStateValue = lampState ? "ON" : "OFF";
-
         ObjectNode newJson = objectMapper.createObjectNode();
         newJson.put("presence", presence);
-        newJson.put("lampState", lampStateValue);
 
         mqttPublisher.publish(stateTopicFor(deviceId), objectMapper.writeValueAsString(newJson), true);
     }
