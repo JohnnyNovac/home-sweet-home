@@ -34,3 +34,14 @@ compactor:
   working_directory: /loki/compactor
   retention_enabled: true
   delete_request_store: filesystem
+
+# Вычисляет правила алертов по логам и шлёт сработавшие в Alertmanager.
+# Правила лежат в подпапке тенанта: при auth_enabled false тенант называется fake.
+ruler:
+  rule_path: /loki/rules-temp
+  storage:
+    type: local
+    local:
+      directory: /etc/loki/rules
+  alertmanager_url: http://alertmanager:9093
+  enable_api: true

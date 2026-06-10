@@ -1,0 +1,10 @@
+groups:
+  - name: service-errors
+    rules:
+      - alert: ServiceErrorLogs
+        expr: sum by (service) (count_over_time({source="service"} | level="ERROR" [5m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Errors in {{ $labels.service }} logs"
+          description: "{{ $labels.service }} logged ERROR-level lines in the last 5 minutes."
