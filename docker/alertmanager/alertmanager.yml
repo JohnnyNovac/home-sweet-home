@@ -12,3 +12,9 @@ receivers:
         chat_id_file: /tmp/chat_id
         parse_mode: HTML
         send_resolved: true
+        message: |
+          {{ if eq .Status "firing" }}{{ if eq .CommonLabels.severity "critical" }}🔴{{ else }}🟡{{ end }} <b>FIRING</b>{{ else }}🟢 <b>RESOLVED</b>{{ end }} · <b>{{ .GroupLabels.alertname }}</b>
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          <i>{{ .Annotations.description }}</i>
+          {{- end }}
