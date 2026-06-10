@@ -27,3 +27,12 @@ groups:
         annotations:
           summary: "Backlog building on {{ $labels.queue }}"
           description: "{{ $labels.queue }} has {{ $value }} ready messages — a consumer may be stuck or a downstream dependency (MongoDB) slow."
+
+      - alert: DeviceOffline
+        expr: device_up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Device {{ $labels.deviceId }} is offline"
+          description: "{{ $labels.deviceId }} has been reporting offline for over 2 minutes."

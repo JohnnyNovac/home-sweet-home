@@ -1,0 +1,14 @@
+route:
+  receiver: telegram
+  group_by: [ 'alertname' ]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token_file: /tmp/bot_token
+        chat_id_file: /tmp/chat_id
+        parse_mode: HTML
+        send_resolved: true

@@ -140,11 +140,28 @@ availability is exposed by event-service as a custom `device_up` gauge (1/0, tag
 `AvailabilityHandler` from each device's `online`/`offline` availability message — it tracks the same signal HA reads
 and resets to no series for a device until the next message after an event-service restart. Prometheus
 (`docker/prometheus/`) scrapes all four targets and evaluates `alert.rules.yml` (service down, non-empty DLQ, work-queue
-backlog). Grafana (`docker/grafana/`) is provisioned from files: two datasources (uid `prometheus` for metrics and
+backlog, a device offline via the `device_up` gauge). Grafana (`docker/grafana/`) is provisioned from files: two
+datasources (uid `prometheus` for metrics and
 uid `loki` for logs) and a dashboards folder with the project overview (service and Arduino-module availability, queues,
 JVM, CPU) plus the community JVM and RabbitMQ dashboards. yandex-service keeps
 `spring-boot-starter-web` only for the outbound `RestClient` and this scrape endpoint — its embedded Tomcat hosts no
 controllers (inbound is gRPC).
+
+**Alerting.** Prometheus forwards firing alerts to Alertmanager (`docker/alertmanager/`, port 9093) — wired via the
+`alerting:` section in `prometheus.yml` (without it the rules only light up in the Prometheus UI, never delivered).
+Alertmanager routes every alert to a single Telegram receiver (`telegram_configs` in `alertmanager.yml`). Both the bot
+token and the channel `chat_id` are kept out of git: Compose passes them from the `TELEGRAM_BOT_TOKEN` /
+`TELEGRAM_CHAT_ID` env vars (GitLab CI/CD variables on deploy, `docker/.env` locally) into the container, an
+`entrypoint` writes them to `/tmp/bot_token` and `/tmp/chat_id`, and Alertmanager reads them via `bot_token_file` /
+`chat_id_file` — it does not expand env vars in its own config, so the file is the only way in. The `$$` in the compose
+entrypoint stops Compose from substituting the values into the command text itself (where `docker inspect` would show
+them); the shell inside the container expands them instead. Only the bot token is truly secret (the numeric `chat_id`
+is useless without it); `chat_id` is routed through a file only for symmetry, which is why the image is pinned to
+`v0.31.0` — `chat_id_file` was added in Alertmanager 0.31.0.
+Log-based alerts come from a second path: the Loki `ruler` (`docker/loki/loki-config.yml`) evaluates LogQL rules in
+`docker/loki/rules/fake/rules.yml` and sends to the same Alertmanager — the `fake/` tenant subfolder is mandatory
+because Loki runs single-tenant (`auth_enabled: false`, tenant id `fake`). Currently one rule fires on any service
+`ERROR` line.
 
 **Device logs.** Each Arduino's `log()` publishes diagnostic lines as JSON (`{level,msg}`) to `home/logs/<deviceId>`
 (routing key `home.logs.<deviceId>`), bound to the `device-logs` queue. Publishing is best-effort and only happens while
