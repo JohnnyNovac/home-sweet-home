@@ -1,6 +1,7 @@
 services:
   rabbitmq:
     image: my-rabbitmq
+    container_name: rabbitmq
     build:
       context: ./rabbitmq
     hostname: rabbitmq
@@ -28,6 +29,7 @@ services:
   # Dependents wait for it via service_completed_successfully.
   rabbitmq-init:
     image: my-rabbitmq
+    container_name: rabbitmq-init
     build:
       context: ./rabbitmq
     entrypoint: [ "/init.sh" ]
@@ -72,6 +74,7 @@ services:
       - homesweethome_net
 
   event-service:
+    container_name: event-service
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -95,6 +98,7 @@ services:
       - homesweethome_net
 
   presence-service:
+    container_name: presence-service
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -114,6 +118,7 @@ services:
       - homesweethome_net
 
   yandex-service:
+    container_name: yandex-service
     build:
       context: ..
       dockerfile: docker/Dockerfile
