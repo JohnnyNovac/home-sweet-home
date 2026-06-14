@@ -13,9 +13,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * {@link SensorHandler} для климатических датчиков ({@code climate}): температура и влажность с DHT.
- * Сохраняет измерения, отражает их в Home Assistant и публикует discovery-конфиги для сущностей
- * температуры и влажности.
+ * {@link SensorHandler} for climate sensors ({@code climate}): temperature and humidity from a DHT
+ * sensor, plus illuminance from a BH1750 when the device reports it. Saves the measurements, mirrors
+ * them to Home Assistant and publishes discovery configs for the temperature, humidity and
+ * illuminance entities.
  */
 @Service
 public class ClimateHandler implements SensorHandler {
@@ -98,6 +99,20 @@ public class ClimateHandler implements SensorHandler {
                 humDiscovery.toString()
         );
 
+        ObjectNode luxDiscovery = objectMapper.createObjectNode();
+        luxDiscovery.put("dev_cla", "illuminance");
+        luxDiscovery.put("stat_t", stateTopic);
+        luxDiscovery.put("unit_of_meas", "lx");
+        luxDiscovery.put("val_tpl", "{{ value_json.illuminance }}");
+        luxDiscovery.put("uniq_id", deviceId + "_illuminance");
+        luxDiscovery.put("exp_aft", haProperties.getExpireAfter());
+        addAvailability(luxDiscovery, deviceId);
+        addDevice(luxDiscovery, deviceId);
+        mqttPublisher.publish(
+                haProperties.getDiscoveryPrefix() + "/sensor/" + deviceId + "_illuminance/config",
+                luxDiscovery.toString()
+        );
+
         logger.debug("Climate discovery sent for {}", deviceId);
     }
 
@@ -134,6 +149,9 @@ public class ClimateHandler implements SensorHandler {
         ObjectNode newJson = objectMapper.createObjectNode();
         newJson.set("temperature", measurements.get("temperature"));
         newJson.set("humidity", measurements.get("humidity"));
+        if (measurements.has("illuminance")) {
+            newJson.set("illuminance", measurements.get("illuminance"));
+        }
 
         mqttPublisher.publish(stateTopicFor(deviceId), objectMapper.writeValueAsString(newJson), true);
     }

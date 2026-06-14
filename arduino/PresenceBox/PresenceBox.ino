@@ -17,17 +17,17 @@ const int PIR_SENSOR_PIN = 14;
 const int RELAY_PIN = 12;
 const int RED_LED_PIN = 15;
 
-bool currentLampState = false;
+bool presenceActive = false;
 volatile bool pirSensorPresence = false;
 volatile bool radarPresence = false;
-
-bool hasIncomingLog = false;
-String incomingLogMessage;
 
 volatile bool radarIsActive = false;  // Radar activity flag
 
 volatile unsigned long lowLevelRadarTime;           // When the radar level went low
 const unsigned long lowLevelRadarDuration = 10000;  // How long the radar stays low (10 seconds)
+
+unsigned long lastHeartbeat = 0;
+const unsigned long heartbeatInterval = 60000;  // re-publish current presence every 60s so the service recovers its state after a restart
 
 WiFiClient net;
 ESP8266WebServer server(8008);
@@ -47,7 +47,6 @@ int pendingCount = 0;
 const char* MQTT_BROKER_IP = "192.168.1.77";  // ← your broker IP here
 const char* DEVICE_ID = "NodeMCU-1";
 const char* AVAILABILITY_TOPIC = "home/availability/nodemcu-1";
-const char* LAMP_STATE_TOPIC = "home/presence/nodemcu-1/lampstate";
 const char* DATA_TOPIC = "home/presence/nodemcu-1/data";
 const char* LOG_TOPIC = "home/logs/nodemcu-1";
 const char* DEVICE_NAME = "PresenceBox";  // unique device name
@@ -88,7 +87,7 @@ void log(String message, const char* level) {
   }
 }
 
-// Writes to Serial and the web buffer only — safe to call from the MQTT callback (does not publish)
+// Writes to Serial and the web buffer only
 void logLocal(String message) {
   Serial.println(message);
 
@@ -120,7 +119,6 @@ bool connectToMQTT() {
   }
 
   if (mqttClient.connected()) {
-    mqttClient.subscribe(LAMP_STATE_TOPIC);
     mqttClient.publish(AVAILABILITY_TOPIC, "online");
     flushPendingLogs();  // send what accumulated before connecting
     log("MQTT connected!");
@@ -145,7 +143,6 @@ void setup() {
   initWebServer();
 
   mqttClient.begin(MQTT_BROKER_IP, net);
-  mqttClient.onMessage(messageReceived);
   mqttClient.setWill(AVAILABILITY_TOPIC, "offline");
   connectToMQTT();
 
@@ -154,8 +151,8 @@ void setup() {
   turnOnRadar();
   if (digitalRead(RADAR_PIN) == HIGH) {
     radarPresence = true;     // radar already sees presence; set it before the interrupt catches the edge
-    currentLampState = true;  // Turning on the chandelier if presence is detected at init
-    sendData(radarPresence, pirSensorPresence, currentLampState);
+    presenceActive = true;    // presence is already detected at init
+    sendData(radarPresence, pirSensorPresence);
   }
   yield();
   log("Waiting one minute for PIR-sensor calibration...");
@@ -184,24 +181,18 @@ void loop() {
     if (!connectToMQTT()) return;
   }
 
-  // Deferred log of an incoming message — see messageReceived()
-  if (hasIncomingLog) {
-    hasIncomingLog = false;
-    log(incomingLogMessage);
-  }
-
   if (radarIsActive) {
-    if (radarPresence && !currentLampState) {
-      currentLampState = true;
-      sendData(radarPresence, pirSensorPresence, currentLampState);
+    if (radarPresence && !presenceActive) {
+      presenceActive = true;
+      sendData(radarPresence, pirSensorPresence);
       log("Detected movement by radar");
     } else if (lowLevelRadarTime > 0) {
       unsigned long currentLowLevelRadarDuration = millis() - lowLevelRadarTime;
       if (currentLowLevelRadarDuration >= lowLevelRadarDuration) {  // Checking whether the configured radar interval has elapsed
         log(String("Current low level radar duration - ") + String(currentLowLevelRadarDuration / 1000) + " seconds");
         turnOffRadar();
-        currentLampState = false;
-        sendData(radarPresence, pirSensorPresence, currentLampState);
+        presenceActive = false;
+        sendData(radarPresence, pirSensorPresence);
 
         lowLevelRadarTime = 0;  // Resetting the timer
 
@@ -211,14 +202,19 @@ void loop() {
   } else if (pirSensorPresence) {
     log("Detected movement by PIR-sensor");
 
-    currentLampState = true;
-    sendData(radarPresence, pirSensorPresence, currentLampState);
+    presenceActive = true;
+    sendData(radarPresence, pirSensorPresence);
 
     turnOnRadar();
 
     pirSensorPresence = false;
 
     log("Radar activated");
+  }
+
+  if (millis() - lastHeartbeat >= heartbeatInterval) {
+    lastHeartbeat = millis();
+    sendData(presenceActive, false);  // presence is held in presenceActive; raw radar/pir are momentary
   }
 }
 
@@ -341,29 +337,12 @@ void turnOffRadar() {
   digitalWrite(GREEN_LED_PIN, false);
 }
 
-void messageReceived(String& topic, String& payload) {
-  // Defer logging to loop(): publishing over MQTT from inside the callback can deadlock
-  incomingLogMessage = "incoming: " + topic + " - " + payload;
-  hasIncomingLog = true;
-
-  String value = payload;
-  value.trim();
-  value.toLowerCase();
-  currentLampState = (value == "true" || value == "on" || value == "1");
-
-  // Note: Do not use the client in the callback to publish, subscribe or
-  // unsubscribe as it may cause deadlocks when other things arrive while
-  // sending and receiving acknowledgments. Instead, change a global variable,
-  // or push to a queue and handle it in the loop after calling `client.loop()`.
-}
-
-void sendData(bool radarPresence, bool pirSensorPresence, bool lampState) {
+void sendData(bool radarPresence, bool pirSensorPresence) {
   // Building the JSON
   DynamicJsonDocument doc(128);
   JsonObject measurements = doc.createNestedObject("measurements");
   measurements["radarPresence"] = radarPresence;
   measurements["pirSensorPresence"] = pirSensorPresence;
-  measurements["lampState"] = lampState;
 
   char payload[128];
   serializeJson(doc, payload);
@@ -371,6 +350,5 @@ void sendData(bool radarPresence, bool pirSensorPresence, bool lampState) {
 
   String radarPresenceString = radarPresence ? "true" : "false";
   String pirSensorPresenceString = pirSensorPresence ? "true" : "false";
-  String lampStateString = lampState ? "on" : "off";
-  log("Publishing presence sensor data - Radar presence: " + radarPresenceString + "; Pir sensor presence: " + pirSensorPresenceString + "; Lamp state: " + lampStateString);
+  log("Publishing presence sensor data - Radar presence: " + radarPresenceString + "; Pir sensor presence: " + pirSensorPresenceString);
 }

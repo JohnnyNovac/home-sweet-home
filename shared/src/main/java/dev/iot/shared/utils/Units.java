@@ -8,7 +8,7 @@ public class Units {
             "humidity", "%",
             "radarPresence", "",
             "pirSensorPresence", "",
-            "lampState", ""
+            "illuminance", "lx"
     );
 
     public static String getUnit(String type) {

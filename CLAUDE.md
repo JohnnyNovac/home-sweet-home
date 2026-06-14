@@ -46,20 +46,22 @@ reserved for HA auto-discovery and HA-facing state topics published by event-ser
 |--------------------------------------|--------------------------------------|-----------------------------------------------|
 | `home/<sensorType>/<deviceId>/data`  | `home.<sensorType>.<deviceId>.data`  | Sensor measurements (JSON in `measurements`)  |
 | `home/availability/<deviceId>`       | `home.availability.<deviceId>`       | `online`/`offline` (MQTT LWT from the device) |
-| `home/presence/<deviceId>/lampstate` | `home.presence.<deviceId>.lampstate` | Lamp state echo (PresenceBox only)            |
 | `home/logs/<deviceId>`               | `home.logs.<deviceId>`               | Device diagnostic logs (JSON `{level,msg}`)   |
 
 Bindings in `docker/rabbitmq/definitions.json`:
 
 - `home.*.*.data` → `event-data` (consumed by `EventRunner`)
-- `home.presence.*.data` → `presence-data` (consumed by `presence-service`)
+- `home.presence.*.data` → `presence-data` (consumed by `presence-service`'s `PresenceListener`)
+- `home.climate.*.data` → `presence-illuminance` (consumed by `presence-service`'s `IlluminanceListener` — only the
+  `illuminance` measurement is used, for the lamp decision; see **Lamp control path**)
 - `home.availability.*` → `device-availability` (consumed by `AvailabilityHandler`)
 - `home.logs.*` → `device-logs` (consumed by Vector, forwarded to Loki — see **Observability**)
 
 `deviceId` lives only in the routing key — never in the JSON payload. Adding a new physical device = flash firmware with
 its own `DEVICE_ID` and matching topics; no service-side config or code changes are needed.
 
-**Poison-message handling / dead-lettering.** Each work queue (`event-data`, `presence-data`, `device-availability`) is
+**Poison-message handling / dead-lettering.** Each work queue (`event-data`, `presence-data`, `presence-illuminance`,
+`device-availability`) is
 declared with `x-dead-letter-exchange: dlx` and routes to a matching `*.dlq` queue (`definitions.json`). Listeners
 classify failures: unrecoverable data errors (malformed JSON, missing required measurement, unexpected routing key —
 `JacksonException` / `IllegalArgumentException` / `ClassCastException`) are wrapped in
@@ -79,9 +81,10 @@ missed heartbeat is not data loss.
 **Sensor handler dispatch (event-service).** `EventRunner` is a `CommandLineRunner` that listens to the event queue and
 dispatches each message by `sensorType` (parsed from the AMQP routing key — `parts[1]`) to a `SensorHandler` via
 `SensorHandlerFactory` (Spring auto-wires the `List<SensorHandler>` and keys by `getType()`). Current types: `climate`
-(DHT temperature/humidity) and `presence` (PIR + radar + lamp state). Adding a new sensor type = new `SensorHandler`
+(DHT temperature/humidity + optional BH1750 illuminance) and `presence` (PIR + radar). Adding a new sensor type = new `SensorHandler`
 bean returning the new type from `getType()` + matching routing-key value from firmware. Processing and persistence do
-not depend on Home Assistant being up — incoming data is always handled and saved. `EventRunner` still subscribes to
+not depend on Home Assistant being up — incoming data is always handled and saved (the one exception is unchanged
+presence heartbeats, de-duplicated as described under **Lamp control path**). `EventRunner` still subscribes to
 `app.ha.status-topic` over MQTT, but only to react to HA (re)starts: when HA reports `online`, every handler's
 `sendDiscoveryForAll()` is called to (re-)publish HA auto-discovery configs for every device the handler has seen so far
 (tracked in `knownDeviceIds`). Discovery published while HA is offline is simply missed and re-sent on the next
@@ -119,13 +122,28 @@ the room is picked up on the next HA restart. Rooms are assigned manually via `m
 `NOTES.md`. A room change takes effect after HA restart (handlers re-publish discovery for every known device when
 `homeassistant/status` flips to `online`).
 
-**Lamp control path.** `presence-service` → parses `lampState` measurement out of the PresenceBox JSON → calls
-`yandex-service` via the gRPC stub declared in `grpc-api/src/main/proto/yandex.proto` (`YandexService.TurnOnOffLamp`).
-Client channel is configured in `presence-service/application.yml` as
+**Lamp control path.** The lamp decision lives in `presence-service`, not on the device, and depends on both presence
+and illuminance. The decision is a small stateful engine (`LampController`) fed by two independent listeners:
+`PresenceListener` (presence data, `radarPresence || pirSensorPresence`) and `IlluminanceListener` (the `illuminance`
+measurement out of `climate` data). The engine keeps the latest value of each and recomputes on every update: it turns
+the lamp **on** when presence is detected **and** the room is dark (`illuminance` below `app.lamp.illuminance-threshold`,
+default 50 lx), and **off** only when presence ends — brightness never turns it off. Recomputing on illuminance changes
+(not just presence events) is what lets the lamp come on when the room darkens while someone is already present. Both
+inputs start unknown (`null`) and the lamp is switched on only once both are known; after a restart illuminance
+self-heals from the 60s `climate` cadence and presence self-heals from a 60s PresenceBox heartbeat (the device
+re-publishes its held presence so the engine recovers state without any last-value store). event-service de-duplicates
+these heartbeats: its `PresenceHandler` persists to Mongo and re-publishes to HA only when the presence value changes,
+so an unchanged heartbeat is dropped (the `lastPresence` map is updated only after a successful save, so a save failure
+is still retried on redelivery). A failed lamp command leaves
+the tracked state unchanged so it is retried on the next presence/illuminance update. The two listeners run on separate
+threads, so `LampController` is synchronised.
+
+The engine calls `yandex-service` via the gRPC stub declared in `grpc-api/src/main/proto/yandex.proto`
+(`YandexService.TurnOnOffLamp`). Client channel is configured in `presence-service/application.yml` as
 `spring.grpc.client.channels.yandex-service.address`. `yandex-service` (`GrpcServerService`) translates the call into a
 Yandex Smart Home "group action" HTTP request via `YandexRestClient`. The whole chain is time-bounded so a slow or
-hung Yandex cloud cannot block the single `presence-data` listener thread indefinitely: `PresenceHandler` applies a
-gRPC deadline (`app.grpc.lamp-deadline`, default 8s) per call, and the `RestClient` in `YandexClientConfig` is built
+hung Yandex cloud cannot block a listener thread indefinitely: `LampController` applies a gRPC deadline
+(`app.grpc.lamp-deadline`, default 8s) per call, and the `RestClient` in `YandexClientConfig` is built
 with connect/read timeouts (`yandex.connect-timeout` 3s / `yandex.read-timeout` 5s). The HTTP timeout frees the
 yandex-service thread; the gRPC deadline frees the presence-service listener even if yandex-service itself is wedged —
 both are needed. A timed-out lamp command is logged and the message is acked (not requeued), since a stale real-time
@@ -170,8 +188,7 @@ so a broker outage loses central delivery but not local visibility. Vector (`doc
 over
 AMQP, parses the JSON and derives `deviceId` from the routing key, and forwards the lines to Loki (`docker/loki/`,
 single-binary, filesystem storage, 30-day retention) with `deviceId`/`level` labels — so device logs are searchable in
-Grafana alongside the metrics. PresenceBox is subscribed to its lamp-state topic, so its MQTT message callback must not
-publish (deadlock risk): it defers that one log line to `loop()` via a flag (`hasIncomingLog`).
+Grafana alongside the metrics.
 
 **Service logs.** The three Spring Boot services ship their logs to the same Loki via the `loki-logback-appender`
 (loki4j) — the appender, dependency and a single shared `logback-spring.xml` live in `shared/` (so yandex-service, which

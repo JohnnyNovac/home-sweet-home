@@ -147,12 +147,18 @@ void loop() {
     }
   }
 
-  int commaIndex = receivedData.indexOf(',');
-  if (commaIndex > 0) {
-    float temperature = receivedData.substring(0, commaIndex).toFloat();
-    float humidity = receivedData.substring(commaIndex + 1).toFloat();
-
-    sendData(temperature, humidity);
+  int firstComma = receivedData.indexOf(',');
+  if (firstComma > 0) {
+    float temperature = receivedData.substring(0, firstComma).toFloat();
+    int secondComma = receivedData.indexOf(',', firstComma + 1);
+    if (secondComma > firstComma) {
+      float humidity = receivedData.substring(firstComma + 1, secondComma).toFloat();
+      float illuminance = receivedData.substring(secondComma + 1).toFloat();
+      sendData(temperature, humidity, illuminance);
+    } else {
+      float humidity = receivedData.substring(firstComma + 1).toFloat();
+      sendData(temperature, humidity);
+    }
   }
 }
 
@@ -225,11 +231,18 @@ void initOTA() {
 }
 
 void sendData(float temperature, float humidity) {
+  sendData(temperature, humidity, NAN);
+}
+
+void sendData(float temperature, float humidity, float illuminance) {
   // Building the JSON
   DynamicJsonDocument doc(128);
   JsonObject measurements = doc.createNestedObject("measurements");
   measurements["temperature"] = temperature;
   measurements["humidity"] = humidity;
+  if (!isnan(illuminance)) {
+    measurements["illuminance"] = illuminance;
+  }
 
   char payload[128];
   serializeJson(doc, payload);
@@ -238,5 +251,10 @@ void sendData(float temperature, float humidity) {
     isFirstValuePublished = true;
   }
   mqttClient.publish(DATA_TOPIC, payload);
-  log("Publishing sensor data - Temperature: " + String(temperature) + "°C, Humidity: " + String(humidity) + "%");
+
+  String logMsg = "Publishing sensor data - Temperature: " + String(temperature) + "°C, Humidity: " + String(humidity) + "%";
+  if (!isnan(illuminance)) {
+    logMsg += ", Illuminance: " + String(illuminance) + "lx";
+  }
+  log(logMsg);
 }

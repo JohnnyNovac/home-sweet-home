@@ -1,13 +1,14 @@
 #include <SoftwareSerial.h>
 #include <SPI.h>
+#include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <Encoder.h>
+#include <BH1750.h>
 #include <DHT.h>
 #include <DHT_U.h>
 
 #define DHTPIN 4
 #define DHTTYPE DHT11
-#define PHOTO_SENSOR_PIN A0
 #define BUTTON_PIN 7
 #define SOUND_PIN 6
 #define ENCODER_PIN_A 2
@@ -15,8 +16,9 @@
 
 #define ESP_TIMEOUT 5000  // mS
 
-DHT dht(DHTPIN, DHTTYPE);           
-LiquidCrystal_I2C lcd(0x27, 16, 2); 
+DHT dht(DHTPIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+BH1750 lightMeter;
 
 // Create a SoftwareSerial object and pass RX and TX pins
 SoftwareSerial esp8266(8, 5);
@@ -44,11 +46,13 @@ void setup() {
 
   dht.begin();
 
+  Wire.begin();
+  lightMeter.begin();
+
   lcd.init();
   lcd.backlight();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-  pinMode(PHOTO_SENSOR_PIN, INPUT);
 
   esp8266.begin(9600);
 }
@@ -71,9 +75,10 @@ void loop() {
 
     float temperature = dht.readTemperature();
     float humidity = dht.readHumidity();
+    float illuminance = lightMeter.readLightLevel();
 
-    // Build string "temperature,humidity"
-    String payload = String(temperature) + "," + String(humidity);
+    // Build string "temperature,humidity,illuminance"
+    String payload = String(temperature) + "," + String(humidity) + "," + String(illuminance);
 
     esp8266.println(payload);
     Serial.println("Sent: " + payload);
@@ -93,7 +98,9 @@ void loop() {
     switch (modesCounter) {
       case 1:
         lcd.setCursor(0, 0);
-        lcd.print("RFID operating...");
+        lcd.print("Lux: ");
+        lcd.print(lightMeter.readLightLevel());
+        lcd.print(" lx   ");
         break;
       case 2:
         lcd.setCursor(0, 0);

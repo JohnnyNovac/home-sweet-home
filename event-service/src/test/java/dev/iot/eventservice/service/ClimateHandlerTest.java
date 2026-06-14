@@ -111,6 +111,40 @@ class ClimateHandlerTest {
     }
 
     @Test
+    @DisplayName("Should publish illuminance discovery and include it in state when present")
+    void shouldHandleIlluminance() {
+        String jsonData = """
+                {
+                    "measurements": {
+                        "temperature": 22.5,
+                        "humidity": 65,
+                        "illuminance": 123.4
+                    }
+                }
+                """;
+
+        when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
+        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
+                .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
+
+        handler.handleIncomingData(DEVICE_ID, jsonData);
+
+        verify(mqttPublisher).publish(
+                eq(DISCOVERY_PREFIX + "/sensor/" + DEVICE_ID + "_illuminance/config"),
+                any(String.class)
+        );
+
+        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mqttPublisher).publish(
+                eq(DISCOVERY_PREFIX + "/sensor/" + DEVICE_ID + "/state"),
+                payloadCaptor.capture(),
+                eq(true)
+        );
+        assertThat(payloadCaptor.getValue()).contains("\"illuminance\":123.4");
+    }
+
+    @Test
     @DisplayName("Should reject data without required measurements")
     void shouldRejectDataWithoutRequiredFields() {
         String invalidJsonData = """

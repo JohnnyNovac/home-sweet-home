@@ -18,15 +18,18 @@ server:
 app:
   rabbitmq:
     presence-data-queue: presence-data
+    illuminance-data-queue: presence-illuminance
   grpc:
     lamp-deadline: 8s
+  lamp:
+    illuminance-threshold: 50
   measurements:
     radar-presence:
       name: radarPresence
     pir-sensor-presence:
       name: pirSensorPresence
-    lamp-state:
-      name: lampState
+    illuminance:
+      name: illuminance
 
 management:
   endpoints:

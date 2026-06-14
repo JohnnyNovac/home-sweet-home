@@ -18,7 +18,7 @@ D3 and D4 are unused.
 
 ## ESP-01
 
-WiFi bridge between MultiBox and the broker: receives DHT sensor readings from the Arduino Uno over Serial and publishes
+WiFi bridge between MultiBox and the broker: receives DHT and illuminance (BH1750) sensor readings from the Arduino Uno over Serial and publishes
 them to RabbitMQ over MQTT. It has no sensors of its own; GPIO pins are mostly unused (RX/TX serve the Serial link with
 the Arduino). Firmware lives in `arduino/ESP-01/`, secrets are in `arduino/ESP-01/secrets.h` (gitignored — use
 `secrets.example.h` at the repo root as the template).
@@ -36,7 +36,6 @@ and state topics published by event-service.
 |--------------------------------------|-------------------------------------------------|
 | `home/<sensorType>/<deviceId>/data`  | JSON with measurements                          |
 | `home/availability/<deviceId>`       | `online` / `offline` (MQTT LWT from the device) |
-| `home/presence/<deviceId>/lampstate` | Lamp state from PresenceBox                     |
 | `home/logs/<deviceId>`               | Device diagnostic logs (JSON `{level,msg}`)     |
 
 `sensorType` is either `climate` or `presence`. `deviceId` is set by the `DEVICE_ID` constant in the `.ino` firmware.

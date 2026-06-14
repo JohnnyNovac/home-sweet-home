@@ -11,7 +11,7 @@ automatically controls lighting via the Yandex Smart Home API.
 ```mermaid
 flowchart LR
     subgraph Hardware["🔌 Hardware"]
-        MB[MultiBox<br/>temperature / humidity]
+        MB[MultiBox<br/>temperature / humidity / illuminance]
         ESP[ESP-01<br/>WiFi bridge]
         PB[PresenceBox<br/>presence]
         MB -->|Serial| ESP
@@ -46,15 +46,15 @@ flowchart LR
 
 Data flow:
 
-1. **MultiBox** (Arduino Uno with a temperature/humidity sensor) sends readings over Serial to **ESP-01**, which
+1. **MultiBox** (Arduino Uno with temperature/humidity and illuminance sensors) sends readings over Serial to **ESP-01**, which
    publishes them to the broker over MQTT. **PresenceBox** (NodeMCU with a PIR sensor + microwave radar) publishes
    presence data directly to the broker over MQTT.
 2. The broker — RabbitMQ with the MQTT plugin — accepts messages over MQTT and dispatches them to subscribers via AMQP
    queues.
 3. **event-service** picks up all sensor events from the sensor AMQP queues, persists them to MongoDB, and forwards them
-   to Home Assistant over MQTT — for dashboard visualization (temperature/humidity graphs, presence indicator, lamp
-   state). **presence-service** receives PresenceBox data from its own AMQP queue in parallel.
-4. **presence-service** decides whether to switch the light on/off and calls **yandex-service** over gRPC.
+   to Home Assistant over MQTT — for dashboard visualization (temperature/humidity graphs, presence indicator,
+   illuminance). **presence-service** receives presence and illuminance data from its own AMQP queues in parallel.
+4. **presence-service** decides whether to switch the light on/off based on presence and illuminance (turns it on only in the dark, off when presence ends) and calls **yandex-service** over gRPC.
 5. **yandex-service** invokes the Yandex Smart Home API and toggles the lighting.
 
 ## Stack
@@ -129,4 +129,3 @@ same Grafana. More detail (ports, dashboards, alert rules) — see [NOTES.en.md]
 - **notification-service** — event notifications (Telegram bot: temperature alerts, presence alerts, service health).
 - **REST API** — control and data access: sensor history, manual light switching, current room state.
 - **voice-service** — custom voice control, without Yandex Alice.
-- **Light sensor** — wire up the luminance sensor already mounted in MultiBox.

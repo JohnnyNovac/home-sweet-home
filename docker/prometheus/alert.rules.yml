@@ -20,7 +20,7 @@ groups:
           description: "{{ $labels.queue }} holds {{ $value }} dead-lettered message(s) — a device is likely sending an unprocessable payload."
 
       - alert: WorkQueueBacklog
-        expr: rabbitmq_queue_messages_ready{queue=~"event-data|presence-data|device-availability"} > 100
+        expr: rabbitmq_queue_messages_ready{queue=~"event-data|presence-data|presence-illuminance|device-availability"} > 100
         for: 5m
         labels:
           severity: warning
