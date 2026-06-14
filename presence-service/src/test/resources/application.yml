@@ -13,6 +13,7 @@ spring:
 app:
   rabbitmq:
     presence-data-queue: presence-data
+    illuminance-data-queue: presence-illuminance
 
 logging:
   level:

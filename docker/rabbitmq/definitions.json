@@ -32,6 +32,16 @@
       }
     },
     {
+      "name": "presence-illuminance",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "dlx",
+        "x-dead-letter-routing-key": "presence-illuminance.dlq"
+      }
+    },
+    {
       "name": "device-availability",
       "vhost": "/",
       "durable": true,
@@ -60,6 +70,13 @@
     },
     {
       "name": "presence-data.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "presence-illuminance.dlq",
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
@@ -100,6 +117,14 @@
     {
       "source": "amq.topic",
       "vhost": "/",
+      "destination": "presence-illuminance",
+      "destination_type": "queue",
+      "routing_key": "home.climate.*.data",
+      "arguments": {}
+    },
+    {
+      "source": "amq.topic",
+      "vhost": "/",
       "destination": "device-availability",
       "destination_type": "queue",
       "routing_key": "home.availability.*",
@@ -127,6 +152,14 @@
       "destination": "presence-data.dlq",
       "destination_type": "queue",
       "routing_key": "presence-data.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "dlx",
+      "vhost": "/",
+      "destination": "presence-illuminance.dlq",
+      "destination_type": "queue",
+      "routing_key": "presence-illuminance.dlq",
       "arguments": {}
     },
     {

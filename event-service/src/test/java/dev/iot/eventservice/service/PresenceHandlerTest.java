@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,8 +56,7 @@ class PresenceHandlerTest {
                 {
                     "measurements": {
                         "radarPresence": true,
-                        "pirSensorPresence": false,
-                        "lampState": true
+                        "pirSensorPresence": false
                     }
                 }
                 """;
@@ -87,8 +87,7 @@ class PresenceHandlerTest {
                 {
                     "measurements": {
                         "radarPresence": false,
-                        "pirSensorPresence": true,
-                        "lampState": false
+                        "pirSensorPresence": true
                     }
                 }
                 """;
@@ -107,6 +106,66 @@ class PresenceHandlerTest {
                 eq(true)
         );
         assertThat(payloadCaptor.getValue()).contains("\"presence\":\"ON\"");
+    }
+
+    @Test
+    @DisplayName("Should not persist or re-publish an unchanged presence heartbeat")
+    void shouldSkipUnchangedPresence() {
+        String jsonData = """
+                {
+                    "measurements": {
+                        "radarPresence": true,
+                        "pirSensorPresence": false
+                    }
+                }
+                """;
+
+        when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
+        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
+                .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
+
+        handler.handleIncomingData(DEVICE_ID, jsonData);
+        handler.handleIncomingData(DEVICE_ID, jsonData);
+
+        verify(sensorDataService, times(1)).saveIncomingData(DEVICE_ID, jsonData);
+        verify(mqttPublisher, times(1)).publish(
+                eq(DISCOVERY_PREFIX + "/binary_sensor/" + DEVICE_ID + "/state"),
+                any(String.class),
+                eq(true)
+        );
+    }
+
+    @Test
+    @DisplayName("Should persist again when presence changes")
+    void shouldPersistOnPresenceChange() {
+        String present = """
+                {
+                    "measurements": {
+                        "radarPresence": true,
+                        "pirSensorPresence": false
+                    }
+                }
+                """;
+        String absent = """
+                {
+                    "measurements": {
+                        "radarPresence": false,
+                        "pirSensorPresence": false
+                    }
+                }
+                """;
+
+        when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
+        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
+                .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
+
+        handler.handleIncomingData(DEVICE_ID, present);
+        handler.handleIncomingData(DEVICE_ID, absent);
+
+        verify(sensorDataService, times(1)).saveIncomingData(DEVICE_ID, present);
+        verify(sensorDataService, times(1)).saveIncomingData(DEVICE_ID, absent);
     }
 
     @Test

@@ -1,10 +1,6 @@
 package dev.iot.presenceservice.service;
 
-import dev.iot.presenceservice.config.GrpcClientProperties;
 import dev.iot.presenceservice.config.MeasurementsProperties;
-import dev.iot.shared.dto.EventDTO;
-import dev.iot.shared.dto.MeasurementDTO;
-import io.grpc.StatusException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,14 +8,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
-import yandex.Yandex;
-import yandex.YandexServiceGrpc;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.assertj.core.api.AssertionsForClassTypes.tuple;
-import static org.mockito.ArgumentMatchers.*;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PresenceHandlerTest {
@@ -29,14 +20,11 @@ class PresenceHandlerTest {
     private PresenceHandler presenceHandler;
 
     @Mock
-    private YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub;
+    private LampController lampController;
 
     @BeforeEach
     void setUp() {
         MeasurementsProperties measurementsProperties = new MeasurementsProperties();
-
-        MeasurementsProperties.Measurement lampState = new MeasurementsProperties.Measurement();
-        lampState.setName("lampState");
 
         MeasurementsProperties.Measurement radarPresence = new MeasurementsProperties.Measurement();
         radarPresence.setName("radarPresence");
@@ -44,82 +32,61 @@ class PresenceHandlerTest {
         MeasurementsProperties.Measurement pirSensorPresence = new MeasurementsProperties.Measurement();
         pirSensorPresence.setName("pirSensorPresence");
 
-        measurementsProperties.setLampState(lampState);
         measurementsProperties.setRadarPresence(radarPresence);
         measurementsProperties.setPirSensorPresence(pirSensorPresence);
 
-        presenceHandler = new PresenceHandler(new ObjectMapper(), yandexServiceStub, measurementsProperties, new GrpcClientProperties());
+        presenceHandler = new PresenceHandler(new ObjectMapper(), measurementsProperties, lampController);
     }
 
     @Test
-    @DisplayName("Should parse presence data and switch the lamp on when lampState is true")
-    void shouldHandlePresenceData() throws StatusException {
-        when(yandexServiceStub.withDeadlineAfter(anyLong(), any())).thenReturn(yandexServiceStub);
-
+    @DisplayName("Should report presence to the lamp controller when the radar reports presence")
+    void shouldReportPresenceOnRadar() {
         String jsonData = """
                 {
                     "measurements": {
                         "radarPresence": true,
-                        "pirSensorPresence": false,
-                        "lampState": true
-                    }
-                }
-                """;
-
-        EventDTO eventDTO = presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
-
-        assertThat(eventDTO).isNotNull();
-        assertThat(eventDTO.sensorId()).isEqualTo(DEVICE_ID);
-        assertThat(eventDTO.measurements()).hasSize(3);
-        assertThat(eventDTO.measurements())
-                .extracting(MeasurementDTO::type, MeasurementDTO::value)
-                .containsExactlyInAnyOrder(
-                        tuple("radarPresence", true),
-                        tuple("pirSensorPresence", false),
-                        tuple("lampState", true)
-                );
-
-        verify(yandexServiceStub).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
-    }
-
-    @Test
-    @DisplayName("Should switch the lamp off when lampState is false")
-    void shouldSwitchLampOffWhenLampStateFalse() throws StatusException {
-        when(yandexServiceStub.withDeadlineAfter(anyLong(), any())).thenReturn(yandexServiceStub);
-
-        String jsonData = """
-                {
-                    "measurements": {
-                        "radarPresence": true,
-                        "pirSensorPresence": false,
-                        "lampState": false
+                        "pirSensorPresence": false
                     }
                 }
                 """;
 
         presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
 
-        verify(yandexServiceStub).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+        verify(lampController).onPresence(true);
     }
 
     @Test
-    @DisplayName("Should swallow a gRPC failure so the message is acknowledged")
-    void shouldSwallowGrpcFailure() throws StatusException {
-        when(yandexServiceStub.withDeadlineAfter(anyLong(), any())).thenReturn(yandexServiceStub);
-        when(yandexServiceStub.turnOnOffLamp(any())).thenThrow(new RuntimeException("yandex-service down"));
-
+    @DisplayName("Should report presence when only the PIR sensor reports presence")
+    void shouldReportPresenceOnPir() {
         String jsonData = """
                 {
                     "measurements": {
-                        "radarPresence": true,
-                        "pirSensorPresence": false,
-                        "lampState": true
+                        "radarPresence": false,
+                        "pirSensorPresence": true
                     }
                 }
                 """;
 
-        assertThatCode(() -> presenceHandler.handleIncomingData(DEVICE_ID, jsonData))
-                .doesNotThrowAnyException();
+        presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
+
+        verify(lampController).onPresence(true);
+    }
+
+    @Test
+    @DisplayName("Should report no presence when neither sensor reports presence")
+    void shouldReportNoPresence() {
+        String jsonData = """
+                {
+                    "measurements": {
+                        "radarPresence": false,
+                        "pirSensorPresence": false
+                    }
+                }
+                """;
+
+        presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
+
+        verify(lampController).onPresence(false);
     }
 
     @Test
@@ -147,32 +114,30 @@ class PresenceHandlerTest {
     }
 
     @Test
-    @DisplayName("Should reject non-boolean lampState instead of throwing NPE/ClassCastException")
-    void shouldRejectNonBooleanLampState() {
-        String nullLampState = """
+    @DisplayName("Should reject a non-boolean presence value instead of throwing NPE/ClassCastException")
+    void shouldRejectNonBooleanPresence() {
+        String nullPresence = """
                 {
                     "measurements": {
-                        "radarPresence": true,
-                        "pirSensorPresence": false,
-                        "lampState": null
+                        "radarPresence": null,
+                        "pirSensorPresence": false
                     }
                 }
                 """;
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, nullLampState))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, nullPresence))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        String stringLampState = """
+        String stringPresence = """
                 {
                     "measurements": {
-                        "radarPresence": true,
-                        "pirSensorPresence": false,
-                        "lampState": "on"
+                        "radarPresence": "on",
+                        "pirSensorPresence": false
                     }
                 }
                 """;
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, stringLampState))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, stringPresence))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

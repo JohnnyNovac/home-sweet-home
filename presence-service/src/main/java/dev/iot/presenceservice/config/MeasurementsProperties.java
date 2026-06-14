@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class MeasurementsProperties {
     private Measurement radarPresence;
     private Measurement pirSensorPresence;
-    private Measurement lampState;
+    private Measurement illuminance;
 
     public Measurement getRadarPresence() {
         return radarPresence;
@@ -24,12 +24,12 @@ public class MeasurementsProperties {
         this.pirSensorPresence = pirSensorPresence;
     }
 
-    public Measurement getLampState() {
-        return lampState;
+    public Measurement getIlluminance() {
+        return illuminance;
     }
 
-    public void setLampState(Measurement lampState) {
-        this.lampState = lampState;
+    public void setIlluminance(Measurement illuminance) {
+        this.illuminance = illuminance;
     }
 
     // ===== Вложенный класс =====

@@ -9,13 +9,15 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * {@link SensorHandler} для датчиков присутствия ({@code presence}): радар, PIR и состояние лампы.
- * Сохраняет измерения, отражает присутствие и состояние лампы в Home Assistant и публикует
- * discovery-конфиги для соответствующих {@code binary_sensor}-сущностей.
+ * {@link SensorHandler} for presence sensors ({@code presence}): radar and PIR. Mirrors the combined
+ * presence to Home Assistant as an occupancy {@code binary_sensor} and persists each change. PresenceBox
+ * re-sends its current presence every minute as a heartbeat, so presence is persisted and re-published
+ * only when it actually changes — unchanged heartbeats are dropped here so they don't pile up in Mongo.
  */
 @Service
 public class PresenceHandler implements SensorHandler {
@@ -29,6 +31,7 @@ public class PresenceHandler implements SensorHandler {
     private final DeviceRegistry deviceRegistry;
 
     private final Set<String> knownDeviceIds = ConcurrentHashMap.newKeySet();
+    private final Map<String, Boolean> lastPresence = new ConcurrentHashMap<>();
 
     public PresenceHandler(
             SensorDataService sensorDataService,
@@ -52,8 +55,17 @@ public class PresenceHandler implements SensorHandler {
             sendDiscoveryFor(deviceId);
         }
 
-        sendDataToHA(deviceId, jsonData);
+        boolean presence = presenceFrom(jsonData);
+        Boolean previous = lastPresence.get(deviceId);
+        if (previous != null && previous == presence) {
+            return;
+        }
+
+        sendDataToHA(deviceId, presence);
         SensorData savedData = sensorDataService.saveIncomingData(deviceId, jsonData);
+        // Only after a successful save, so a save failure is retried on redelivery instead of being
+        // swallowed by the de-duplication above.
+        lastPresence.put(deviceId, presence);
         logger.debug("Saved presence data for {}: {}", deviceId, savedData);
     }
 
@@ -112,16 +124,15 @@ public class PresenceHandler implements SensorHandler {
         }
     }
 
-    private void sendDataToHA(String deviceId, String jsonData) {
-        JsonNode root = objectMapper.readTree(jsonData);
-        JsonNode measurements = root.path("measurements");
+    private boolean presenceFrom(String jsonData) {
+        JsonNode measurements = objectMapper.readTree(jsonData).path("measurements");
+        return measurements.path("radarPresence").asBoolean(false)
+               || measurements.path("pirSensorPresence").asBoolean(false);
+    }
 
-        boolean radar = measurements.path("radarPresence").asBoolean(false);
-        boolean pir = measurements.path("pirSensorPresence").asBoolean(false);
-        String presence = radar || pir ? "ON" : "OFF";
-
+    private void sendDataToHA(String deviceId, boolean presence) {
         ObjectNode newJson = objectMapper.createObjectNode();
-        newJson.put("presence", presence);
+        newJson.put("presence", presence ? "ON" : "OFF");
 
         mqttPublisher.publish(stateTopicFor(deviceId), objectMapper.writeValueAsString(newJson), true);
     }

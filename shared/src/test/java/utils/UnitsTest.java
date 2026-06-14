@@ -23,11 +23,17 @@ class UnitsTest {
     }
 
     @Test
+    @DisplayName("Should return correct unit for illuminance")
+    void shouldReturnCorrectUnitForIlluminance() {
+        String unit = Units.getUnit("illuminance");
+        assertThat(unit).isEqualTo("lx");
+    }
+
+    @Test
     @DisplayName("Should return empty string for presence sensors")
     void shouldReturnEmptyStringForPresenceSensors() {
         assertThat(Units.getUnit("radarPresence")).isEmpty();
         assertThat(Units.getUnit("pirSensorPresence")).isEmpty();
-        assertThat(Units.getUnit("lampState")).isEmpty();
     }
 
     @Test
