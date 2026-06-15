@@ -196,34 +196,28 @@ void initOTA() {
   // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
 
   ArduinoOTA.onStart([]() {
-    String type;
-    if (ArduinoOTA.getCommand() == U_FLASH) {
-      type = "sketch";
-    } else {  // U_FS
-      type = "filesystem";
-    }
-
-    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
-    log("Start updating " + type);
+    // Только Serial: тяжёлая работа в колбэках OTA на ESP-01 приводит к краху
+    Serial.println("OTA start");
   });
   ArduinoOTA.onEnd([]() {
-    log("\nEnd");
+    Serial.println("\nOTA end");
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    log(String("Progress: ") + String(progress / (total / 100)) + "%");
+    // Без MQTT, JSON и роста logData в момент записи во flash
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
   });
   ArduinoOTA.onError([](ota_error_t error) {
-    log(String("Error[") + String(error) + "]: ");
+    Serial.printf("OTA error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) {
-      log("Auth Failed");
+      Serial.println("Auth Failed");
     } else if (error == OTA_BEGIN_ERROR) {
-      log("Begin Failed");
+      Serial.println("Begin Failed");
     } else if (error == OTA_CONNECT_ERROR) {
-      log("Connect Failed");
+      Serial.println("Connect Failed");
     } else if (error == OTA_RECEIVE_ERROR) {
-      log("Receive Failed");
+      Serial.println("Receive Failed");
     } else if (error == OTA_END_ERROR) {
-      log("End Failed");
+      Serial.println("End Failed");
     }
   });
   ArduinoOTA.begin();
