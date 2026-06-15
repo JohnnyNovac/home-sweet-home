@@ -54,6 +54,7 @@ public class LampController {
     }
 
     private void reevaluate() {
+        logger.debug("Reevaluating lamp: present={}, illuminance={}, lampOn={}", present, illuminance, lampOn);
         if (Boolean.TRUE.equals(present) && isDark() && !lampOn) {
             if (turnOnOffLamp(true)) {
                 lampOn = true;
@@ -77,11 +78,10 @@ public class LampController {
         logger.info("Setting lamp state to {}", turnOn ? "ON" : "OFF");
 
         try {
-            Yandex.TurnOnOffLampResponse response = yandexServiceStub
+            yandexServiceStub
                     .withDeadlineAfter(grpcClientProperties.getLampDeadline().toMillis(), TimeUnit.MILLISECONDS)
                     .turnOnOffLamp(request);
 
-            logger.info("Lamp state changed: {}", response);
             return true;
         } catch (Exception e) {
             logger.error("Failed to change lamp state", e);
