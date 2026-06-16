@@ -10,11 +10,10 @@
 | D1  | radar OUT         |
 | D2  | red LED (board)   |
 | D5  | PIR sensor OUT    |
-| D6  | MOSFET switch     |
 | D7  | mode switch       |
 | D8  | red LED (frame)   |
 
-D3 and D4 are unused.
+D3, D4 and D6 are unused. The radar is now powered directly, so the D6 switch is no longer used.
 
 ## ESP-01
 

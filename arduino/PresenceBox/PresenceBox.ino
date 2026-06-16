@@ -14,17 +14,11 @@
 const int GREEN_LED_PIN = 16;
 const int RADAR_PIN = 5;
 const int PIR_SENSOR_PIN = 14;
-const int RELAY_PIN = 12;
 const int RED_LED_PIN = 15;
 
 bool presenceActive = false;
-volatile bool pirSensorPresence = false;
 volatile bool radarPresence = false;
-
-volatile bool radarIsActive = false;  // Radar activity flag
-
-volatile unsigned long lowLevelRadarTime;           // When the radar level went low
-const unsigned long lowLevelRadarDuration = 10000;  // How long the radar stays low (10 seconds)
+volatile bool pirSensorPresence = false;
 
 unsigned long lastHeartbeat = 0;
 const unsigned long heartbeatInterval = 60000;  // re-publish current presence every 60s so the service recovers its state after a restart
@@ -136,7 +130,6 @@ void setup() {
   pinMode(GREEN_LED_PIN, OUTPUT);
   pinMode(RADAR_PIN, INPUT);
   pinMode(PIR_SENSOR_PIN, INPUT);
-  pinMode(RELAY_PIN, OUTPUT);
   pinMode(RED_LED_PIN, OUTPUT);
 
   initWiFi();
@@ -148,20 +141,27 @@ void setup() {
 
   initOTA();
 
-  turnOnRadar();
-  if (digitalRead(RADAR_PIN) == HIGH) {
-    radarPresence = true;     // radar already sees presence; set it before the interrupt catches the edge
-    presenceActive = true;    // presence is already detected at init
-    sendData(radarPresence, pirSensorPresence);
-  }
-  yield();
+  // Radar is always powered now; the PIR needs ~1 min to calibrate after power-up,
+  // and the radar self-stabilises within the same window
   log("Waiting one minute for PIR-sensor calibration...");
-  for (int i = 0; i < 60; i++) {  // Waiting a minute for PIR sensor calibration
-    mqttClient.loop();            // keep the MQTT keep-alive alive so the broker does not drop us
-    delay(1000);                  // 1 second delay
-    yield();                      // Resetting the watchdog
+  for (int i = 0; i < 60; i++) {
+    mqttClient.loop();  // keep the MQTT keep-alive alive so the broker does not drop us
+    delay(1000);
+    yield();  // Resetting the watchdog
   }
-  attachInterrupt(digitalPinToInterrupt(PIR_SENSOR_PIN), detectPirSensorPresence, RISING);
+
+  // Both sensors are read by interrupt; CHANGE so the ISR tracks the current level,
+  // not just the rising edge — presence is the held output of each sensor
+  attachInterrupt(digitalPinToInterrupt(RADAR_PIN), detectRadarSignalChange, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIR_SENSOR_PIN), detectPirSensorPresence, CHANGE);
+
+  // Publish the initial presence so the service has a value right after boot
+  radarPresence = digitalRead(RADAR_PIN) == HIGH;
+  pirSensorPresence = digitalRead(PIR_SENSOR_PIN) == HIGH;
+  presenceActive = radarPresence || pirSensorPresence;
+  sendData(radarPresence, pirSensorPresence);
+  digitalWrite(GREEN_LED_PIN, presenceActive);
+  digitalWrite(RED_LED_PIN, !presenceActive);
 
   log("Setup finished!");
 }
@@ -181,40 +181,28 @@ void loop() {
     if (!connectToMQTT()) return;
   }
 
-  if (radarIsActive) {
-    if (radarPresence && !presenceActive) {
-      presenceActive = true;
-      sendData(radarPresence, pirSensorPresence);
-      log("Detected movement by radar");
-    } else if (lowLevelRadarTime > 0) {
-      unsigned long currentLowLevelRadarDuration = millis() - lowLevelRadarTime;
-      if (currentLowLevelRadarDuration >= lowLevelRadarDuration) {  // Checking whether the configured radar interval has elapsed
-        log(String("Current low level radar duration - ") + String(currentLowLevelRadarDuration / 1000) + " seconds");
-        turnOffRadar();
-        presenceActive = false;
-        sendData(radarPresence, pirSensorPresence);
+  // Snapshot the volatile flags once so radar and pir stay consistent within this iteration
+  bool radar = radarPresence;
+  bool pir = pirSensorPresence;
+  bool presence = radar || pir;
 
-        lowLevelRadarTime = 0;  // Resetting the timer
-
-        log("Radar deactivated, PIR-sensor activated");
-      }
+  if (presence != presenceActive) {
+    presenceActive = presence;
+    sendData(radar, pir);
+    if (presence) {
+      // Report which sensor raised presence, only on the absence -> presence transition
+      String source = radar && pir ? "RADAR and PIR" : radar ? "RADAR" : "PIR";
+      log("Presence detected by " + source);
+    } else {
+      log("Presence ended");
     }
-  } else if (pirSensorPresence) {
-    log("Detected movement by PIR-sensor");
-
-    presenceActive = true;
-    sendData(radarPresence, pirSensorPresence);
-
-    turnOnRadar();
-
-    pirSensorPresence = false;
-
-    log("Radar activated");
+    digitalWrite(GREEN_LED_PIN, presence);
+    digitalWrite(RED_LED_PIN, !presence);
   }
 
   if (millis() - lastHeartbeat >= heartbeatInterval) {
     lastHeartbeat = millis();
-    sendData(presenceActive, false);  // presence is held in presenceActive; raw radar/pir are momentary
+    sendData(radar, pir);
   }
 }
 
@@ -292,49 +280,12 @@ void initOTA() {
   log("OTA is ready");
 }
 
-IRAM_ATTR void detectPirSensorPresence() {
-  if (!radarIsActive) {
-    pirSensorPresence = true;
-  }
-}
-
 IRAM_ATTR void detectRadarSignalChange() {
-  if (digitalRead(RADAR_PIN) == LOW) {
-    // If the level is low, start the timer
-    lowLevelRadarTime = millis();
-    radarPresence = false;
-  } else {
-    // If the level is high, reset the timer
-    lowLevelRadarTime = 0;
-    radarPresence = true;
-  }
+  radarPresence = digitalRead(RADAR_PIN) == HIGH;
 }
 
-void turnOnRadar() {
-  radarIsActive = true;
-  log("Turning ON radar...");
-  digitalWrite(RELAY_PIN, true);  // Activating the radar via the relay
-  // 3s radar warm-up; keep MQTT serviced so the connection and lamp commands are not stalled
-  unsigned long warmupStart = millis();
-  while (millis() - warmupStart < 3000) {
-    mqttClient.loop();
-    delay(10);
-    yield();
-  }
-  attachInterrupt(digitalPinToInterrupt(RADAR_PIN), detectRadarSignalChange, CHANGE);
-
-  digitalWrite(RED_LED_PIN, false);
-  digitalWrite(GREEN_LED_PIN, true);
-}
-
-void turnOffRadar() {
-  radarIsActive = false;
-  log("Turning OFF radar...");
-  digitalWrite(RELAY_PIN, false);  // Deactivating the radar via the relay
-  detachInterrupt(digitalPinToInterrupt(RADAR_PIN));
-
-  digitalWrite(RED_LED_PIN, true);
-  digitalWrite(GREEN_LED_PIN, false);
+IRAM_ATTR void detectPirSensorPresence() {
+  pirSensorPresence = digitalRead(PIR_SENSOR_PIN) == HIGH;
 }
 
 void sendData(bool radarPresence, bool pirSensorPresence) {
