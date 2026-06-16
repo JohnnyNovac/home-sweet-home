@@ -12,9 +12,10 @@ services:
       - "1883:1883"
     healthcheck:
       test: rabbitmq-diagnostics -q check_running
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
