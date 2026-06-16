@@ -15,8 +15,8 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * Реестр устройств: ведёт коллекцию {@code devices} в MongoDB, где ключ — {@code deviceId},
- * а также хранятся {@code sensorType}, {@code room}, {@code name} и {@code lastSeenAt}.
+ * Device registry: maintains the {@code devices} collection in MongoDB, keyed by {@code deviceId},
+ * also holding {@code sensorType}, {@code room}, {@code name} and {@code lastSeenAt}.
  */
 @Service
 public class DeviceRegistry {
@@ -32,16 +32,16 @@ public class DeviceRegistry {
     }
 
     /**
-     * Регистрирует факт получения сообщения от устройства одним атомарным upsert: обновляет
-     * {@code lastSeenAt} и создаёт запись, если её ещё нет. {@code sensorType} записывают только
-     * data-сообщения (они всегда несут правильный тип); availability-сообщение передаёт {@code null}
-     * и поле {@code sensorType} не трогает, поэтому известный тип не затирается. Обновление меняет
-     * только перечисленные поля (не заменяет документ целиком), так что {@code room} и параллельные
-     * сообщения от того же устройства ничего не теряют.
+     * Records that a message was received from a device with a single atomic upsert: updates
+     * {@code lastSeenAt} and creates the row if it does not exist yet. Only data messages write
+     * {@code sensorType} (they always carry the correct type); an availability message passes {@code null}
+     * and leaves the {@code sensorType} field untouched, so a known type is not blanked. The update changes
+     * only the listed fields (it does not replace the whole document), so {@code room} and concurrent
+     * messages from the same device do not lose anything.
      *
-     * @param deviceId   идентификатор устройства
-     * @param sensorType тип сенсора из data-сообщения либо {@code null} для availability-канала
-     * @return сохранённое устройство
+     * @param deviceId   device identifier
+     * @param sensorType sensor type from a data message, or {@code null} for the availability channel
+     * @return the saved device
      */
     public Device recordSeen(String deviceId, String sensorType) {
         Query byId = Query.query(Criteria.where("_id").is(deviceId));
@@ -56,13 +56,13 @@ public class DeviceRegistry {
     }
 
     /**
-     * Возвращает назначенную устройству комнату для проставления {@code suggested_area} в
-     * discovery-конфиге. Если запрос к Mongo завершился ошибкой, отдаём {@link Optional#empty()} —
-     * discovery публикуется без {@code suggested_area}, а комната подхватится при следующем
-     * перезапуске HA. Ожидание ограничено тайм-аутами драйвера MongoDB в строке подключения.
+     * Returns the room assigned to the device, used to set {@code suggested_area} in the discovery config.
+     * If the Mongo query fails, returns {@link Optional#empty()} — discovery is published without
+     * {@code suggested_area}, and the room is picked up on the next HA restart. The wait is bounded by the
+     * MongoDB driver timeouts in the connection string.
      *
-     * @param deviceId идентификатор устройства
-     * @return назначенная комната или {@link Optional#empty()}, если она не задана либо недоступна
+     * @param deviceId device identifier
+     * @return the assigned room, or {@link Optional#empty()} if it is not set or unavailable
      */
     public Optional<String> roomFor(String deviceId) {
         try {
@@ -74,13 +74,13 @@ public class DeviceRegistry {
     }
 
     /**
-     * Возвращает заданное вручную отображаемое имя устройства для поля {@code name} в discovery-конфиге HA.
-     * Если имя не задано или запрос к Mongo завершился ошибкой, отдаём {@link Optional#empty()} — в discovery
-     * вместо имени попадает сам {@code deviceId}. Ожидание ограничено тайм-аутами драйвера MongoDB в строке
-     * подключения.
+     * Returns the manually assigned display name of the device for the {@code name} field in the HA discovery
+     * config. If the name is not set or the Mongo query fails, returns {@link Optional#empty()} — the
+     * {@code deviceId} itself is used in discovery instead of a name. The wait is bounded by the MongoDB
+     * driver timeouts in the connection string.
      *
-     * @param deviceId идентификатор устройства
-     * @return отображаемое имя или {@link Optional#empty()}, если оно не задано либо недоступно
+     * @param deviceId device identifier
+     * @return the display name, or {@link Optional#empty()} if it is not set or unavailable
      */
     public Optional<String> nameFor(String deviceId) {
         try {

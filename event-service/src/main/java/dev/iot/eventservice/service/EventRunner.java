@@ -12,11 +12,11 @@ import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 
 /**
- * Точка входа потока данных event-service. Слушает очередь данных, разбирает routing key и
- * диспетчеризует сообщение по {@code sensorType} в нужный {@link SensorHandler} через
- * {@link SensorHandlerFactory}, попутно обновляя {@link DeviceRegistry}. Обработка и сохранение
- * данных не зависят от состояния Home Assistant; подписка на {@code app.ha.status-topic} нужна
- * только для того, чтобы при переходе HA в online повторно опубликовать discovery-конфиги.
+ * Entry point of the event-service data flow. Listens to the data queue, parses the routing key and
+ * dispatches the message by {@code sensorType} to the right {@link SensorHandler} via
+ * {@link SensorHandlerFactory}, updating {@link DeviceRegistry} along the way. Processing and storing
+ * data do not depend on the state of Home Assistant; the subscription to {@code app.ha.status-topic} is
+ * only there to re-publish discovery configs when HA comes online.
  */
 @Component
 public class EventRunner implements CommandLineRunner {

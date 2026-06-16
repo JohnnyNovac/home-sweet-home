@@ -32,7 +32,6 @@ public class MeasurementsProperties {
         this.illuminance = illuminance;
     }
 
-    // ===== Вложенный класс =====
     public static class Measurement {
         private String name;
 

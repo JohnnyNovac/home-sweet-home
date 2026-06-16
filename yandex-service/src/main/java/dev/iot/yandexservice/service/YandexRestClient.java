@@ -18,11 +18,11 @@ public class YandexRestClient {
     }
 
     /**
-     * Отправляет команду на группу устройств
+     * Sends a command to a group of devices.
      *
-     * @param request запрос с действиями для группы устройств
-     * @param groupId ID группы устройств, к которой нужно применить действия
-     * @return ответ от API Яндекса с результатами выполнения действий для группы устройств
+     * @param request the request with actions for the group of devices
+     * @param groupId ID of the device group to apply the actions to
+     * @return the Yandex API response with the results of the actions for the group
      */
     public DeviceGroupActionResponse sendGroupAction(DeviceGroupActionRequest request, String groupId) {
         return client.post()

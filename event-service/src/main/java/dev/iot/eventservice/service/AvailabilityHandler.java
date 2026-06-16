@@ -15,10 +15,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Пассивный потребитель availability-сообщений ({@code home.availability.<deviceId>}).
- * Обновляет {@code lastSeenAt} в {@link DeviceRegistry} (с {@code sensorType = null}) и публикует
- * метрику {@code device_up} (1 — online, 0 — offline) с тегом {@code deviceId} для Prometheus.
- * В Home Assistant ничего не пересылает — HA читает доступность из MQTT-топика устройства напрямую.
+ * Passive consumer of availability messages ({@code home.availability.<deviceId>}).
+ * Updates {@code lastSeenAt} in {@link DeviceRegistry} (with {@code sensorType = null}) and publishes
+ * the {@code device_up} metric (1 — online, 0 — offline) tagged with {@code deviceId} for Prometheus.
+ * It forwards nothing to Home Assistant — HA reads availability from the device's MQTT topic directly.
  */
 @Component
 public class AvailabilityHandler {
