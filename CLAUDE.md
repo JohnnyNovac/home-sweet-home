@@ -123,11 +123,18 @@ the room is picked up on the next HA restart. Rooms are assigned manually via `m
 `homeassistant/status` flips to `online`).
 
 **Lamp control path.** The lamp decision lives in `presence-service`, not on the device, and depends on both presence
-and illuminance. The decision is a small stateful engine (`LampController`) fed by two independent listeners:
+and illuminance. The decision is a small stateful engine (`LampService`) fed by two independent listeners:
 `PresenceListener` (presence data, `radarPresence || pirSensorPresence`) and `IlluminanceListener` (the `illuminance`
 measurement out of `climate` data). The engine keeps the latest value of each and recomputes on every update: it turns
-the lamp **on** when presence is detected **and** the room is dark (`illuminance` below `app.lamp.illuminance-threshold`,
-default 50 lx), and **off** only when presence ends — brightness never turns it off. Recomputing on illuminance changes
+the lamp **on** when presence is detected **and** the room is dark (`illuminance` below the threshold), and **off** only
+when presence ends — brightness never turns it off. The threshold is runtime-configurable: it is persisted in
+presence-service's own MongoDB database (`presence`, `settings` collection, fixed `_id` `lamp`) and that stored value is
+the source of truth, with `app.lamp.illuminance-threshold` (default 50 lx) used only as the seed when the collection is
+still empty. `LampService.loadSettings()` reads it once at startup (seeding the default if absent), and the
+`/api/v1/lamp` REST endpoint (`controller.LampController`) exposes it: `GET` returns the lamp state and threshold,
+`PUT /threshold` changes the threshold (persisted with a whole-document `save`, then the decision is recomputed so a
+now-dark room reacts immediately) and `POST /state` forces the lamp on/off (a direct command, not a sticky override —
+the automation may flip it back on the next presence/illuminance update). Recomputing on illuminance changes
 (not just presence events) is what lets the lamp come on when the room darkens while someone is already present. Both
 inputs start unknown (`null`) and the lamp is switched on only once both are known; after a restart illuminance
 self-heals from the 60s `climate` cadence and presence self-heals from a 60s PresenceBox heartbeat (the device
@@ -136,13 +143,13 @@ these heartbeats: its `PresenceHandler` persists to Mongo and re-publishes to HA
 so an unchanged heartbeat is dropped (the `lastPresence` map is updated only after a successful save, so a save failure
 is still retried on redelivery). A failed lamp command leaves
 the tracked state unchanged so it is retried on the next presence/illuminance update. The two listeners run on separate
-threads, so `LampController` is synchronised.
+threads, so `LampService` is synchronised.
 
 The engine calls `yandex-service` via the gRPC stub declared in `grpc-api/src/main/proto/yandex.proto`
 (`YandexService.TurnOnOffLamp`). Client channel is configured in `presence-service/application.yml` as
 `spring.grpc.client.channels.yandex-service.address`. `yandex-service` (`GrpcServerService`) translates the call into a
 Yandex Smart Home "group action" HTTP request via `YandexRestClient`. The whole chain is time-bounded so a slow or
-hung Yandex cloud cannot block a listener thread indefinitely: `LampController` applies a gRPC deadline
+hung Yandex cloud cannot block a listener thread indefinitely: `LampService` applies a gRPC deadline
 (`app.grpc.lamp-deadline`, default 8s) per call, and the `RestClient` in `YandexClientConfig` is built
 with connect/read timeouts (`yandex.connect-timeout` 3s / `yandex.read-timeout` 5s). The HTTP timeout frees the
 yandex-service thread; the gRPC deadline frees the presence-service listener even if yandex-service itself is wedged —
@@ -224,6 +231,11 @@ parser live in `shared/` (`JsonDtoParser`, `EventDTO`, `MeasurementDTO`).
     - `MqttConfig` is gated on `app.mqtt.enabled` (default true) and tests set it to `false`; a `MqttTestConfig`
       provides a mock `MqttClient`/`MqttPublisher` (commit 64b41db). Preserve both properties when editing test
       configs — listeners will otherwise try to reach a real broker and fail.
+- Controller (web-layer) tests use `@WebMvcTest` with an injected `MockMvc` and `@MockitoBean` services (e.g.
+  `presence-service`'s `LampControllerTest`). In Spring Boot 4.0 the MVC test slice was moved out of
+  `spring-boot-test-autoconfigure` (which now only carries `@JsonTest`) into a separate `spring-boot-webmvc-test`
+  module, package `org.springframework.boot.webmvc.test.autoconfigure` — add that `testImplementation` dependency to any
+  module that needs `@WebMvcTest`/`@AutoConfigureMockMvc`.
 - See `docs/testing.md` for the unit-vs-integration breakdown per module.
 
 ## Arduino firmware

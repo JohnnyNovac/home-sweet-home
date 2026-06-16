@@ -107,6 +107,8 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
       - SPRING_PROFILES_ACTIVE=docker
     restart: unless-stopped
     depends_on:
@@ -114,6 +116,8 @@ services:
         condition: service_healthy
       rabbitmq-init:
         condition: service_completed_successfully
+      mongodb:
+        condition: service_started
     networks:
       - homesweethome_net
 

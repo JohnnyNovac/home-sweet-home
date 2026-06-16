@@ -19,12 +19,12 @@ public class IlluminanceListener {
 
     private final ObjectMapper objectMapper;
     private final MeasurementsProperties measurementsProperties;
-    private final LampController lampController;
+    private final LampService lampService;
 
-    public IlluminanceListener(ObjectMapper objectMapper, MeasurementsProperties measurementsProperties, LampController lampController) {
+    public IlluminanceListener(ObjectMapper objectMapper, MeasurementsProperties measurementsProperties, LampService lampService) {
         this.objectMapper = objectMapper;
         this.measurementsProperties = measurementsProperties;
-        this.lampController = lampController;
+        this.lampService = lampService;
     }
 
     @RabbitListener(queues = "${app.rabbitmq.illuminance-data-queue}")
@@ -35,7 +35,7 @@ public class IlluminanceListener {
 
             // Climate messages from devices without a light sensor carry no illuminance — just skip them.
             if (illuminance.isNumber()) {
-                lampController.onIlluminance(illuminance.asDouble());
+                lampService.onIlluminance(illuminance.asDouble());
             }
         } catch (JacksonException e) {
             logger.error("Discarding unprocessable climate message, routingKey={}, payload={}", routingKey, message, e);

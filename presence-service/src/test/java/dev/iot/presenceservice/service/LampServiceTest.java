@@ -2,6 +2,7 @@ package dev.iot.presenceservice.service;
 
 import dev.iot.presenceservice.config.GrpcClientProperties;
 import dev.iot.presenceservice.config.LampProperties;
+import dev.iot.presenceservice.repository.LampSettingsRepository;
 import io.grpc.StatusException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,29 +13,27 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import yandex.Yandex;
 import yandex.YandexServiceGrpc;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class LampControllerTest {
+class LampServiceTest {
 
     private static final double THRESHOLD = 50;
 
     @Mock
     private YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub;
 
-    private LampController lampController;
+    @Mock
+    private LampSettingsRepository lampSettingsRepository;
+
+    private LampService lampService;
 
     @BeforeEach
     void setUp() {
         LampProperties lampProperties = new LampProperties();
         lampProperties.setIlluminanceThreshold(THRESHOLD);
-        lampController = new LampController(yandexServiceStub, new GrpcClientProperties(), lampProperties);
+        lampService = new LampService(yandexServiceStub, new GrpcClientProperties(), lampProperties, lampSettingsRepository);
     }
 
     private void stubDeadline() {
@@ -46,9 +45,9 @@ class LampControllerTest {
     void shouldTurnOnWhenPresentAndDark() throws StatusException {
         stubDeadline();
 
-        lampController.onIlluminance(10);
-        lampController.onPresence(true);
-        lampController.onPresence(true);
+        lampService.onIlluminance(10);
+        lampService.onPresence(true);
+        lampService.onPresence(true);
 
         verify(yandexServiceStub, times(1)).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
     }
@@ -56,7 +55,7 @@ class LampControllerTest {
     @Test
     @DisplayName("Should not touch the lamp while illuminance is still unknown")
     void shouldNotActWhileIlluminanceUnknown() throws StatusException {
-        lampController.onPresence(true);
+        lampService.onPresence(true);
 
         verify(yandexServiceStub, never()).turnOnOffLamp(any());
     }
@@ -66,11 +65,11 @@ class LampControllerTest {
     void shouldTurnOnWhenRoomDarkensWhilePresent() throws StatusException {
         stubDeadline();
 
-        lampController.onIlluminance(500);
-        lampController.onPresence(true);
+        lampService.onIlluminance(500);
+        lampService.onPresence(true);
         verify(yandexServiceStub, never()).turnOnOffLamp(any());
 
-        lampController.onIlluminance(10);
+        lampService.onIlluminance(10);
         verify(yandexServiceStub, times(1)).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
     }
 
@@ -79,9 +78,9 @@ class LampControllerTest {
     void shouldNotTurnOffWhenBright() throws StatusException {
         stubDeadline();
 
-        lampController.onIlluminance(10);
-        lampController.onPresence(true);
-        lampController.onIlluminance(500);
+        lampService.onIlluminance(10);
+        lampService.onPresence(true);
+        lampService.onIlluminance(500);
 
         verify(yandexServiceStub, never()).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
     }
@@ -91,9 +90,9 @@ class LampControllerTest {
     void shouldTurnOffWhenPresenceEnds() throws StatusException {
         stubDeadline();
 
-        lampController.onIlluminance(10);
-        lampController.onPresence(true);
-        lampController.onPresence(false);
+        lampService.onIlluminance(10);
+        lampService.onPresence(true);
+        lampService.onPresence(false);
 
         verify(yandexServiceStub).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
     }
@@ -101,9 +100,9 @@ class LampControllerTest {
     @Test
     @DisplayName("Should not turn the lamp off when presence ends but it was never switched on")
     void shouldNotTurnOffWhenNeverOn() throws StatusException {
-        lampController.onIlluminance(500);
-        lampController.onPresence(true);
-        lampController.onPresence(false);
+        lampService.onIlluminance(500);
+        lampService.onPresence(true);
+        lampService.onPresence(false);
 
         verify(yandexServiceStub, never()).turnOnOffLamp(any());
     }
@@ -116,10 +115,25 @@ class LampControllerTest {
                 .thenThrow(new RuntimeException("yandex-service down"))
                 .thenReturn(Yandex.TurnOnOffLampResponse.getDefaultInstance());
 
-        lampController.onIlluminance(10);
-        lampController.onPresence(true);  // first attempt throws, lamp stays off
-        lampController.onIlluminance(9);  // still present and dark, lamp off -> retry
+        lampService.onIlluminance(10);
+        lampService.onPresence(true);  // first attempt throws, lamp stays off
+        lampService.onIlluminance(9);  // still present and dark, lamp off -> retry
 
         verify(yandexServiceStub, times(2)).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
+    }
+
+    @Test
+    @DisplayName("Should persist a new threshold and reevaluate so a now-dark room turns the lamp on")
+    void shouldReactToThresholdChange() throws StatusException {
+        stubDeadline();
+
+        lampService.onIlluminance(60);
+        lampService.onPresence(true);
+        verify(yandexServiceStub, never()).turnOnOffLamp(any());  // 60 >= 50, not dark
+
+        lampService.setIlluminanceThreshold(70);  // 60 < 70, now dark and present
+
+        verify(lampSettingsRepository).save(argThat(s -> s.illuminanceThreshold() == 70));
+        verify(yandexServiceStub, times(1)).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
     }
 }

@@ -4,6 +4,8 @@ spring:
     port: 5672
     username: johnnyluger
     password: johnnyluger
+  mongodb:
+    uri: mongodb://johnnymongo:johnnymongo@localhost:27017/presence?authSource=admin
   grpc:
     client:
       channels:

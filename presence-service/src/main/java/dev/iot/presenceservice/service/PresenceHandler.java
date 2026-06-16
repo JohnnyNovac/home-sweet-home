@@ -12,19 +12,19 @@ public class PresenceHandler {
 
     private final ObjectMapper objectMapper;
     private final MeasurementsProperties measurementsProperties;
-    private final LampController lampController;
+    private final LampService lampService;
 
-    public PresenceHandler(ObjectMapper objectMapper, MeasurementsProperties measurementsProperties, LampController lampController) {
+    public PresenceHandler(ObjectMapper objectMapper, MeasurementsProperties measurementsProperties, LampService lampService) {
         this.objectMapper = objectMapper;
         this.measurementsProperties = measurementsProperties;
-        this.lampController = lampController;
+        this.lampService = lampService;
     }
 
     public void handleIncomingData(String deviceId, String jsonData) {
         validateJsonFormat(jsonData);
 
         EventDTO eventDTO = new EventDTO(deviceId, JsonDtoParser.parseMeasurements(jsonData));
-        lampController.onPresence(isPresenceDetected(eventDTO));
+        lampService.onPresence(isPresenceDetected(eventDTO));
     }
 
     private boolean isPresenceDetected(EventDTO eventDTO) {

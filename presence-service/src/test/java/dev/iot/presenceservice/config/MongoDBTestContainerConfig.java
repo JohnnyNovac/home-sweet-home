@@ -1,0 +1,18 @@
+package dev.iot.presenceservice.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.mongodb.MongoDBContainer;
+
+@Configuration
+public class MongoDBTestContainerConfig {
+
+    @Container
+    public static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:latest");
+
+    static {
+        mongoDBContainer.start();
+        Integer mappedPort = mongoDBContainer.getMappedPort(27017);
+        System.setProperty("mongodb.container.port", String.valueOf(mappedPort));
+    }
+}

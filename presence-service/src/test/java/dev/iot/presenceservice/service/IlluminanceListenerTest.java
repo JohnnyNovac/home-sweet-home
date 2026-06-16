@@ -23,7 +23,7 @@ class IlluminanceListenerTest {
     private IlluminanceListener listener;
 
     @Mock
-    private LampController lampController;
+    private LampService lampService;
 
     @BeforeEach
     void setUp() {
@@ -32,7 +32,7 @@ class IlluminanceListenerTest {
         illuminance.setName("illuminance");
         measurementsProperties.setIlluminance(illuminance);
 
-        listener = new IlluminanceListener(new ObjectMapper(), measurementsProperties, lampController);
+        listener = new IlluminanceListener(new ObjectMapper(), measurementsProperties, lampService);
     }
 
     @Test
@@ -50,7 +50,7 @@ class IlluminanceListenerTest {
 
         listener.handleMessage(message, ROUTING_KEY);
 
-        verify(lampController).onIlluminance(123.4);
+        verify(lampService).onIlluminance(123.4);
     }
 
     @Test
@@ -67,7 +67,7 @@ class IlluminanceListenerTest {
 
         listener.handleMessage(message, ROUTING_KEY);
 
-        verify(lampController, never()).onIlluminance(anyDouble());
+        verify(lampService, never()).onIlluminance(anyDouble());
     }
 
     @Test

@@ -1,4 +1,7 @@
 spring:
+  mongodb:
+    host: localhost
+    port: ${mongodb.container.port}
   rabbitmq:
     host: localhost
     port: 5672

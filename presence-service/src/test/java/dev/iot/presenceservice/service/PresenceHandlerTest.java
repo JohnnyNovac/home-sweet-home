@@ -20,7 +20,7 @@ class PresenceHandlerTest {
     private PresenceHandler presenceHandler;
 
     @Mock
-    private LampController lampController;
+    private LampService lampService;
 
     @BeforeEach
     void setUp() {
@@ -35,7 +35,7 @@ class PresenceHandlerTest {
         measurementsProperties.setRadarPresence(radarPresence);
         measurementsProperties.setPirSensorPresence(pirSensorPresence);
 
-        presenceHandler = new PresenceHandler(new ObjectMapper(), measurementsProperties, lampController);
+        presenceHandler = new PresenceHandler(new ObjectMapper(), measurementsProperties, lampService);
     }
 
     @Test
@@ -52,7 +52,7 @@ class PresenceHandlerTest {
 
         presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
 
-        verify(lampController).onPresence(true);
+        verify(lampService).onPresence(true);
     }
 
     @Test
@@ -69,7 +69,7 @@ class PresenceHandlerTest {
 
         presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
 
-        verify(lampController).onPresence(true);
+        verify(lampService).onPresence(true);
     }
 
     @Test
@@ -86,7 +86,7 @@ class PresenceHandlerTest {
 
         presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
 
-        verify(lampController).onPresence(false);
+        verify(lampService).onPresence(false);
     }
 
     @Test
