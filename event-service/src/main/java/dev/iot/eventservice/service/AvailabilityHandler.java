@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Passive consumer of availability messages ({@code home.availability.<deviceId>}).
- * Updates {@code lastSeenAt} in {@link DeviceRegistry} (with {@code sensorType = null}) and publishes
+ * Updates {@code lastSeenAt} in {@link DeviceService} (with {@code sensorType = null}) and publishes
  * the {@code device_up} metric (1 — online, 0 — offline) tagged with {@code deviceId} for Prometheus.
  * It forwards nothing to Home Assistant — HA reads availability from the device's MQTT topic directly.
  */
@@ -25,13 +25,13 @@ public class AvailabilityHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(AvailabilityHandler.class);
 
-    private final DeviceRegistry deviceRegistry;
+    private final DeviceService deviceService;
     private final MeterRegistry meterRegistry;
 
     private final Map<String, AtomicInteger> deviceUpGauges = new ConcurrentHashMap<>();
 
-    public AvailabilityHandler(DeviceRegistry deviceRegistry, MeterRegistry meterRegistry) {
-        this.deviceRegistry = deviceRegistry;
+    public AvailabilityHandler(DeviceService deviceService, MeterRegistry meterRegistry) {
+        this.deviceService = deviceService;
         this.meterRegistry = meterRegistry;
     }
 
@@ -49,7 +49,7 @@ public class AvailabilityHandler {
         recordDeviceUp(deviceId, "online".equals(body));
 
         try {
-            deviceRegistry.recordSeen(deviceId, null);
+            deviceService.recordSeen(deviceId, null);
         } catch (RuntimeException e) {
             logger.error("Failed to upsert device {}", deviceId, e);
         }

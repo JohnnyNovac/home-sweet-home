@@ -1,7 +1,7 @@
 package dev.iot.presenceservice.service;
 
 import dev.iot.presenceservice.config.MeasurementsProperties;
-import dev.iot.shared.dto.EventDTO;
+import dev.iot.shared.dto.CreateEventDto;
 import dev.iot.shared.utils.JsonDtoParser;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
@@ -23,17 +23,17 @@ public class PresenceHandler {
     public void handleIncomingData(String deviceId, String jsonData) {
         validateJsonFormat(jsonData);
 
-        EventDTO eventDTO = new EventDTO(deviceId, JsonDtoParser.parseMeasurements(jsonData));
-        lampService.onPresence(isPresenceDetected(eventDTO));
+        CreateEventDto createEventDTO = new CreateEventDto(deviceId, JsonDtoParser.parseMeasurements(jsonData));
+        lampService.onPresence(isPresenceDetected(createEventDTO));
     }
 
-    private boolean isPresenceDetected(EventDTO eventDTO) {
-        return booleanMeasurement(eventDTO, measurementsProperties.getRadarPresence().getName())
-               || booleanMeasurement(eventDTO, measurementsProperties.getPirSensorPresence().getName());
+    private boolean isPresenceDetected(CreateEventDto createEventDTO) {
+        return booleanMeasurement(createEventDTO, measurementsProperties.getRadarPresence().getName())
+                || booleanMeasurement(createEventDTO, measurementsProperties.getPirSensorPresence().getName());
     }
 
-    private boolean booleanMeasurement(EventDTO eventDTO, String name) {
-        return eventDTO.measurements().stream()
+    private boolean booleanMeasurement(CreateEventDto createEventDTO, String name) {
+        return createEventDTO.measurements().stream()
                 .filter(m -> m.type().equals(name))
                 .findFirst()
                 .map(m -> {

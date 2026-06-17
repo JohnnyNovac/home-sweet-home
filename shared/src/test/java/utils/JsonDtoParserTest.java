@@ -1,12 +1,13 @@
 package utils;
 
-import dev.iot.shared.dto.EventDTO;
-import dev.iot.shared.dto.MeasurementDTO;
+import dev.iot.shared.dto.CreateEventDto;
+import dev.iot.shared.dto.CreateMeasurementDto;
 import dev.iot.shared.utils.JsonDtoParser;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JsonDtoParserTest {
 
@@ -42,16 +43,16 @@ class JsonDtoParserTest {
                 }
                 """;
 
-        EventDTO eventDTO = JsonDtoParser.parseJson(jsonData);
+        CreateEventDto createEventDTO = JsonDtoParser.parseJson(jsonData);
 
-        assertThat(eventDTO.measurements()).hasSize(4);
+        assertThat(createEventDTO.measurements()).hasSize(4);
 
-        assertThat(eventDTO.measurements())
-                .extracting(MeasurementDTO::type)
+        assertThat(createEventDTO.measurements())
+                .extracting(CreateMeasurementDto::type)
                 .containsExactlyInAnyOrder("temperature", "humidity", "motion", "status");
 
-        assertThat(eventDTO.measurements())
-                .extracting(MeasurementDTO::value)
+        assertThat(createEventDTO.measurements())
+                .extracting(CreateMeasurementDto::value)
                 .containsExactlyInAnyOrder(22.5, 65, true, "active");
     }
 
@@ -65,9 +66,9 @@ class JsonDtoParserTest {
                 }
                 """;
 
-        EventDTO eventDTO = JsonDtoParser.parseJson(jsonData);
+        CreateEventDto createEventDTO = JsonDtoParser.parseJson(jsonData);
 
-        assertThat(eventDTO.measurements()).isEmpty();
+        assertThat(createEventDTO.measurements()).isEmpty();
     }
 
     @Test
@@ -83,11 +84,11 @@ class JsonDtoParserTest {
                 }
                 """;
 
-        EventDTO eventDTO = JsonDtoParser.parseJson(jsonData);
+        CreateEventDto createEventDTO = JsonDtoParser.parseJson(jsonData);
 
-        assertThat(eventDTO.measurements()).hasSize(2);
-        assertThat(eventDTO.measurements())
-                .extracting(MeasurementDTO::value)
+        assertThat(createEventDTO.measurements()).hasSize(2);
+        assertThat(createEventDTO.measurements())
+                .extracting(CreateMeasurementDto::value)
                 .containsExactlyInAnyOrder(25.7, 1013);
     }
 
@@ -104,11 +105,11 @@ class JsonDtoParserTest {
                 }
                 """;
 
-        EventDTO eventDTO = JsonDtoParser.parseJson(jsonData);
+        CreateEventDto createEventDTO = JsonDtoParser.parseJson(jsonData);
 
-        assertThat(eventDTO.measurements()).hasSize(2);
-        assertThat(eventDTO.measurements())
-                .extracting(MeasurementDTO::value)
+        assertThat(createEventDTO.measurements()).hasSize(2);
+        assertThat(createEventDTO.measurements())
+                .extracting(CreateMeasurementDto::value)
                 .containsExactlyInAnyOrder(true, false);
     }
 
@@ -165,11 +166,11 @@ class JsonDtoParserTest {
                 }
                 """;
 
-        EventDTO eventDTO = JsonDtoParser.parseJson(jsonWithNullValues);
+        CreateEventDto createEventDTO = JsonDtoParser.parseJson(jsonWithNullValues);
 
-        assertThat(eventDTO.measurements()).hasSize(2);
-        assertThat(eventDTO.measurements())
-                .extracting(MeasurementDTO::value)
+        assertThat(createEventDTO.measurements()).hasSize(2);
+        assertThat(createEventDTO.measurements())
+                .extracting(CreateMeasurementDto::value)
                 .containsExactlyInAnyOrder(null, null);
     }
 }

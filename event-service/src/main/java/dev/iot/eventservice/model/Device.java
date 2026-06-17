@@ -18,11 +18,11 @@ public class Device {
     public Device() {
     }
 
-    public Device(String deviceId, String sensorType, String room, Instant lastSeenAt) {
+    public Device(String deviceId, String sensorType, String room, String name) {
         this.deviceId = deviceId;
         this.sensorType = sensorType;
         this.room = room;
-        this.lastSeenAt = lastSeenAt;
+        this.name = name;
     }
 
     public String getDeviceId() {

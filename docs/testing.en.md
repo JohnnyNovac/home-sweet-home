@@ -12,21 +12,27 @@
 ### `event-service`
 
 - **Mappers**: `SensorDataMapperTest`, `MeasurementMapperTest`.
-- **Service layer (unit)**: `SensorDataServiceImplTest`, `EventRunnerTest`, `SensorHandlerFactoryTest`,
-  `Esp01SensorHandlerTest`, `PresenceSensorHandlerTest`, `MqttPublisherTest`.
-- **Integration**: `SensorDataServiceIntegrationTest` — against a real MongoDB via Testcontainers.
+- **Service layer (unit)**: `SensorDataServiceTest`, `DeviceServiceTest`, `EventRunnerTest`,
+  `SensorHandlerFactoryTest`, `ClimateHandlerTest`, `PresenceHandlerTest`, `AvailabilityHandlerTest`,
+  `MqttPublisherTest`.
+- **Web layer (`@WebMvcTest`)**: `DeviceControllerTest`, `SensorDataControllerTest` — REST contract for the device
+  registry and sensor data (response codes, error handling via `GlobalExceptionHandler`).
+- **Integration**: `SensorDataServiceIntegrationTest`, `DeviceServiceIntegrationTest` — against a real MongoDB via
+  Testcontainers.
 - **Context**: `EventServiceApplicationTest` — verifies the Spring context loads.
 
 ### `presence-service`
 
 - `PresenceHandlerTest` — parses PresenceBox messages and triggers the gRPC call to `yandex-service`.
+- `LampServiceTest` — lamp on/off logic driven by presence and illuminance.
+- `IlluminanceListenerTest` — handling of the `illuminance` measurement from `climate` data.
+- `LampControllerTest` (`@WebMvcTest`) — the `/api/v1/lamp` REST endpoint (state, threshold, forced toggle).
 - `PresenceServiceApplicationTest` — verifies the Spring context loads.
 
 ### `yandex-service`
 
 - `GrpcServerServiceTest` — gRPC server and request mapping into `DeviceGroupActionRequest`.
 - `YandexRestClientTest` — HTTP client to the Yandex Smart Home API.
-- `YandexServiceApplicationTests` — verifies the Spring context loads.
 
 ## Stack
 
@@ -54,5 +60,5 @@ MQTT clients try to reach a real broker on context startup.
 ```bash
 ./gradlew test                                                        # all tests
 ./gradlew :event-service:test                                         # tests for one module
-./gradlew :event-service:test --tests "*SensorDataServiceImplTest"    # one test class
+./gradlew :event-service:test --tests "*SensorDataServiceTest"    # one test class
 ```

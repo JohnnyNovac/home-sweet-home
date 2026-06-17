@@ -3,7 +3,7 @@ package dev.iot.eventservice.service;
 import dev.iot.eventservice.mapper.SensorDataMapper;
 import dev.iot.eventservice.model.SensorData;
 import dev.iot.eventservice.repository.SensorDataRepository;
-import dev.iot.shared.dto.EventDTO;
+import dev.iot.shared.dto.CreateEventDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,7 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class SensorDataServiceImplTest {
+class SensorDataServiceTest {
 
     private static final String DEVICE_ID = "climate-1";
 
@@ -30,11 +30,11 @@ class SensorDataServiceImplTest {
     @Mock
     private SensorDataMapper sensorDataMapper;
 
-    private SensorDataServiceImpl sensorService;
+    private SensorDataService sensorService;
 
     @BeforeEach
     void setUp() {
-        sensorService = new SensorDataServiceImpl(repository, sensorDataMapper);
+        sensorService = new SensorDataService(repository, sensorDataMapper);
     }
 
     @Test
@@ -51,13 +51,13 @@ class SensorDataServiceImplTest {
 
         SensorData expectedSensorData = new SensorData(DEVICE_ID, null, List.of());
 
-        when(sensorDataMapper.toDocument(any(EventDTO.class))).thenReturn(expectedSensorData);
+        when(sensorDataMapper.toSensorData(any(CreateEventDto.class))).thenReturn(expectedSensorData);
         when(repository.save(any(SensorData.class))).thenReturn(expectedSensorData);
 
         SensorData result = sensorService.saveIncomingData(DEVICE_ID, jsonData);
 
         assertThat(result).isEqualTo(expectedSensorData);
-        verify(sensorDataMapper).toDocument(any(EventDTO.class));
+        verify(sensorDataMapper).toSensorData(any(CreateEventDto.class));
         verify(repository).save(expectedSensorData);
     }
 
@@ -75,7 +75,7 @@ class SensorDataServiceImplTest {
 
         SensorData expectedSensorData = new SensorData(DEVICE_ID, null, List.of());
 
-        when(sensorDataMapper.toDocument(any(EventDTO.class))).thenReturn(expectedSensorData);
+        when(sensorDataMapper.toSensorData(any(CreateEventDto.class))).thenReturn(expectedSensorData);
         when(repository.save(any(SensorData.class))).thenThrow(new RuntimeException("Database error"));
 
         assertThatThrownBy(() -> sensorService.saveIncomingData(DEVICE_ID, jsonData))

@@ -18,9 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PresenceHandlerTest {
@@ -38,7 +36,7 @@ class PresenceHandlerTest {
     private HAConfigProperties haProperties;
 
     @Mock
-    private DeviceRegistry deviceRegistry;
+    private DeviceService deviceService;
 
     private PresenceHandler handler;
 
@@ -46,7 +44,7 @@ class PresenceHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new PresenceHandler(sensorDataService, mqttPublisher, haProperties, objectMapper, deviceRegistry);
+        handler = new PresenceHandler(sensorDataService, mqttPublisher, haProperties, objectMapper, deviceService);
     }
 
     @Test
@@ -62,7 +60,7 @@ class PresenceHandlerTest {
                 """;
 
         when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -93,7 +91,7 @@ class PresenceHandlerTest {
                 """;
 
         when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -121,7 +119,7 @@ class PresenceHandlerTest {
                 """;
 
         when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -157,7 +155,7 @@ class PresenceHandlerTest {
                 """;
 
         when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 

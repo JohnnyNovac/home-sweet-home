@@ -1,7 +1,7 @@
 package dev.iot.shared.utils;
 
-import dev.iot.shared.dto.EventDTO;
-import dev.iot.shared.dto.MeasurementDTO;
+import dev.iot.shared.dto.CreateEventDto;
+import dev.iot.shared.dto.CreateMeasurementDto;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -17,20 +17,20 @@ public class JsonDtoParser {
         return root.get("sensorId").asString();
     }
 
-    public static EventDTO parseJson(String jsonData) {
+    public static CreateEventDto parseJson(String jsonData) {
         JsonNode root = objectMapper.readTree(jsonData);
         String sensorId = root.get("sensorId").asString();
-        return new EventDTO(sensorId, parseMeasurements(jsonData));
+        return new CreateEventDto(sensorId, parseMeasurements(jsonData));
     }
 
-    public static List<MeasurementDTO> parseMeasurements(String jsonData) {
+    public static List<CreateMeasurementDto> parseMeasurements(String jsonData) {
         JsonNode root = objectMapper.readTree(jsonData);
         JsonNode measurementsNode = root.get("measurements");
         return extractMeasurements(measurementsNode);
     }
 
-    private static List<MeasurementDTO> extractMeasurements(JsonNode measurementsNode) {
-        List<MeasurementDTO> measurementDTOs = new ArrayList<>();
+    private static List<CreateMeasurementDto> extractMeasurements(JsonNode measurementsNode) {
+        List<CreateMeasurementDto> createMeasurementDtos = new ArrayList<>();
 
         measurementsNode.properties().forEach(entry -> {
             String type = entry.getKey();
@@ -49,9 +49,9 @@ public class JsonDtoParser {
                 value = valueNode.toString();
             }
 
-            measurementDTOs.add(new MeasurementDTO(type, value));
+            createMeasurementDtos.add(new CreateMeasurementDto(type, value));
         });
 
-        return measurementDTOs;
+        return createMeasurementDtos;
     }
 }

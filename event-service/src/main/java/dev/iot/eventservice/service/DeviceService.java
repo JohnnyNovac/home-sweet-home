@@ -1,9 +1,18 @@
 package dev.iot.eventservice.service;
 
+import dev.iot.eventservice.dto.CreateDeviceDto;
+import dev.iot.eventservice.dto.DeviceDto;
+import dev.iot.eventservice.dto.UpdateDeviceDto;
+import dev.iot.eventservice.exception.DeviceAlreadyExistsException;
+import dev.iot.eventservice.exception.DeviceNotFoundException;
+import dev.iot.eventservice.mapper.DeviceMapper;
 import dev.iot.eventservice.model.Device;
 import dev.iot.eventservice.repository.DeviceRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -12,23 +21,92 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Device registry: maintains the {@code devices} collection in MongoDB, keyed by {@code deviceId},
  * also holding {@code sensorType}, {@code room}, {@code name} and {@code lastSeenAt}.
  */
 @Service
-public class DeviceRegistry {
+public class DeviceService {
 
-    private static final Logger logger = LoggerFactory.getLogger(DeviceRegistry.class);
+    private static final Logger logger = LoggerFactory.getLogger(DeviceService.class);
 
     private final MongoTemplate mongoTemplate;
     private final DeviceRepository repository;
+    private final DeviceMapper deviceMapper;
 
-    public DeviceRegistry(MongoTemplate mongoTemplate, DeviceRepository repository) {
+    public DeviceService(MongoTemplate mongoTemplate, DeviceRepository repository, DeviceMapper deviceMapper) {
         this.mongoTemplate = mongoTemplate;
         this.repository = repository;
+        this.deviceMapper = deviceMapper;
+    }
+
+    public DeviceDto create(CreateDeviceDto createDeviceDto) {
+        String deviceId = createDeviceDto.deviceId();
+
+        if (deviceId == null || deviceId.isBlank()) {
+            deviceId = generateDeviceId(createDeviceDto);
+        }
+
+        try {
+            Device device = repository.insert(deviceMapper.toDevice(createDeviceDto, deviceId));
+            return deviceMapper.toDeviceDto(device);
+        } catch (DuplicateKeyException e) {
+            throw new DeviceAlreadyExistsException(deviceId);
+        }
+    }
+
+    private String generateDeviceId(CreateDeviceDto dto) {
+        return dto.sensorType() + "-" + UUID.randomUUID();
+    }
+
+    public List<DeviceDto> getDevices(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return repository.findAll(pageable).stream().map(deviceMapper::toDeviceDto).toList();
+    }
+
+    public void delete(String id) {
+        repository.deleteById(id);
+    }
+
+    /**
+     * Updates the manually managed fields ({@code room}, {@code name}) of an existing device with a
+     * field-level {@code $set}, mirroring {@link #recordSeen}: {@code lastSeenAt} and {@code sensorType}
+     * stay under the pipeline's control and are never touched here, so a concurrent data message can't be
+     * clobbered. Only non-null fields are written, so a partial update leaves the rest intact.
+     *
+     * @param deviceId        device identifier from the request path
+     * @param updateDeviceDto the new {@code room}/{@code name} values
+     * @return the updated device
+     * @throws DeviceNotFoundException if no device with this id exists
+     */
+    public DeviceDto update(String deviceId, UpdateDeviceDto updateDeviceDto) {
+        if (updateDeviceDto.room() == null && updateDeviceDto.name() == null) {
+            Device existing = repository.findById(deviceId)
+                    .orElseThrow(() -> new DeviceNotFoundException(deviceId));
+            return deviceMapper.toDeviceDto(existing);
+        }
+
+        Query byId = Query.query(Criteria.where("_id").is(deviceId));
+
+        Update update = new Update();
+        if (updateDeviceDto.room() != null) {
+            update.set("room", updateDeviceDto.room());
+        }
+        if (updateDeviceDto.name() != null) {
+            update.set("name", updateDeviceDto.name());
+        }
+
+        FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true);
+        Device updated = mongoTemplate.findAndModify(byId, update, options, Device.class);
+        if (updated == null) {
+            throw new DeviceNotFoundException(deviceId);
+        }
+
+        return deviceMapper.toDeviceDto(updated);
     }
 
     /**

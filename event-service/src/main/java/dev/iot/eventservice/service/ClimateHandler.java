@@ -27,7 +27,7 @@ public class ClimateHandler implements SensorHandler {
     private final MqttPublisher mqttPublisher;
     private final HAConfigProperties haProperties;
     private final ObjectMapper objectMapper;
-    private final DeviceRegistry deviceRegistry;
+    private final DeviceService deviceService;
 
     private final Set<String> knownDeviceIds = ConcurrentHashMap.newKeySet();
 
@@ -36,13 +36,13 @@ public class ClimateHandler implements SensorHandler {
             MqttPublisher mqttPublisher,
             HAConfigProperties haProperties,
             ObjectMapper objectMapper,
-            DeviceRegistry deviceRegistry
+            DeviceService deviceService
     ) {
         this.sensorDataService = sensorDataService;
         this.mqttPublisher = mqttPublisher;
         this.haProperties = haProperties;
         this.objectMapper = objectMapper;
-        this.deviceRegistry = deviceRegistry;
+        this.deviceService = deviceService;
     }
 
     @Override
@@ -129,8 +129,8 @@ public class ClimateHandler implements SensorHandler {
     private void addDevice(ObjectNode payload, String deviceId) {
         ObjectNode device = payload.putObject("device");
         device.putArray("identifiers").add(deviceId);
-        device.put("name", deviceRegistry.nameFor(deviceId).orElse(deviceId));
-        deviceRegistry.roomFor(deviceId).ifPresent(room -> device.put("suggested_area", room));
+        device.put("name", deviceService.nameFor(deviceId).orElse(deviceId));
+        deviceService.roomFor(deviceId).ifPresent(room -> device.put("suggested_area", room));
     }
 
     private void validateJsonFormat(String jsonData) {

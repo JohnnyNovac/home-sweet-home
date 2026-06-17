@@ -20,7 +20,7 @@ per-module wrappers.
 ./gradlew build                            # compile + run all tests
 ./gradlew :event-service:bootRun           # run a single service
 ./gradlew :event-service:test              # tests for one module
-./gradlew :event-service:test --tests "*SensorDataServiceImplTest.methodName"
+./gradlew :event-service:test --tests "*SensorDataServiceTest.methodName"
 
 docker compose -f docker/docker-compose.yml up -d     # infrastructure (RabbitMQ, MongoDB, Home Assistant, Prometheus, Grafana) + services
 ```
@@ -104,7 +104,7 @@ online. `AvailabilityHandler` in event-service never republishes anything to HA 
 device registry and sets the `device_up` gauge (1 for `online`, 0 for `offline`, tagged by `deviceId`) for the
 availability monitoring described under **Observability**.
 
-**Device registry.** `DeviceRegistry` maintains the `devices` MongoDB collection (fields: `deviceId` as `_id`,
+**Device registry.** `DeviceService` maintains the `devices` MongoDB collection (fields: `deviceId` as `_id`,
 `sensorType`, `room`, `name`, `lastSeenAt`). `recordSeen(deviceId, sensorType)` is called on every data message (from
 `EventRunner`) and every availability message (from `AvailabilityHandler`, with `sensorType = null`). It is a single
 atomic field-level upsert (`findAndModify` with `$set`), not a read-modify-write: it always sets `lastSeenAt` and
@@ -118,9 +118,27 @@ is used as the display name (e.g. `NodeMCU-1`), otherwise discovery falls back t
 stays lowercase in topics while HA shows a friendly name. The lookup is a plain blocking query; its wait is bounded by
 the MongoDB driver timeouts set in the
 connection URI, and if Mongo is slow or unavailable it degrades to no `suggested_area` rather than failing discovery —
-the room is picked up on the next HA restart. Rooms are assigned manually via `mongosh` — see
-`NOTES.md`. A room change takes effect after HA restart (handlers re-publish discovery for every known device when
-`homeassistant/status` flips to `online`).
+the room is picked up on the next HA restart. `room`/`name` are assigned either via `mongosh` (see `NOTES.md`) or
+through the registry REST API below. A room change takes effect after HA restart (handlers re-publish discovery for
+every known device when `homeassistant/status` flips to `online`).
+
+`DeviceService` also backs a REST API (`DeviceController`, `/api/v1/devices`): `POST` creates a device with
+`repository.insert` (insert-only — a duplicate `_id` throws `DeviceAlreadyExistsException`, mapped to `409`, instead of
+overwriting an existing row), `GET` returns a paged list, `PUT /{id}` updates `room`/`name` with the same field-level
+`$set` as `recordSeen` (it never touches `lastSeenAt`/`sensorType`, so a manual edit and a concurrent data message can't
+clobber each other; a missing device throws `DeviceNotFoundException` → `404`), and `DELETE /{id}` removes one device.
+On `POST` the request body (`CreateDeviceDto`) is `@Valid`-checked — `sensorType` and `room` are `@NotBlank`, a missing
+one returns `400` as a `ValidationErrorResponse` (per-field list) — while `deviceId` is optional: if it is blank,
+`DeviceService` generates an opaque, stable id (`sensorType + "-" + UUID`, deliberately not derived from the mutable
+`room`) so a UI can add a device without supplying one. As a result the `devices` collection has two kinds of rows:
+auto-discovered ones (created by `recordSeen` under the firmware's `deviceId`, carrying `lastSeenAt`) and ones added
+through the API with a generated id — the latter stay catalog-only (no `lastSeenAt`) until real hardware publishes under
+that same id, since the live data binding is by the routing-key `deviceId`, not by the registry row.
+`SensorDataService` (no longer an interface — it is now a plain `@Service`) backs `SensorDataController`
+(`/api/v1/sensor-data`): `POST` stores a reading, `GET` returns the paged history, `DELETE` clears the whole collection.
+Both controllers report errors as `ErrorResponse` via `GlobalExceptionHandler` (`@RestControllerAdvice`). These HTTP
+paths are a separate entry point from the MQTT/AMQP flow — a reading inserted over `POST` is not mirrored to HA and does
+not update the registry the way `EventRunner` does.
 
 **Lamp control path.** The lamp decision lives in `presence-service`, not on the device, and depends on both presence
 and illuminance. The decision is a small stateful engine (`LampService`) fed by two independent listeners:
@@ -211,7 +229,10 @@ and service logs (`source=service`, via loki4j) share the `source` label, so the
 both with `{source=~"arduino|service"}`.
 
 **JSON parsing.** Uses Jackson 3 (`tools.jackson.*`, not `com.fasterxml.jackson.*`). Shared DTOs and the sensor-payload
-parser live in `shared/` (`JsonDtoParser`, `EventDTO`, `MeasurementDTO`).
+parser live in `shared/` (`JsonDtoParser`, the inbound `CreateEventDto`/`CreateMeasurementDto`, and the outbound
+`EventDto`/`MeasurementDto` returned by the REST read endpoints). The `Create*` records carry only what an incoming
+payload has; the read records add stored fields (`id`, `timestamp`, `unit`). Entity↔DTO conversion is done by the
+hand-written `@Component` mappers in `event-service` (`SensorDataMapper`, `MeasurementMapper`, `DeviceMapper`).
 
 **Configuration properties.** `@ConfigurationPropertiesScan` on each `*Application` class picks up
 `@ConfigurationProperties` classes (`HAConfigProperties`, `RabbitMQConfigProperties`, `MeasurementsProperties`,

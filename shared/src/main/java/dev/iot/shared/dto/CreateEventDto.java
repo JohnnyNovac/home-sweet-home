@@ -2,8 +2,8 @@ package dev.iot.shared.dto;
 
 import java.util.List;
 
-public record EventDTO(
+public record CreateEventDto(
         String sensorId,
-        List<MeasurementDTO> measurements
+        List<CreateMeasurementDto> measurements
 ) {
 }

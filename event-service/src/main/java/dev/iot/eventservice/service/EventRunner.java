@@ -14,7 +14,7 @@ import tools.jackson.core.JacksonException;
 /**
  * Entry point of the event-service data flow. Listens to the data queue, parses the routing key and
  * dispatches the message by {@code sensorType} to the right {@link SensorHandler} via
- * {@link SensorHandlerFactory}, updating {@link DeviceRegistry} along the way. Processing and storing
+ * {@link SensorHandlerFactory}, updating {@link DeviceService} along the way. Processing and storing
  * data do not depend on the state of Home Assistant; the subscription to {@code app.ha.status-topic} is
  * only there to re-publish discovery configs when HA comes online.
  */
@@ -26,18 +26,18 @@ public class EventRunner implements CommandLineRunner {
     private final MqttPublisher mqttPublisher;
     private final HAConfigProperties haProperties;
     private final SensorHandlerFactory sensorHandlerFactory;
-    private final DeviceRegistry deviceRegistry;
+    private final DeviceService deviceService;
 
     public EventRunner(
             MqttPublisher mqttPublisher,
             HAConfigProperties haProperties,
             SensorHandlerFactory sensorHandlerFactory,
-            DeviceRegistry deviceRegistry
+            DeviceService deviceService
     ) {
         this.mqttPublisher = mqttPublisher;
         this.haProperties = haProperties;
         this.sensorHandlerFactory = sensorHandlerFactory;
-        this.deviceRegistry = deviceRegistry;
+        this.deviceService = deviceService;
     }
 
     @Override
@@ -63,7 +63,7 @@ public class EventRunner implements CommandLineRunner {
         }
 
         try {
-            deviceRegistry.recordSeen(deviceId, sensorType);
+            deviceService.recordSeen(deviceId, sensorType);
         } catch (RuntimeException e) {
             logger.error("Failed to upsert device {}", deviceId, e);
         }

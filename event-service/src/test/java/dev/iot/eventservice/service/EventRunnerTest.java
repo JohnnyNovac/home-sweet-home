@@ -37,7 +37,7 @@ class EventRunnerTest {
     private SensorHandlerFactory sensorHandlerFactory;
 
     @Mock
-    private DeviceRegistry deviceRegistry;
+    private DeviceService deviceService;
 
     @InjectMocks
     private EventRunner eventRunner;
@@ -107,7 +107,7 @@ class EventRunnerTest {
         assertThatCode(() -> eventRunner.handleEventMessage("{}", "home.climate"))
                 .doesNotThrowAnyException();
 
-        verifyNoInteractions(sensorHandlerFactory, deviceRegistry);
+        verifyNoInteractions(sensorHandlerFactory, deviceService);
     }
 
     @Test
@@ -118,7 +118,7 @@ class EventRunnerTest {
         assertThatCode(() -> eventRunner.handleEventMessage("{}", "home.unknown.esp01.data"))
                 .doesNotThrowAnyException();
 
-        verifyNoInteractions(deviceRegistry);
+        verifyNoInteractions(deviceService);
     }
 
     @Test
@@ -127,7 +127,7 @@ class EventRunnerTest {
         SensorHandler handler = mock(SensorHandler.class);
         when(sensorHandlerFactory.getHandler("climate")).thenReturn(handler);
         doThrow(new RuntimeException("mongo down"))
-                .when(deviceRegistry).recordSeen("esp01", "climate");
+                .when(deviceService).recordSeen("esp01", "climate");
 
         eventRunner.handleEventMessage("{}", "home.climate.esp01.data");
 

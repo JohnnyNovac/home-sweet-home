@@ -1,7 +1,8 @@
 package dev.iot.eventservice.mapper;
 
 import dev.iot.eventservice.model.Measurement;
-import dev.iot.shared.dto.MeasurementDTO;
+import dev.iot.shared.dto.CreateMeasurementDto;
+import dev.iot.shared.dto.MeasurementDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,9 +23,9 @@ class MeasurementMapperTest {
     void shouldMapMeasurementDtoToMeasurement() {
         String temperatureType = "temperature";
         double temperatureValue = 22.5;
-        MeasurementDTO dto = new MeasurementDTO(temperatureType, temperatureValue);
+        CreateMeasurementDto dto = new CreateMeasurementDto(temperatureType, temperatureValue);
 
-        Measurement result = measurementMapper.toEntity(dto);
+        Measurement result = measurementMapper.toMeasurement(dto);
 
         assertThat(result.getType()).isEqualTo(temperatureType);
         assertThat(result.getValue()).isEqualTo(temperatureValue);
@@ -35,9 +36,9 @@ class MeasurementMapperTest {
     @DisplayName("Should handle boolean values")
     void shouldHandleBooleanValues() {
         String radarPresenceType = "radarPresence";
-        MeasurementDTO dto = new MeasurementDTO(radarPresenceType, true);
+        CreateMeasurementDto dto = new CreateMeasurementDto(radarPresenceType, true);
 
-        Measurement result = measurementMapper.toEntity(dto);
+        Measurement result = measurementMapper.toMeasurement(dto);
 
         assertThat(result.getType()).isEqualTo(radarPresenceType);
         assertThat(result.getValue()).isEqualTo(true);
@@ -49,9 +50,9 @@ class MeasurementMapperTest {
     void shouldHandleHumidity() {
         String humidityType = "humidity";
         double humidityValue = 65;
-        MeasurementDTO dto = new MeasurementDTO(humidityType, humidityValue);
+        CreateMeasurementDto dto = new CreateMeasurementDto(humidityType, humidityValue);
 
-        Measurement result = measurementMapper.toEntity(dto);
+        Measurement result = measurementMapper.toMeasurement(dto);
 
         assertThat(result.getType()).isEqualTo(humidityType);
         assertThat(result.getValue()).isEqualTo(humidityValue);
@@ -64,12 +65,24 @@ class MeasurementMapperTest {
         String unknownType = "unknown";
         String unknownValue = "value";
         String unknownUnit = "unknown";
-        MeasurementDTO dto = new MeasurementDTO(unknownType, unknownValue);
+        CreateMeasurementDto dto = new CreateMeasurementDto(unknownType, unknownValue);
 
-        Measurement result = measurementMapper.toEntity(dto);
+        Measurement result = measurementMapper.toMeasurement(dto);
 
         assertThat(result.getType()).isEqualTo(unknownType);
         assertThat(result.getValue()).isEqualTo(unknownValue);
         assertThat(result.getUnit()).isEqualTo(unknownUnit);
+    }
+
+    @Test
+    @DisplayName("Should map Measurement back to MeasurementDto")
+    void shouldMapMeasurementToMeasurementDto() {
+        Measurement measurement = new Measurement("temperature", 22.5, "°C");
+
+        MeasurementDto result = measurementMapper.toMeasurementDto(measurement);
+
+        assertThat(result.type()).isEqualTo("temperature");
+        assertThat(result.value()).isEqualTo(22.5);
+        assertThat(result.unit()).isEqualTo("°C");
     }
 }

@@ -21,7 +21,7 @@ class AvailabilityHandlerTest {
     private static final String ROUTING_KEY = "home.availability." + DEVICE_ID;
 
     @Mock
-    private DeviceRegistry deviceRegistry;
+    private DeviceService deviceService;
 
     private MeterRegistry meterRegistry;
     private AvailabilityHandler handler;
@@ -29,7 +29,7 @@ class AvailabilityHandlerTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        handler = new AvailabilityHandler(deviceRegistry, meterRegistry);
+        handler = new AvailabilityHandler(deviceService, meterRegistry);
     }
 
     @Test
@@ -38,7 +38,7 @@ class AvailabilityHandlerTest {
         handler.handle("online", ROUTING_KEY);
 
         assertThat(deviceUp()).isEqualTo(1.0);
-        verify(deviceRegistry).recordSeen(DEVICE_ID, null);
+        verify(deviceService).recordSeen(DEVICE_ID, null);
     }
 
     @Test

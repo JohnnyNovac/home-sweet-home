@@ -37,7 +37,7 @@ class ClimateHandlerTest {
     private HAConfigProperties haProperties;
 
     @Mock
-    private DeviceRegistry deviceRegistry;
+    private DeviceService deviceService;
 
     private ClimateHandler handler;
 
@@ -45,7 +45,7 @@ class ClimateHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new ClimateHandler(sensorDataService, mqttPublisher, haProperties, objectMapper, deviceRegistry);
+        handler = new ClimateHandler(sensorDataService, mqttPublisher, haProperties, objectMapper, deviceService);
     }
 
     @Test
@@ -61,7 +61,7 @@ class ClimateHandlerTest {
                 """;
 
         when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -96,7 +96,7 @@ class ClimateHandlerTest {
                 """;
 
         when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.of("bedroom"));
+        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.of("bedroom"));
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -124,7 +124,7 @@ class ClimateHandlerTest {
                 """;
 
         when(haProperties.getDiscoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -171,7 +171,7 @@ class ClimateHandlerTest {
                 }
                 """;
 
-        when(deviceRegistry.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenThrow(new RuntimeException("mongo down"));
 

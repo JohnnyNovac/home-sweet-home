@@ -1,6 +1,6 @@
 package dev.iot.shared.dto;
 
-public record MeasurementDTO(
+public record CreateMeasurementDto(
         String type,
         Object value
 ) {

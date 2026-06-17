@@ -12,21 +12,27 @@
 ### `event-service`
 
 - **Маппинг**: `SensorDataMapperTest`, `MeasurementMapperTest`.
-- **Сервисный слой** (unit): `SensorDataServiceImplTest`, `EventRunnerTest`, `SensorHandlerFactoryTest`,
-  `Esp01SensorHandlerTest`, `PresenceSensorHandlerTest`, `MqttPublisherTest`.
-- **Интеграция**: `SensorDataServiceIntegrationTest` — с реальной MongoDB через Testcontainers.
+- **Сервисный слой** (unit): `SensorDataServiceTest`, `DeviceServiceTest`, `EventRunnerTest`,
+  `SensorHandlerFactoryTest`, `ClimateHandlerTest`, `PresenceHandlerTest`, `AvailabilityHandlerTest`,
+  `MqttPublisherTest`.
+- **Веб-слой** (`@WebMvcTest`): `DeviceControllerTest`, `SensorDataControllerTest` — REST-контракт реестра устройств и
+  показаний сенсоров (коды ответов, обработка ошибок через `GlobalExceptionHandler`).
+- **Интеграция**: `SensorDataServiceIntegrationTest`, `DeviceServiceIntegrationTest` — с реальной MongoDB через
+  Testcontainers.
 - **Контекст**: `EventServiceApplicationTest` — проверка загрузки Spring-контекста.
 
 ### `presence-service`
 
 - `PresenceHandlerTest` — парсинг сообщений PresenceBox и триггер gRPC-вызова к `yandex-service`.
+- `LampServiceTest` — логика включения/выключения лампы по присутствию и освещённости.
+- `IlluminanceListenerTest` — обработка измерения `illuminance` из `climate`-данных.
+- `LampControllerTest` (`@WebMvcTest`) — REST-эндпоинт `/api/v1/lamp` (состояние, порог, принудительное переключение).
 - `PresenceServiceApplicationTest` — проверка загрузки Spring-контекста.
 
 ### `yandex-service`
 
 - `GrpcServerServiceTest` — gRPC-сервер и маппинг запроса в `DeviceGroupActionRequest`.
 - `YandexRestClientTest` — HTTP-клиент к Yandex Smart Home API.
-- `YandexServiceApplicationTests` — проверка загрузки Spring-контекста.
 
 ## Стек
 
@@ -54,5 +60,5 @@
 ```bash
 ./gradlew test                                                        # все тесты
 ./gradlew :event-service:test                                         # тесты одного модуля
-./gradlew :event-service:test --tests "*SensorDataServiceImplTest"    # один тестовый класс
+./gradlew :event-service:test --tests "*SensorDataServiceTest"    # один тестовый класс
 ```
