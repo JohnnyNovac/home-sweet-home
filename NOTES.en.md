@@ -56,6 +56,13 @@ event-service
 is subscribed to `homeassistant/status` and re-publishes discovery with the updated `suggested_area` and name when HA
 transitions to `online`.
 
+## API gateway
+
+`api-gateway` is the single entry point on port 8080. It routes requests by path prefix to the owning service:
+`/api/v1/devices/**` and `/api/v1/sensor-data/**` go to event-service, `/api/v1/lamp/**` to presence-service. In
+docker-compose only its port is published; the other services are reachable only inside the network. For local runs
+(`bootRun`, the `local` profile) the routes point at `localhost`.
+
 ## Monitoring
 
 Prometheus collects metrics, Loki stores logs, and Grafana displays everything — all come up with the same
@@ -67,8 +74,8 @@ docker-compose.
 | Prometheus | http://localhost:9091 | metrics storage, Alerts tab                   |
 
 Each service exposes metrics through Spring Boot Actuator at `/actuator/prometheus` (event-service on port 8081,
-presence-service on 8082, yandex-service on 8083). RabbitMQ exposes metrics via the `rabbitmq_prometheus` plugin on port
-15692 (the `/metrics/per-object` path — broken down per queue).
+presence-service on 8082, yandex-service on 8083, api-gateway on 8080). RabbitMQ exposes metrics via the
+`rabbitmq_prometheus` plugin on port 15692 (the `/metrics/per-object` path — broken down per queue).
 
 Grafana's data source and dashboards are defined by the files in `docker/grafana/provisioning`; the dashboards
 themselves live in `docker/grafana/dashboards`: the overview `home-sweet-home` plus the community JVM (Micrometer) and

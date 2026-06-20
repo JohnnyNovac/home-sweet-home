@@ -137,6 +137,28 @@ services:
     networks:
       - homesweethome_net
 
+  # Single entry point: routes /api/v1/** to the service that owns each path.
+  # The only service whose port is published; the rest stay internal to the network.
+  api-gateway:
+    container_name: api-gateway
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        JAR_FILE: api-gateway/build/libs/api-gateway-0.0.1-SNAPSHOT.jar
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      event-service:
+        condition: service_started
+      presence-service:
+        condition: service_started
+    networks:
+      - homesweethome_net
+
   prometheus:
     image: prom/prometheus:v2.53.0
     container_name: prometheus
@@ -153,6 +175,7 @@ services:
       - event-service
       - presence-service
       - yandex-service
+      - api-gateway
     networks:
       - homesweethome_net
 

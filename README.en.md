@@ -42,6 +42,10 @@ flowchart LR
     PS -->|gRPC| YS
     YS -->|HTTPS| YAPI
     YAPI --> LIGHTNING
+
+    CLIENT([API clients]) -->|HTTP :8080| GW[api-gateway]
+    GW -->|REST| ES
+    GW -->|REST| PS
 ```
 
 Data flow:
@@ -65,6 +69,7 @@ Data flow:
 - Spring Data MongoDB (event-service)
 - Spring AMQP (RabbitMQ) — inter-service bus
 - Spring gRPC — synchronous calls between presence-service and yandex-service
+- Spring Cloud Gateway (WebMVC) — API gateway, single entry point
 - Eclipse Paho — MQTT client
 - Spring Boot Actuator + Micrometer — metrics (exported to Prometheus)
 
@@ -94,6 +99,7 @@ Data flow:
 | `event-service`    | Receives MQTT events, persists to MongoDB, forwards to Home Assistant |
 | `presence-service` | Presence-based automation logic, gRPC client to yandex-service        |
 | `yandex-service`   | gRPC server, proxy to the Yandex Smart Home API                       |
+| `api-gateway`      | Single entry point: routes REST requests to the services              |
 | `grpc-api`         | Shared protobuf contracts                                             |
 | `shared`           | Shared DTOs and parsers                                               |
 | `arduino/`         | Firmware for `MultiBox`, `ESP-01` (WiFi bridge) and `PresenceBox`     |
@@ -127,5 +133,8 @@ same Grafana. More detail (ports, dashboards, alert rules) — see [NOTES.en.md]
 ## Roadmap
 
 - **notification-service** — event notifications (Telegram bot: temperature alerts, presence alerts, service health).
-- **REST API** — control and data access: sensor history, manual light switching, current room state.
+- **Web UI** — a separate UI client over the services' REST endpoints. The API gateway (Spring Cloud Gateway) is
+  already up as the single entry point on port 8080: it routes `/api/v1/**` to the services — sensor history and
+  recording (`/api/v1/sensor-data`) and the device registry (`/api/v1/devices`) in event-service, light control
+  (`/api/v1/lamp`) in presence-service.
 - **voice-service** — custom voice control, without Yandex Alice.

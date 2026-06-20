@@ -42,6 +42,10 @@ flowchart LR
     PS -->|gRPC| YS
     YS -->|HTTPS| YAPI
     YAPI --> LIGHTNING
+
+    CLIENT([Клиенты API]) -->|HTTP :8080| GW[api-gateway]
+    GW -->|REST| ES
+    GW -->|REST| PS
 ```
 
 Поток данных:
@@ -64,6 +68,7 @@ flowchart LR
 - Spring Data MongoDB (event-service)
 - Spring AMQP (RabbitMQ) — межсервисная шина
 - Spring gRPC — синхронные вызовы между presence-service и yandex-service
+- Spring Cloud Gateway (WebMVC) — API-шлюз, единая точка входа
 - Eclipse Paho — MQTT-клиент
 - Spring Boot Actuator + Micrometer — метрики (экспорт в Prometheus)
 
@@ -93,6 +98,7 @@ flowchart LR
 | `event-service`    | Приём MQTT-событий, сохранение в MongoDB, ретрансляция в Home Assistant |
 | `presence-service` | Логика автоматизации по присутствию, gRPC-клиент к yandex-service       |
 | `yandex-service`   | gRPC-сервер, прокси к Yandex Smart Home API                             |
+| `api-gateway`      | Единая точка входа: маршрутизирует REST-запросы к сервисам              |
 | `grpc-api`         | Общие protobuf-контракты                                                |
 | `shared`           | Общие DTO и парсеры                                                     |
 | `arduino/`         | Прошивки для `MultiBox`, `ESP-01` (WiFi-мост) и `PresenceBox`           |
@@ -127,7 +133,8 @@ docker compose -f docker/docker-compose.yml up -d
 
 - **notification-service** — нотификации о событиях (Telegram-бот: алерты по температуре, тревоги по присутствию, статус
   сервисов).
-- **API-шлюз и веб-интерфейс** — единая точка входа (Spring Cloud Gateway) и отдельный UI-клиент поверх REST-эндпоинтов
-  сервисов. Сами эндпоинты уже доступны напрямую: история и запись показаний (`/api/v1/sensor-data`), реестр устройств
-  (`/api/v1/devices`) в event-service, управление светом (`/api/v1/lamp`) в presence-service.
+- **Веб-интерфейс** — отдельный UI-клиент поверх REST-эндпоинтов сервисов. API-шлюз (Spring Cloud Gateway) уже поднят
+  как единая точка входа на порту 8080: маршрутизирует `/api/v1/**` к сервисам — история и запись показаний
+  (`/api/v1/sensor-data`) и реестр устройств (`/api/v1/devices`) в event-service, управление светом (`/api/v1/lamp`)
+  в presence-service.
 - **voice-service** — собственное голосовое управление, без интеграции с Алисой.

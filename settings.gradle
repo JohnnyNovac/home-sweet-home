@@ -5,3 +5,5 @@ include 'grpc-api'
 include 'event-service'
 include 'presence-service'
 include 'yandex-service'
+
+include 'api-gateway'

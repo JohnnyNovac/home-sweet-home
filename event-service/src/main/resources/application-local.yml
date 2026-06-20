@@ -1,7 +1,0 @@
-spring:
-  rabbitmq:
-    host: 192.168.1.77
-    username: johnnyluger
-    password: johnnyluger
-  mongodb:
-    uri: mongodb://johnnymongo:johnnymongo@localhost:27017/events?authSource=admin

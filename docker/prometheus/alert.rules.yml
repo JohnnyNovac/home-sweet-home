@@ -2,7 +2,7 @@ groups:
   - name: home-sweet-home
     rules:
       - alert: ServiceDown
-        expr: up{job=~"event-service|presence-service|yandex-service"} == 0
+        expr: up{job=~"event-service|presence-service|yandex-service|api-gateway"} == 0
         for: 1m
         labels:
           severity: critical

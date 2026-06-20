@@ -53,6 +53,13 @@ docker exec -it mongodb mongosh -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_
 Assistant: event-service подписан на `homeassistant/status` и при переходе в `online` повторно публикует discovery
 с актуальными `suggested_area` и именем.
 
+## API-шлюз
+
+`api-gateway` — единая точка входа на порту 8080. Маршрутизирует запросы по префиксу пути к нужному сервису:
+`/api/v1/devices/**` и `/api/v1/sensor-data/**` — в event-service, `/api/v1/lamp/**` — в presence-service. В
+docker-compose наружу опубликован только его порт, остальные сервисы доступны лишь внутри сети. При локальном запуске
+(`bootRun`, профиль `local`) маршруты ведут на `localhost`.
+
 ## Мониторинг
 
 Метрики собирает Prometheus, логи устройств — Loki, отображает всё Grafana — поднимаются тем же docker-compose.
@@ -63,8 +70,8 @@ Assistant: event-service подписан на `homeassistant/status` и при 
 | Prometheus | http://localhost:9091 | хранилище метрик, вкладка Alerts     |
 
 Каждый сервис отдаёт метрики через Spring Boot Actuator по пути `/actuator/prometheus` (event-service — порт 8081,
-presence-service — 8082, yandex-service — 8083). RabbitMQ отдаёт метрики плагином `rabbitmq_prometheus` на порту 15692
-(путь `/metrics/per-object` — с разбивкой по очередям).
+presence-service — 8082, yandex-service — 8083, api-gateway — 8080). RabbitMQ отдаёт метрики плагином
+`rabbitmq_prometheus` на порту 15692 (путь `/metrics/per-object` — с разбивкой по очередям).
 
 Источник данных и дашборды Grafana задаются файлами в `docker/grafana/provisioning`, сами дашборды — в
 `docker/grafana/dashboards`: обзорный `home-sweet-home`, а также community-дашборды JVM (Micrometer) и RabbitMQ. Чтобы

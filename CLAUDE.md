@@ -12,9 +12,9 @@ automation decisions and calls `yandex-service` over gRPC, which in turn calls t
 ## Build / run
 
 Multi-module Gradle build (Java 21, Spring Boot 4.0, Gradle wrapper). Modules are listed in `settings.gradle`: `shared`,
-`grpc-api`, `event-service`, `presence-service`, `yandex-service`. It was recently converted from a composite build to a
-multi-module build (commit 6719c60) — treat `./gradlew` from the repo root as the single entry point; do not look for
-per-module wrappers.
+`grpc-api`, `event-service`, `presence-service`, `yandex-service`, `api-gateway`. It was recently converted from a
+composite build to a multi-module build (commit 6719c60) — treat `./gradlew` from the repo root as the single entry
+point; do not look for per-module wrappers.
 
 ```bash
 ./gradlew build                            # compile + run all tests
@@ -174,16 +174,29 @@ yandex-service thread; the gRPC deadline frees the presence-service listener eve
 both are needed. A timed-out lamp command is logged and the message is acked (not requeued), since a stale real-time
 toggle is not worth retrying.
 
+**API gateway.** `api-gateway` is the single HTTP entry point — a Spring Cloud Gateway Server WebMVC (the servlet
+variant, not the reactive WebFlux one) used as a pure router: no controllers, no response aggregation. Routes are
+declared in `application.yml` under `spring.cloud.gateway.server.webmvc.routes` (note the `server.webmvc` segment — the
+bare `spring.cloud.gateway.routes` prefix is the old reactive one and is silently ignored here) and match by path
+prefix, forwarding to the owning service by its in-network name without rewriting the path: `/api/v1/devices/**` and
+`/api/v1/sensor-data/**` → `event-service:8081`, `/api/v1/lamp/**` → `presence-service:8082`. It is the only service
+whose port is published in `docker-compose.yml` (`8080`); the domain services have no `ports:` and stay internal to
+`homesweethome_net`, reachable only through the gateway. The Spring Cloud version is pinned via the
+`spring-cloud-dependencies` BOM (train 2025.1.x / Oakwood, which targets Boot 4.0) in `api-gateway/build.gradle`, not
+hardcoded per artifact. `application-local.yml` points the same routes at `localhost:8081`/`localhost:8082` for
+`bootRun`. Auth is not enforced here yet — this is the planned place for it before the API is exposed publicly.
+
 **Observability.** Each service exposes Spring Boot Actuator with a Micrometer/Prometheus registry at
 `/actuator/prometheus` (event-service 8081, presence-service 8082, yandex-service 8083 — the HTTP port, separate from
-yandex-service's gRPC server on 9090). RabbitMQ exposes the `rabbitmq_prometheus` plugin on 15692; the scrape uses
+yandex-service's gRPC server on 9090 — and api-gateway 8080). RabbitMQ exposes the `rabbitmq_prometheus` plugin on
+15692; the scrape uses
 `/metrics/per-object` so per-queue series (`rabbitmq_queue_messages{queue=...}`) are available — the key signals are
 per-queue (a non-empty `*.dlq`, a per-queue backlog), which the aggregated default `/metrics` hides. Device
 availability is exposed by event-service as a custom `device_up` gauge (1/0, tagged by `deviceId`), set by
 `AvailabilityHandler` from each device's `online`/`offline` availability message — it tracks the same signal HA reads
 and resets to no series for a device until the next message after an event-service restart. Prometheus
-(`docker/prometheus/`) scrapes all four targets and evaluates `alert.rules.yml` (service down, non-empty DLQ, work-queue
-backlog). Grafana (`docker/grafana/`) is provisioned from files: two
+(`docker/prometheus/`) scrapes all five targets and evaluates `alert.rules.yml` (service down — including api-gateway,
+non-empty DLQ, work-queue backlog). Grafana (`docker/grafana/`) is provisioned from files: two
 datasources (uid `prometheus` for metrics and
 uid `loki` for logs) and a dashboards folder with the project overview (service and Arduino-module availability, queues,
 JVM, CPU) plus the community JVM and RabbitMQ dashboards. yandex-service keeps
