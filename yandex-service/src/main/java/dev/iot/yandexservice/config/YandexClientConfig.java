@@ -11,12 +11,12 @@ import org.springframework.web.client.RestClient;
 public class YandexClientConfig {
 
     @Bean
-    public RestClient client(YandexProperties props) {
+    public RestClient client(YandexProperties props, RestClient.Builder builder) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) props.getConnectTimeout().toMillis());
         requestFactory.setReadTimeout((int) props.getReadTimeout().toMillis());
 
-        return RestClient.builder()
+        return builder
                 .baseUrl(props.getBaseUrl())
                 .requestFactory(requestFactory)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + props.getOauthToken())

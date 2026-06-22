@@ -199,7 +199,16 @@ and resets to no series for a device until the next message after an event-servi
 non-empty DLQ, work-queue backlog). Grafana (`docker/grafana/`) is provisioned from files: two
 datasources (uid `prometheus` for metrics and
 uid `loki` for logs) and a dashboards folder with the project overview (service and Arduino-module availability, queues,
-JVM, CPU) plus the community JVM and RabbitMQ dashboards. yandex-service keeps
+JVM, CPU, inbound/outbound HTTP, and MongoDB driver health) plus the community JVM and RabbitMQ dashboards. The HTTP
+panels read the Micrometer-standard `http_server_requests_*` (inbound, auto-instrumented on every controller) and
+`http_client_requests_*` (outbound to Yandex); the latter only exists because `YandexClientConfig` builds its
+`RestClient` from the auto-configured `RestClient.Builder` bean — a plain `RestClient.builder()` would skip the
+`ObservationRestClientCustomizer` and emit no client metric. That bean is not free with `spring-boot-starter-web`: in
+Boot 4.0 the web starter is server-only (it pulls `spring-boot-webmvc`, not the HTTP-client autoconfig), so
+yandex-service must depend on `spring-boot-restclient` explicitly for `RestClientAutoConfiguration` to register the
+builder. The MongoDB panels read `mongodb_driver_commands_*`
+(command latency/errors) and `mongodb_driver_pool_*` (connection-pool saturation), both auto-instrumented by Spring Boot
+on event-service and presence-service. yandex-service keeps
 `spring-boot-starter-web` only for the outbound `RestClient` and this scrape endpoint — its embedded Tomcat hosts no
 controllers (inbound is gRPC).
 
