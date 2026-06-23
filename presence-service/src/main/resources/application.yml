@@ -22,7 +22,7 @@ app:
     presence-data-queue: presence-data
     illuminance-data-queue: presence-illuminance
   grpc:
-    lamp-deadline: 8s
+    lamp-deadline: 12s
   lamp:
     illuminance-threshold: 50
   measurements:

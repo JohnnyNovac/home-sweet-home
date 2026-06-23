@@ -168,10 +168,12 @@ The engine calls `yandex-service` via the gRPC stub declared in `grpc-api/src/ma
 `spring.grpc.client.channels.yandex-service.address`. `yandex-service` (`GrpcServerService`) translates the call into a
 Yandex Smart Home "group action" HTTP request via `YandexRestClient`. The whole chain is time-bounded so a slow or
 hung Yandex cloud cannot block a listener thread indefinitely: `LampService` applies a gRPC deadline
-(`app.grpc.lamp-deadline`, default 8s) per call, and the `RestClient` in `YandexClientConfig` is built
+(`app.grpc.lamp-deadline`, default 12s) per call, and the `RestClient` in `YandexClientConfig` is built
 with connect/read timeouts (`yandex.connect-timeout` 3s / `yandex.read-timeout` 5s). The HTTP timeout frees the
 yandex-service thread; the gRPC deadline frees the presence-service listener even if yandex-service itself is wedged —
-both are needed. A timed-out lamp command is logged and the message is acked (not requeued), since a stale real-time
+both are needed. The gRPC deadline is deliberately larger than the worst-case HTTP duration (`connect` 3s + `read` 5s =
+8s) so that on a slow Yandex cloud the HTTP layer times out first and yandex-service returns a meaningful error, rather
+than presence-service hitting a blind `DEADLINE_EXCEEDED`. A timed-out lamp command is logged and the message is acked (not requeued), since a stale real-time
 toggle is not worth retrying.
 
 **API gateway.** `api-gateway` is the single HTTP entry point — a Spring Cloud Gateway Server WebMVC (the servlet

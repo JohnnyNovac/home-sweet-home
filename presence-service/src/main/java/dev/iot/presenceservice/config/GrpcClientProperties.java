@@ -11,7 +11,7 @@ public class GrpcClientProperties {
      * Deadline for the response to a lamp-command call to yandex-service. If no response arrives within
      * this time, the gRPC call fails and the queue listener thread is released.
      */
-    private Duration lampDeadline = Duration.ofSeconds(8);
+    private Duration lampDeadline = Duration.ofSeconds(12);
 
     public Duration getLampDeadline() {
         return lampDeadline;
