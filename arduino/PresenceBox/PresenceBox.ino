@@ -150,10 +150,12 @@ void setup() {
     yield();  // Resetting the watchdog
   }
 
-  // Both sensors are read by interrupt; CHANGE so the ISR tracks the current level,
-  // not just the rising edge — presence is the held output of each sensor
+  // Radar is read by level (CHANGE) — it is the presence authority and its output is held.
+  // The PIR is edge-triggered (RISING): each new motion sets a one-shot flag that loop() clears
+  // once the radar confirms presence, so a lingering PIR level can't keep presence alive after
+  // the radar drops.
   attachInterrupt(digitalPinToInterrupt(RADAR_PIN), detectRadarSignalChange, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(PIR_SENSOR_PIN), detectPirSensorPresence, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIR_SENSOR_PIN), detectPirSensorPresence, RISING);
 
   // Publish the initial presence so the service has a value right after boot
   radarPresence = digitalRead(RADAR_PIN) == HIGH;
@@ -183,6 +185,9 @@ void loop() {
 
   // Snapshot the volatile flags once so radar and pir stay consistent within this iteration
   bool radar = radarPresence;
+  if (radar) {
+    pirSensorPresence = false;
+  }
   bool pir = pirSensorPresence;
   bool presence = radar || pir;
 
@@ -285,7 +290,7 @@ IRAM_ATTR void detectRadarSignalChange() {
 }
 
 IRAM_ATTR void detectPirSensorPresence() {
-  pirSensorPresence = digitalRead(PIR_SENSOR_PIN) == HIGH;
+  pirSensorPresence = true;
 }
 
 void sendData(bool radarPresence, bool pirSensorPresence) {
