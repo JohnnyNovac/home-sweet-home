@@ -148,6 +148,9 @@ services:
         JAR_FILE: api-gateway/build/libs/api-gateway-0.0.1-SNAPSHOT.jar
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     ports:
       - "8080:8080"
     restart: unless-stopped

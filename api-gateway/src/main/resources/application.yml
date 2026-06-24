@@ -1,6 +1,11 @@
 spring:
   application:
     name: api-gateway
+  mongodb:
+    uri: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/auth?authSource=admin&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000&socketTimeoutMS=5000
+  data:
+    mongodb:
+      auto-index-creation: true
   cloud:
     gateway:
       server:
@@ -21,6 +26,14 @@ spring:
 
 server:
   port: 8080
+
+app:
+  security:
+    jwt-secret: ${JWT_SECRET}
+  init:
+    admin:
+      username: ${ADMIN_USERNAME}
+      password: ${ADMIN_PASSWORD}
 
 management:
   endpoints:
