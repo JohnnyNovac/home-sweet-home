@@ -151,6 +151,8 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
     ports:
       - "8080:8080"
     restart: unless-stopped
@@ -158,6 +160,8 @@ services:
       event-service:
         condition: service_started
       presence-service:
+        condition: service_started
+      mongodb:
         condition: service_started
     networks:
       - homesweethome_net

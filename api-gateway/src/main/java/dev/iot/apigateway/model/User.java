@@ -28,6 +28,12 @@ public class User {
         this.enabled = enabled;
     }
 
+    public User(String username, Set<Role> roles, boolean enabled) {
+        this.username = username;
+        this.roles = roles;
+        this.enabled = enabled;
+    }
+
     public String getId() {
         return id;
     }
