@@ -68,8 +68,16 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - EVENT_MONGO_USER=${EVENT_MONGO_USER}
+      - EVENT_MONGO_PASS=${EVENT_MONGO_PASS}
+      - PRESENCE_MONGO_USER=${PRESENCE_MONGO_USER}
+      - PRESENCE_MONGO_PASS=${PRESENCE_MONGO_PASS}
+      - GATEWAY_MONGO_USER=${GATEWAY_MONGO_USER}
+      - GATEWAY_MONGO_PASS=${GATEWAY_MONGO_PASS}
     volumes:
       - mongodb_data:/data/db
+      - ./mongodb/init/00-create-app-users.sh:/docker-entrypoint-initdb.d/00-create-app-users.sh:ro
+      - ./mongodb/init/create-app-users.js:/scripts/create-app-users.js:ro
     restart: unless-stopped
     networks:
       - homesweethome_net
@@ -84,8 +92,8 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - EVENT_MONGO_USER=${EVENT_MONGO_USER}
+      - EVENT_MONGO_PASS=${EVENT_MONGO_PASS}
       - SPRING_PROFILES_ACTIVE=docker
     restart: unless-stopped
     depends_on:
@@ -108,8 +116,8 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - PRESENCE_MONGO_USER=${PRESENCE_MONGO_USER}
+      - PRESENCE_MONGO_PASS=${PRESENCE_MONGO_PASS}
       - SPRING_PROFILES_ACTIVE=docker
     restart: unless-stopped
     depends_on:
@@ -151,8 +159,8 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - GATEWAY_MONGO_USER=${GATEWAY_MONGO_USER}
+      - GATEWAY_MONGO_PASS=${GATEWAY_MONGO_PASS}
     ports:
       - "8080:8080"
     restart: unless-stopped

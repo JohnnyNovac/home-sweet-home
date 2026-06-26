@@ -7,7 +7,7 @@ spring:
     username: ${RABBITMQ_DEFAULT_USER}
     password: ${RABBITMQ_DEFAULT_PASS}
   mongodb:
-    uri: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/presence?authSource=admin&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000&socketTimeoutMS=5000
+    uri: mongodb://${PRESENCE_MONGO_USER}:${PRESENCE_MONGO_PASS}@mongodb:27017/presence?serverSelectionTimeoutMS=3000&connectTimeoutMS=3000&socketTimeoutMS=5000
   grpc:
     client:
       channels:

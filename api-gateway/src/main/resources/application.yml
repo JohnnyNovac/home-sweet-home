@@ -2,7 +2,7 @@ spring:
   application:
     name: api-gateway
   mongodb:
-    uri: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/auth?authSource=admin&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000&socketTimeoutMS=5000
+    uri: mongodb://${GATEWAY_MONGO_USER}:${GATEWAY_MONGO_PASS}@mongodb:27017/auth?serverSelectionTimeoutMS=3000&connectTimeoutMS=3000&socketTimeoutMS=5000
   data:
     mongodb:
       auto-index-creation: true

@@ -32,6 +32,17 @@ Local dev uses the `local` Spring profile (`application-local.yml` in each servi
 reads RabbitMQ / Mongo / Yandex / Grafana credentials from env vars (`RABBITMQ_DEFAULT_USER/PASS`,
 `MONGO_INITDB_ROOT_USERNAME/PASSWORD`, `YANDEX_OAUTH_TOKEN`, `YANDEX_CHANDELIER_ID`, `GRAFANA_ADMIN_USER/PASSWORD`).
 
+**MongoDB users.** Each service has its own database and a `readWrite`-only user scoped to it (event-service → `events`,
+presence-service → `presence`, api-gateway → `auth`), so connection URIs no longer carry `authSource=admin` — the user
+lives in the database it connects to, which is also its default auth source. The root account
+(`MONGO_INITDB_ROOT_*`) stays only on the `mongodb` container. The per-service users are created on first init by
+`docker/mongodb/init/00-create-app-users.sh`, which injects the `*_MONGO_USER`/`*_MONGO_PASS` env vars as globals and
+`load()`s `create-app-users.js` (the `.js` is mounted under `/scripts`, not `/docker-entrypoint-initdb.d`, so the
+entrypoint does not also run it without those globals; the image ships the legacy `mongo` shell, which has no
+`process.env`). Because init scripts run only on an empty data volume, an existing deployment needs the same
+`createUser`
+run once by hand — see `NOTES.md`.
+
 ## Architecture notes that span multiple files
 
 **Message routing.** RabbitMQ is the single broker for both MQTT (port 1883, from Arduino) and AMQP (to services). MQTT
