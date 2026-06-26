@@ -41,7 +41,7 @@ WiFi-мост между MultiBox и брокером: принимает пок
 ## Назначение комнаты и имени устройству
 
 При первом сообщении устройство автоматически добавляется в коллекцию `devices` (Mongo, БД `events`). Поля `room`
-(комната в Home Assistant) и `name` (отображаемое имя устройства в Home Assistant) задаются вручную через `mongosh`:
+(комната в Home Assistant) и `name` (отображаемое имя устройства в Home Assistant) задаются вручную через `mongo`:
 
 ```bash
 docker exec -it mongodb mongo -u $EVENT_MONGO_USER -p $EVENT_MONGO_PASS events

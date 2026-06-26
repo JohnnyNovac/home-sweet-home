@@ -43,11 +43,10 @@ and state topics published by event-service.
 
 On the first message the device is automatically added to the `devices` collection (Mongo, database `events`). The
 `room` field (the room in Home Assistant) and the `name` field (the device's display name in Home Assistant) are set
-manually via `mongosh`:
+manually via `mongo`:
 
 ```bash
-docker exec -it mongodb mongosh -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD
-> use events
+docker exec -it mongodb mongo -u $EVENT_MONGO_USER -p $EVENT_MONGO_PASS events
 > db.devices.updateOne({_id: "esp-01-1"}, {$set: {room: "bedroom", name: "ESP-01-1"}})
 ```
 
@@ -55,6 +54,33 @@ If `name` is not set, Home Assistant shows the device by its `deviceId`. Restart
 event-service
 is subscribed to `homeassistant/status` and re-publishes discovery with the updated `suggested_area` and name when HA
 transitions to `online`.
+
+## MongoDB users
+
+Each service has its own database and a user with `readWrite` rights on that database only: event-service — database
+`events`, presence-service — `presence`, api-gateway — `auth`. That is why the connection strings no longer carry
+`authSource=admin`: the user lives in the same database it connects to, which is also where its password is checked by
+default. The root account (`MONGO_INITDB_ROOT_*`) stays only on the MongoDB container itself, for initial setup.
+
+The users are created by `docker/mongodb/init/00-create-app-users.sh`: it passes the passwords from environment
+variables and runs `docker/mongodb/init/create-app-users.js` with the `createUser` commands via `load()`. The script
+runs only on the first initialization — when the `mongodb_data` volume is empty. On an already running server with a
+populated volume the users must be created once by hand as root (the password values are the same as in the
+`*_MONGO_USER`/`*_MONGO_PASS` variables):
+
+```bash
+docker exec -it mongodb mongo -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD \
+  --authenticationDatabase admin --eval "
+    var EVENT_MONGO_USER='...'; var EVENT_MONGO_PASS='...';
+    var PRESENCE_MONGO_USER='...'; var PRESENCE_MONGO_PASS='...';
+    var GATEWAY_MONGO_USER='...'; var GATEWAY_MONGO_PASS='...';
+    load('/scripts/create-app-users.js');
+  "
+```
+
+For local runs (`bootRun`, the `local` profile) the services connect to the local MongoDB as `eventsjohnny` /
+`presencejohnny` (see `application-local.yml`); these users must be created once in the local database with the same
+`createUser`.
 
 ## API gateway
 
@@ -111,7 +137,8 @@ logs panel on the overview dashboard shows them together with `{source=~"arduino
    ```
 3. GitLab Runner installed and added to the `docker` group.
 4. Gradle installed.
-5. CI/CD Variables added via the UI — for RabbitMQ, MongoDB, Yandex and Grafana (admin username and password).
+5. CI/CD Variables added via the UI — for RabbitMQ, MongoDB (the root account `MONGO_INITDB_ROOT_*` and a
+   `*_MONGO_USER`/`*_MONGO_PASS` pair per service), Yandex and Grafana (admin username and password).
 6. A Home Assistant account is set up with the MQTT integration. The `homeassistant/status` topic must be retained —
    `event-service` reads it on startup to determine HA's state.
 7. The `local` Spring profile is active for local development.

@@ -25,7 +25,11 @@ flowchart LR
         YS[yandex-service]
     end
 
-    MONGO[(MongoDB)]
+    subgraph Mongo["🗄 MongoDB"]
+        DBE[(events)]
+        DBP[(presence)]
+        DBA[(auth)]
+    end
 
     subgraph External["🌐 External"]
         HA[Home Assistant]
@@ -37,7 +41,8 @@ flowchart LR
     PB -->|MQTT| BROKER
     BROKER -->|AMQP| ES
     BROKER -->|AMQP| PS
-    ES --> MONGO
+    ES --> DBE
+    PS --> DBP
     ES -->|MQTT| HA
     PS -->|gRPC| YS
     YS -->|HTTPS| YAPI
@@ -46,6 +51,7 @@ flowchart LR
     CLIENT([Клиенты API]) -->|HTTP :8080| GW[api-gateway]
     GW -->|REST| ES
     GW -->|REST| PS
+    GW --> DBA
 ```
 
 Поток данных:

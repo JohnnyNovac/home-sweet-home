@@ -129,7 +129,7 @@ is used as the display name (e.g. `NodeMCU-1`), otherwise discovery falls back t
 stays lowercase in topics while HA shows a friendly name. The lookup is a plain blocking query; its wait is bounded by
 the MongoDB driver timeouts set in the
 connection URI, and if Mongo is slow or unavailable it degrades to no `suggested_area` rather than failing discovery —
-the room is picked up on the next HA restart. `room`/`name` are assigned either via `mongosh` (see `NOTES.md`) or
+the room is picked up on the next HA restart. `room`/`name` are assigned either via `mongo` (see `NOTES.md`) or
 through the registry REST API below. A room change takes effect after HA restart (handlers re-publish discovery for
 every known device when `homeassistant/status` flips to `online`).
 
