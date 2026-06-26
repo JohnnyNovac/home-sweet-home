@@ -27,7 +27,7 @@ Encoder myEnc(ENCODER_PIN_A, ENCODER_PIN_B);
 
 const char *modes[] = { "Mode 1", "Mode 2", "Mode 3" };
 volatile byte modesCounter = 0;
-volatile bool modeChanged = false;
+volatile bool modeChangedByEncoder = false;
 volatile uint32_t debounce;
 
 unsigned long modeDisplayTime = 0;
@@ -35,6 +35,12 @@ const unsigned long updateInterval = 1000;
 
 unsigned long lastSensorSend = 0;
 const unsigned long sensorSendInterval = 60000;  // 60 seconds
+
+unsigned long lastModeSwitch = 0;
+const unsigned long modeSwitchInterval = 7000;
+
+unsigned long lastDataDraw = 0;
+const unsigned long dataDrawInterval = 1000;  // redraw the LCD once per second
 
 bool prevBtnState = LOW;
 bool currentBtnState = LOW;
@@ -84,17 +90,31 @@ void loop() {
     Serial.println("Sent: " + payload);
   }
 
-  if (modeChanged) {
+  if (modeChangedByEncoder) {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(modes[modesCounter]);
     tone(SOUND_PIN, 200, 100);  // Sound 200 Hz for 100 ms
-    modeChanged = false;
+    modeChangedByEncoder = false;
     modeDisplayTime = currentMillis;  // Save display time
-    esp8266.println("Hello, World?");
   }
 
-  if (currentMillis - modeDisplayTime >= updateInterval) {
+  // Single source of truth for whether the encoder banner is still held.
+  bool bannerActive = (currentMillis - modeDisplayTime < updateInterval);
+
+  if (bannerActive) {
+    // Freeze the auto-cycle timer so it cannot fire right after the banner.
+    lastModeSwitch = currentMillis;
+  } else if (currentMillis - lastModeSwitch >= modeSwitchInterval) {
+    // Quiet auto-cycle: switch mode without banner or sound.
+    lastModeSwitch = currentMillis;
+    modesCounter = (modesCounter + 1) % 3;
+    lcd.clear();
+    lastDataDraw = currentMillis - dataDrawInterval;  // redraw immediately, no blank screen
+  }
+
+  if (!bannerActive && currentMillis - lastDataDraw >= dataDrawInterval) {
+    lastDataDraw = currentMillis;
     switch (modesCounter) {
       case 1:
         lcd.setCursor(0, 0);
@@ -104,6 +124,7 @@ void loop() {
         break;
       case 2:
         lcd.setCursor(0, 0);
+        lcd.print("Weather: N/A");
         break;
       default:
         float h = dht.readHumidity();
@@ -112,7 +133,6 @@ void loop() {
         lcd.setCursor(0, 0);
         lcd.print("Temp: ");
         lcd.print(t);
-
 
         lcd.setCursor(0, 1);
         lcd.print("Hum: ");
@@ -150,6 +170,6 @@ void processEncoderSignal() {
     Serial.print("Mode changed to: ");
     Serial.println(modesCounter);
 
-    modeChanged = true;
+    modeChangedByEncoder = true;
   }
 }
