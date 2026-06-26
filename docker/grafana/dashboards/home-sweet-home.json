@@ -2,7 +2,7 @@
   "uid": "home-sweet-home",
   "title": "Home Sweet Home — overview",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "refresh": "30s",
   "time": {
@@ -98,8 +98,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 6
+        "x": 12,
+        "y": 74
       },
       "datasource": {
         "type": "prometheus",
@@ -143,8 +143,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 6
+        "x": 0,
+        "y": 74
       },
       "datasource": {
         "type": "prometheus",
@@ -189,7 +189,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 14
+        "y": 6
       },
       "datasource": {
         "type": "prometheus",
@@ -234,7 +234,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 14
+        "y": 6
       },
       "datasource": {
         "type": "prometheus",
@@ -385,9 +385,9 @@
       "title": "HTTP requests (inbound, rps)",
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
-        "y": 38
+        "y": 14
       },
       "datasource": {
         "type": "prometheus",
@@ -431,8 +431,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 38
+        "x": 0,
+        "y": 50
       },
       "datasource": {
         "type": "prometheus",
@@ -476,8 +476,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 46
+        "x": 12,
+        "y": 50
       },
       "datasource": {
         "type": "prometheus",
@@ -522,7 +522,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 38
       },
       "datasource": {
         "type": "prometheus",
@@ -566,8 +566,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 46
+        "x": 0,
+        "y": 58
       },
       "datasource": {
         "type": "prometheus",
@@ -610,7 +610,7 @@
       "title": "MongoDB connection pool (checked out vs size)",
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 66
       },
@@ -666,7 +666,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 66
+        "y": 58
       },
       "datasource": {
         "type": "prometheus",
