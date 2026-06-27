@@ -10,6 +10,14 @@ automatically controls lighting via the Yandex Smart Home API.
 
 ```mermaid
 flowchart LR
+    CLIENT([API clients])
+
+    subgraph Gateway["📱 api-gateway"]
+        GW[api-gateway]
+        DBA[(auth)]
+        GW --> DBA
+    end
+
     subgraph Hardware["🔌 Hardware"]
         MB[MultiBox<br/>temperature / humidity / illuminance]
         ESP[ESP-01<br/>WiFi bridge]
@@ -19,16 +27,16 @@ flowchart LR
 
     BROKER[(RabbitMQ<br/>MQTT/AMQP)]
 
-    subgraph Backend["⚙️ Backend"]
+    subgraph EventSvc["⚙️ event-service"]
         ES[event-service]
-        PS[presence-service]
-        YS[yandex-service]
+        DBE[(events)]
+        ES --> DBE
     end
 
-    subgraph Mongo["🗄 MongoDB"]
-        DBE[(events)]
+    subgraph PresenceSvc["⚙️ presence-service"]
+        PS[presence-service]
         DBP[(presence)]
-        DBA[(auth)]
+        PS --> DBP
     end
 
     subgraph External["🌐 External"]
@@ -37,21 +45,19 @@ flowchart LR
         LIGHTNING[💡 Lighting]
     end
 
+    YS[yandex-service]
+
+    CLIENT -->|HTTP :8080| GW
     ESP -->|MQTT| BROKER
     PB -->|MQTT| BROKER
     BROKER -->|AMQP| ES
     BROKER -->|AMQP| PS
-    ES --> DBE
-    PS --> DBP
+    GW -->|REST| ES
+    GW -->|REST| PS
     ES -->|MQTT| HA
     PS -->|gRPC| YS
     YS -->|HTTPS| YAPI
     YAPI --> LIGHTNING
-
-    CLIENT([API clients]) -->|HTTP :8080| GW[api-gateway]
-    GW -->|REST| ES
-    GW -->|REST| PS
-    GW --> DBA
 ```
 
 Data flow:

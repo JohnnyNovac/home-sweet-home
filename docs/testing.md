@@ -24,7 +24,8 @@
 ### `presence-service`
 
 - `PresenceHandlerTest` — парсинг сообщений PresenceBox и триггер gRPC-вызова к `yandex-service`.
-- `LampServiceTest` — логика включения/выключения лампы по присутствию и освещённости.
+- `LampServiceTest` — логика включения и отложенного выключения лампы по присутствию и освещённости (в том числе отмена
+  выключения при возврате присутствия в течение задержки и сохранение порога и задержки в БД).
 - `IlluminanceListenerTest` — обработка измерения `illuminance` из `climate`-данных.
 - `LampControllerTest` (`@WebMvcTest`) — REST-эндпоинт `/api/v1/lamp` (состояние, порог, принудительное переключение).
 - `PresenceServiceApplicationTest` — проверка загрузки Spring-контекста.

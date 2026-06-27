@@ -12,7 +12,8 @@ automation decisions and calls `yandex-service` over gRPC, which in turn calls t
 ## Build / run
 
 Multi-module Gradle build (Java 21, Spring Boot 4.0, Gradle wrapper). Modules are listed in `settings.gradle`: `shared`,
-`grpc-api`, `event-service`, `presence-service`, `yandex-service`, `api-gateway`. It was recently converted from a
+`grpc-api`, `event-service`, `presence-service`, `yandex-service`, `api-gateway`, `web-support` (a shared web layer —
+common request-validation/error handling for the REST services) and `web-ui`. It was recently converted from a
 composite build to a multi-module build (commit 6719c60) — treat `./gradlew` from the repo root as the single entry
 point; do not look for per-module wrappers.
 
@@ -147,7 +148,13 @@ through the API with a generated id — the latter stay catalog-only (no `lastSe
 that same id, since the live data binding is by the routing-key `deviceId`, not by the registry row.
 `SensorDataService` (no longer an interface — it is now a plain `@Service`) backs `SensorDataController`
 (`/api/v1/sensor-data`): `POST` stores a reading, `GET` returns the paged history, `DELETE` clears the whole collection.
-Both controllers report errors as `ErrorResponse` via `GlobalExceptionHandler` (`@RestControllerAdvice`). These HTTP
+Both controllers report errors as `ErrorResponse`: domain failures (`404`/`409`) via event-service's own
+`GlobalExceptionHandler` (`@RestControllerAdvice`), while request-validation failures (`400`, a per-field
+`ValidationErrorResponse`) are handled uniformly by `CommonExceptionHandler` in the shared `web-support` module —
+pulled into each REST service (event-service, presence-service) with `@Import` so the error contract is identical across
+them, with the response DTOs (`ErrorResponse`, `FieldError`, `ValidationErrorResponse`) living in `web-support` too. A
+`@WebMvcTest` slice does not pick up that imported advice on its own, so a web-layer test that exercises validation must
+`@Import(CommonExceptionHandler.class)` itself. These HTTP
 paths are a separate entry point from the MQTT/AMQP flow — a reading inserted over `POST` is not mirrored to HA and does
 not update the registry the way `EventRunner` does.
 
@@ -155,15 +162,22 @@ not update the registry the way `EventRunner` does.
 and illuminance. The decision is a small stateful engine (`LampService`) fed by two independent listeners:
 `PresenceListener` (presence data, `radarPresence || pirSensorPresence`) and `IlluminanceListener` (the `illuminance`
 measurement out of `climate` data). The engine keeps the latest value of each and recomputes on every update: it turns
-the lamp **on** when presence is detected **and** the room is dark (`illuminance` below the threshold), and **off** only
-when presence ends — brightness never turns it off. The threshold is runtime-configurable: it is persisted in
-presence-service's own MongoDB database (`presence`, `settings` collection, fixed `_id` `lamp`) and that stored value is
-the source of truth, with `app.lamp.illuminance-threshold` (default 50 lx) used only as the seed when the collection is
-still empty. `LampService.loadSettings()` reads it once at startup (seeding the default if absent), and the
-`/api/v1/lamp` REST endpoint (`controller.LampController`) exposes it: `GET` returns the lamp state and threshold,
-`PUT /threshold` changes the threshold (persisted with a whole-document `save`, then the decision is recomputed so a
-now-dark room reacts immediately) and `POST /state` forces the lamp on/off (a direct command, not a sticky override —
-the automation may flip it back on the next presence/illuminance update). Recomputing on illuminance changes
+the lamp **on** when presence is detected **and** the room is dark (`illuminance` below the threshold), and **off**
+after presence ends — but not immediately: the switch-off is delayed by `app.lamp.lamp-off-delay` (default 15 s) and
+scheduled on a single-thread `ScheduledExecutorService`; if presence returns within that window the pending task is
+cancelled (`cancel(false)` — an already-running task is not interrupted), so a brief gap in presence does not flick the
+lamp off. The delayed task itself re-checks presence before acting, since the cancel can lose the race against a task
+that has already started. Brightness never turns the lamp off. Two settings are runtime-configurable — the illuminance
+threshold and the off-delay — and both are persisted in presence-service's own MongoDB database (`presence`, `settings`
+collection) as the source of truth: one document per setting, keyed by `_id` (`illuminanceThreshold` / `lampOffDelay`)
+with a numeric `value` (the off-delay stored as whole seconds). The matching config defaults
+(`app.lamp.illuminance-threshold`, 50 lx; `app.lamp.lamp-off-delay`, 15 s) are used only as the seed when a document is
+still absent. `LampService.loadSettings()` reads both once at startup (seeding the defaults if absent), and the
+`/api/v1/lamp` REST endpoint (`controller.LampController`) exposes them: `GET` returns the lamp state, threshold and
+off-delay, `PUT /threshold` changes the threshold (persisted with a `save`, then the decision is recomputed so a
+now-dark room reacts immediately), `PUT /off-delay` changes the delay (validated `@Positive`, applied to the next
+switch-off rather than a countdown already in flight) and `POST /state` forces the lamp on/off (a direct command, not a
+sticky override — the automation may flip it back on the next presence/illuminance update). Recomputing on illuminance changes
 (not just presence events) is what lets the lamp come on when the room darkens while someone is already present. Both
 inputs start unknown (`null`) and the lamp is switched on only once both are known; after a restart illuminance
 self-heals from the 60s `climate` cadence and presence self-heals from a 60s PresenceBox heartbeat (the device

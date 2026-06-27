@@ -1,6 +1,4 @@
-package dev.iot.eventservice.exception;
-
-import dev.iot.eventservice.dto.FieldError;
+package dev.iot.websupport.dto;
 
 import java.util.List;
 

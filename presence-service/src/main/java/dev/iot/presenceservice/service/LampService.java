@@ -5,12 +5,17 @@ import dev.iot.presenceservice.config.LampProperties;
 import dev.iot.presenceservice.model.LampSettings;
 import dev.iot.presenceservice.repository.LampSettingsRepository;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import yandex.Yandex;
 import yandex.YandexServiceGrpc;
 
+import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -28,7 +33,8 @@ public class LampService {
 
     private static final Logger logger = LoggerFactory.getLogger(LampService.class);
 
-    private static final String SETTINGS_ID = "lamp";
+    private static final String ILLUMINANCE_THRESHOLD_SETTING_ID = "illuminanceThreshold";
+    private static final String LAMP_OFF_DELAY_SETTING_ID = "lampOffDelay";
 
     private final YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub;
     private final GrpcClientProperties grpcClientProperties;
@@ -38,6 +44,10 @@ public class LampService {
     private Double illuminance;
     private boolean lampOn;
     private double illuminanceThreshold;
+    private Duration lampOffDelay;
+
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private Future<?> pendingLampOff;
 
     public LampService(
             YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub,
@@ -49,25 +59,30 @@ public class LampService {
         this.grpcClientProperties = grpcClientProperties;
         this.lampSettingsRepository = lampSettingsRepository;
         this.illuminanceThreshold = lampProperties.getIlluminanceThreshold();
+        this.lampOffDelay = lampProperties.getLampOffDelay();
     }
 
-    /**
-     * Loads the illuminance threshold from the database, which is the source of truth. If the
-     * database is still empty, the default the service started with (from configuration) is persisted
-     * there. Runs once at startup, before the listeners begin to change state.
-     */
     @PostConstruct
     synchronized void loadSettings() {
-        lampSettingsRepository.findById(SETTINGS_ID).ifPresentOrElse(
-                settings -> illuminanceThreshold = settings.illuminanceThreshold(),
-                () -> lampSettingsRepository.save(new LampSettings(SETTINGS_ID, illuminanceThreshold))
+        lampSettingsRepository.findById(ILLUMINANCE_THRESHOLD_SETTING_ID).ifPresentOrElse(
+                settings -> illuminanceThreshold = settings.value(),
+                () -> lampSettingsRepository.save(new LampSettings(ILLUMINANCE_THRESHOLD_SETTING_ID, illuminanceThreshold))
         );
-        logger.info("Lamp illuminance threshold is {} lx", illuminanceThreshold);
+        lampSettingsRepository.findById(LAMP_OFF_DELAY_SETTING_ID).ifPresentOrElse(
+                settings -> lampOffDelay = Duration.ofSeconds((long) settings.value()),
+                () -> lampSettingsRepository.save(new LampSettings(LAMP_OFF_DELAY_SETTING_ID, lampOffDelay.toSeconds()))
+        );
+        logger.info("Lamp illuminance threshold is {} lx, off-delay is {} s", illuminanceThreshold, lampOffDelay.toSeconds());
     }
 
     public synchronized void onPresence(boolean present) {
         this.present = present;
-        reevaluate();
+        if (present) {
+            cancelPendingOff();
+            reevaluate();
+        } else {
+            scheduleLampOff();
+        }
     }
 
     public synchronized void onIlluminance(double illuminance) {
@@ -81,10 +96,30 @@ public class LampService {
             if (turnOnOffLamp(true)) {
                 lampOn = true;
             }
-        } else if (Boolean.FALSE.equals(present) && lampOn) {
+        }
+    }
+
+    private void scheduleLampOff() {
+        if (!lampOn || pendingLampOff != null) {
+            return;
+        }
+        pendingLampOff = scheduler.schedule(this::turnOffAfterDelay, lampOffDelay.toSeconds(), TimeUnit.SECONDS);
+    }
+
+    // runs on the scheduler thread — must re-check presence, the cancel may have lost the race
+    private synchronized void turnOffAfterDelay() {
+        pendingLampOff = null;
+        if (Boolean.FALSE.equals(present) && lampOn) {
             if (turnOnOffLamp(false)) {
                 lampOn = false;
             }
+        }
+    }
+
+    private void cancelPendingOff() {
+        if (pendingLampOff != null) {
+            pendingLampOff.cancel(false);
+            pendingLampOff = null;
         }
     }
 
@@ -94,9 +129,19 @@ public class LampService {
 
     public synchronized void setIlluminanceThreshold(double threshold) {
         illuminanceThreshold = threshold;
-        lampSettingsRepository.save(new LampSettings(SETTINGS_ID, threshold));
+        lampSettingsRepository.save(new LampSettings(ILLUMINANCE_THRESHOLD_SETTING_ID, threshold));
         logger.info("Lamp illuminance threshold changed to {} lx", threshold);
         reevaluate();
+    }
+
+    public synchronized long getLampOffDelay() {
+        return lampOffDelay.toSeconds();
+    }
+
+    public synchronized void setLampOffDelay(Duration offDelay) {
+        lampOffDelay = offDelay;
+        lampSettingsRepository.save(new LampSettings(LAMP_OFF_DELAY_SETTING_ID, offDelay.toSeconds()));
+        logger.info("Lamp off-delay changed to {} s", offDelay.toSeconds());
     }
 
     public synchronized boolean isLampOn() {
@@ -135,5 +180,10 @@ public class LampService {
             logger.error("Failed to change lamp state", e);
             return false;
         }
+    }
+
+    @PreDestroy
+    void shutdown() {
+        scheduler.shutdownNow();
     }
 }

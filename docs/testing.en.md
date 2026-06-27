@@ -24,7 +24,8 @@
 ### `presence-service`
 
 - `PresenceHandlerTest` — parses PresenceBox messages and triggers the gRPC call to `yandex-service`.
-- `LampServiceTest` — lamp on/off logic driven by presence and illuminance.
+- `LampServiceTest` — lamp on and delayed-off logic driven by presence and illuminance (including cancelling the
+  switch-off when presence returns within the delay, and persisting the threshold and off-delay).
 - `IlluminanceListenerTest` — handling of the `illuminance` measurement from `climate` data.
 - `LampControllerTest` (`@WebMvcTest`) — the `/api/v1/lamp` REST endpoint (state, threshold, forced toggle).
 - `PresenceServiceApplicationTest` — verifies the Spring context loads.

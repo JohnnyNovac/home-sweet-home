@@ -1,0 +1,25 @@
+plugins {
+    id 'java-library'
+    id 'io.spring.dependency-management'
+}
+
+description = 'web-support'
+
+repositories {
+    mavenCentral()
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.boot:spring-boot-dependencies:4.0.5"
+    }
+}
+
+dependencies {
+    implementation 'org.springframework:spring-web'
+    implementation 'org.springframework:spring-context'
+}
+
+test {
+    useJUnitPlatform()
+}

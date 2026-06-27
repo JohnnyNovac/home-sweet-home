@@ -13,6 +13,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import yandex.Yandex;
 import yandex.YandexServiceGrpc;
 
+import java.time.Duration;
+
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -20,6 +22,7 @@ import static org.mockito.Mockito.*;
 class LampServiceTest {
 
     private static final double THRESHOLD = 50;
+    private static final Duration OFF_DELAY = Duration.ofMillis(50);
 
     @Mock
     private YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub;
@@ -33,6 +36,7 @@ class LampServiceTest {
     void setUp() {
         LampProperties lampProperties = new LampProperties();
         lampProperties.setIlluminanceThreshold(THRESHOLD);
+        lampProperties.setLampOffDelay(OFF_DELAY);
         lampService = new LampService(yandexServiceStub, new GrpcClientProperties(), lampProperties, lampSettingsRepository);
     }
 
@@ -94,7 +98,7 @@ class LampServiceTest {
         lampService.onPresence(true);
         lampService.onPresence(false);
 
-        verify(yandexServiceStub).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+        verify(yandexServiceStub, timeout(1000)).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
     }
 
     @Test
@@ -133,7 +137,29 @@ class LampServiceTest {
 
         lampService.setIlluminanceThreshold(70);  // 60 < 70, now dark and present
 
-        verify(lampSettingsRepository).save(argThat(s -> s.illuminanceThreshold() == 70));
+        verify(lampSettingsRepository).save(argThat(s -> s.id().equals("illuminanceThreshold") && s.value() == 70));
         verify(yandexServiceStub, times(1)).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
+    }
+
+    @Test
+    @DisplayName("Should not turn the lamp off when presence returns before the off-delay elapses")
+    void shouldNotTurnOffWhenPresenceReturnsBeforeDelay() throws StatusException {
+        stubDeadline();
+
+        lampService.onIlluminance(10);
+        lampService.onPresence(true);
+        lampService.onPresence(false);  // schedules a delayed off
+        lampService.onPresence(true);   // returns in time, cancels it
+
+        verify(yandexServiceStub, after(OFF_DELAY.toMillis() + 200).never())
+                .turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+    }
+
+    @Test
+    @DisplayName("Should persist a new off-delay")
+    void shouldPersistOffDelay() {
+        lampService.setLampOffDelay(Duration.ofSeconds(30));
+
+        verify(lampSettingsRepository).save(argThat(s -> s.id().equals("lampOffDelay") && s.value() == 30));
     }
 }

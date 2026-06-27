@@ -25,6 +25,7 @@ app:
     lamp-deadline: 12s
   lamp:
     illuminance-threshold: 50
+    lamp-off-delay: 15s
   measurements:
     radar-presence:
       name: radarPresence

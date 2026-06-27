@@ -10,6 +10,14 @@
 
 ```mermaid
 flowchart LR
+    CLIENT([Клиенты API])
+
+    subgraph Gateway["📱 api-gateway"]
+        GW[api-gateway]
+        DBA[(auth)]
+        GW --> DBA
+    end
+
     subgraph Hardware["🔌 Hardware"]
         MB[MultiBox<br/>температура / влажность / освещённость]
         ESP[ESP-01<br/>WiFi-мост]
@@ -19,16 +27,16 @@ flowchart LR
 
     BROKER[(RabbitMQ<br/>MQTT/AMQP)]
 
-    subgraph Backend["⚙️ Backend"]
+    subgraph EventSvc["⚙️ event-service"]
         ES[event-service]
-        PS[presence-service]
-        YS[yandex-service]
+        DBE[(events)]
+        ES --> DBE
     end
 
-    subgraph Mongo["🗄 MongoDB"]
-        DBE[(events)]
+    subgraph PresenceSvc["⚙️ presence-service"]
+        PS[presence-service]
         DBP[(presence)]
-        DBA[(auth)]
+        PS --> DBP
     end
 
     subgraph External["🌐 External"]
@@ -37,21 +45,19 @@ flowchart LR
         LIGHTNING[💡 Освещение]
     end
 
+    YS[yandex-service]
+
+    CLIENT -->|HTTP :8080| GW
     ESP -->|MQTT| BROKER
     PB -->|MQTT| BROKER
     BROKER -->|AMQP| ES
     BROKER -->|AMQP| PS
-    ES --> DBE
-    PS --> DBP
+    GW -->|REST| ES
+    GW -->|REST| PS
     ES -->|MQTT| HA
     PS -->|gRPC| YS
     YS -->|HTTPS| YAPI
     YAPI --> LIGHTNING
-
-    CLIENT([Клиенты API]) -->|HTTP :8080| GW[api-gateway]
-    GW -->|REST| ES
-    GW -->|REST| PS
-    GW --> DBA
 ```
 
 Поток данных:
