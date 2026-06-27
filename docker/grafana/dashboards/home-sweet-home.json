@@ -384,10 +384,10 @@
       "type": "timeseries",
       "title": "HTTP requests (inbound, rps)",
       "gridPos": {
-        "h": 8,
+        "h": 12,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 38
       },
       "datasource": {
         "type": "prometheus",
@@ -519,10 +519,10 @@
       "type": "timeseries",
       "title": "Yandex HTTP latency max (outbound)",
       "gridPos": {
-        "h": 12,
+        "h": 8,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 14
       },
       "datasource": {
         "type": "prometheus",
