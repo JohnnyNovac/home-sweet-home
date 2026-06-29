@@ -41,6 +41,8 @@ public class GrpcServerService extends YandexServiceGrpc.YandexServiceImplBase {
 
             DeviceGroupActionResponse response = client.sendGroupAction(turnOnOffRequest, yandexProperties.chandelierId());
 
+            logger.info("Yandex group action response (turnOn={}): {}", request.getTurnOn(), response);
+
             if (!"ok".equals(response.status())) {
                 throw new RuntimeException("Yandex API failed: " + response.status());
             }
