@@ -24,16 +24,10 @@ class PresenceHandlerTest {
 
     @BeforeEach
     void setUp() {
-        MeasurementsProperties measurementsProperties = new MeasurementsProperties();
-
-        MeasurementsProperties.Measurement radarPresence = new MeasurementsProperties.Measurement();
-        radarPresence.setName("radarPresence");
-
-        MeasurementsProperties.Measurement pirSensorPresence = new MeasurementsProperties.Measurement();
-        pirSensorPresence.setName("pirSensorPresence");
-
-        measurementsProperties.setRadarPresence(radarPresence);
-        measurementsProperties.setPirSensorPresence(pirSensorPresence);
+        MeasurementsProperties measurementsProperties = new MeasurementsProperties(
+                new MeasurementsProperties.Measurement("radarPresence"),
+                new MeasurementsProperties.Measurement("pirSensorPresence"),
+                null);
 
         presenceHandler = new PresenceHandler(new ObjectMapper(), measurementsProperties, lampService);
     }

@@ -44,7 +44,7 @@ public class MqttConfig {
         options.setCleanSession(true);
         int qos = 1;
         boolean retained = true;
-        options.setWill(haTopics.getServiceAvailabilityTopic(), "offline".getBytes(), qos, retained);
+        options.setWill(haTopics.serviceAvailabilityTopic(), "offline".getBytes(), qos, retained);
 
         int maxAttempts = 10;
 
@@ -112,8 +112,8 @@ public class MqttConfig {
             MqttMessage online = new MqttMessage("online".getBytes());
             online.setQos(1);
             online.setRetained(true);
-            client.publish(haTopics.getServiceAvailabilityTopic(), online);
-            logger.info("Published service availability 'online' to {}", haTopics.getServiceAvailabilityTopic());
+            client.publish(haTopics.serviceAvailabilityTopic(), online);
+            logger.info("Published service availability 'online' to {}", haTopics.serviceAvailabilityTopic());
         } catch (MqttException e) {
             logger.error("Failed to publish service availability 'online'", e);
         }

@@ -31,7 +31,7 @@ public class IlluminanceListener {
     public void handleMessage(String message, @Header(AmqpHeaders.RECEIVED_ROUTING_KEY) String routingKey) {
         try {
             JsonNode measurements = objectMapper.readTree(message).path("measurements");
-            JsonNode illuminance = measurements.path(measurementsProperties.getIlluminance().getName());
+            JsonNode illuminance = measurements.path(measurementsProperties.illuminance().name());
 
             // Climate messages from devices without a light sensor carry no illuminance — just skip them.
             if (illuminance.isNumber()) {

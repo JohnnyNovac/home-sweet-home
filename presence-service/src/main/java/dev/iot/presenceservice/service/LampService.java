@@ -58,8 +58,8 @@ public class LampService {
         this.yandexServiceStub = yandexServiceStub;
         this.grpcClientProperties = grpcClientProperties;
         this.lampSettingsRepository = lampSettingsRepository;
-        this.illuminanceThreshold = lampProperties.getIlluminanceThreshold();
-        this.lampOffDelay = lampProperties.getLampOffDelay();
+        this.illuminanceThreshold = lampProperties.illuminanceThreshold();
+        this.lampOffDelay = lampProperties.lampOffDelay();
     }
 
     @PostConstruct
@@ -172,7 +172,7 @@ public class LampService {
 
         try {
             yandexServiceStub
-                    .withDeadlineAfter(grpcClientProperties.getLampDeadline().toMillis(), TimeUnit.MILLISECONDS)
+                    .withDeadlineAfter(grpcClientProperties.lampDeadline().toMillis(), TimeUnit.MILLISECONDS)
                     .turnOnOffLamp(request);
 
             return true;

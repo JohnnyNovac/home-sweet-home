@@ -34,10 +34,8 @@ class LampServiceTest {
 
     @BeforeEach
     void setUp() {
-        LampProperties lampProperties = new LampProperties();
-        lampProperties.setIlluminanceThreshold(THRESHOLD);
-        lampProperties.setLampOffDelay(OFF_DELAY);
-        lampService = new LampService(yandexServiceStub, new GrpcClientProperties(), lampProperties, lampSettingsRepository);
+        LampProperties lampProperties = new LampProperties(THRESHOLD, OFF_DELAY);
+        lampService = new LampService(yandexServiceStub, new GrpcClientProperties(Duration.ofSeconds(12)), lampProperties, lampSettingsRepository);
     }
 
     private void stubDeadline() {

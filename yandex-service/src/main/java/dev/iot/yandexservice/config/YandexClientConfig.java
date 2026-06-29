@@ -13,13 +13,13 @@ public class YandexClientConfig {
     @Bean
     public RestClient client(YandexProperties props, RestClient.Builder builder) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout((int) props.getConnectTimeout().toMillis());
-        requestFactory.setReadTimeout((int) props.getReadTimeout().toMillis());
+        requestFactory.setConnectTimeout((int) props.connectTimeout().toMillis());
+        requestFactory.setReadTimeout((int) props.readTimeout().toMillis());
 
         return builder
-                .baseUrl(props.getBaseUrl())
+                .baseUrl(props.baseUrl())
                 .requestFactory(requestFactory)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + props.getOauthToken())
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + props.oauthToken())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }

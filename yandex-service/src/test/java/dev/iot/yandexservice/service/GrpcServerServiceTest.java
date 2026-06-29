@@ -38,7 +38,7 @@ class GrpcServerServiceTest {
     @BeforeEach
     void setUp() {
         grpcServerService = new GrpcServerService(yandexRestClient, yandexProperties);
-        when(yandexProperties.getChandelierId()).thenReturn(CHANDELIER_ID);
+        when(yandexProperties.chandelierId()).thenReturn(CHANDELIER_ID);
     }
 
     @Test

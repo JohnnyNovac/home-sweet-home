@@ -77,11 +77,11 @@ public class ClimateHandler implements SensorHandler {
         tempDiscovery.put("unit_of_meas", "°C");
         tempDiscovery.put("val_tpl", "{{ value_json.temperature }}");
         tempDiscovery.put("uniq_id", deviceId + "_temp");
-        tempDiscovery.put("exp_aft", haProperties.getExpireAfter());
+        tempDiscovery.put("exp_aft", haProperties.expireAfter());
         addAvailability(tempDiscovery, deviceId);
         addDevice(tempDiscovery, deviceId);
         mqttPublisher.publish(
-                haProperties.getDiscoveryPrefix() + "/sensor/" + deviceId + "_temp/config",
+                haProperties.discoveryPrefix() + "/sensor/" + deviceId + "_temp/config",
                 tempDiscovery.toString()
         );
 
@@ -91,11 +91,11 @@ public class ClimateHandler implements SensorHandler {
         humDiscovery.put("unit_of_meas", "%");
         humDiscovery.put("val_tpl", "{{ value_json.humidity }}");
         humDiscovery.put("uniq_id", deviceId + "_hum");
-        humDiscovery.put("exp_aft", haProperties.getExpireAfter());
+        humDiscovery.put("exp_aft", haProperties.expireAfter());
         addAvailability(humDiscovery, deviceId);
         addDevice(humDiscovery, deviceId);
         mqttPublisher.publish(
-                haProperties.getDiscoveryPrefix() + "/sensor/" + deviceId + "_hum/config",
+                haProperties.discoveryPrefix() + "/sensor/" + deviceId + "_hum/config",
                 humDiscovery.toString()
         );
 
@@ -105,11 +105,11 @@ public class ClimateHandler implements SensorHandler {
         luxDiscovery.put("unit_of_meas", "lx");
         luxDiscovery.put("val_tpl", "{{ value_json.illuminance }}");
         luxDiscovery.put("uniq_id", deviceId + "_illuminance");
-        luxDiscovery.put("exp_aft", haProperties.getExpireAfter());
+        luxDiscovery.put("exp_aft", haProperties.expireAfter());
         addAvailability(luxDiscovery, deviceId);
         addDevice(luxDiscovery, deviceId);
         mqttPublisher.publish(
-                haProperties.getDiscoveryPrefix() + "/sensor/" + deviceId + "_illuminance/config",
+                haProperties.discoveryPrefix() + "/sensor/" + deviceId + "_illuminance/config",
                 luxDiscovery.toString()
         );
 
@@ -117,12 +117,12 @@ public class ClimateHandler implements SensorHandler {
     }
 
     private String stateTopicFor(String deviceId) {
-        return haProperties.getDiscoveryPrefix() + "/sensor/" + deviceId + "/state";
+        return haProperties.discoveryPrefix() + "/sensor/" + deviceId + "/state";
     }
 
     private void addAvailability(ObjectNode payload, String deviceId) {
         payload.putArray("avty")
-                .add(objectMapper.createObjectNode().put("t", haProperties.getServiceAvailabilityTopic()))
+                .add(objectMapper.createObjectNode().put("t", haProperties.serviceAvailabilityTopic()))
                 .add(objectMapper.createObjectNode().put("t", "home/availability/" + deviceId));
     }
 

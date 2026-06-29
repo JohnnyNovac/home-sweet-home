@@ -91,7 +91,7 @@ public class PresenceHandler implements SensorHandler {
         addAvailability(presenceDiscovery, deviceId);
         addDevice(presenceDiscovery, deviceId);
         mqttPublisher.publish(
-                haProperties.getDiscoveryPrefix() + "/binary_sensor/" + deviceId + "_presence/config",
+                haProperties.discoveryPrefix() + "/binary_sensor/" + deviceId + "_presence/config",
                 presenceDiscovery.toString()
         );
 
@@ -99,12 +99,12 @@ public class PresenceHandler implements SensorHandler {
     }
 
     private String stateTopicFor(String deviceId) {
-        return haProperties.getDiscoveryPrefix() + "/binary_sensor/" + deviceId + "/state";
+        return haProperties.discoveryPrefix() + "/binary_sensor/" + deviceId + "/state";
     }
 
     private void addAvailability(ObjectNode payload, String deviceId) {
         payload.putArray("avty")
-                .add(objectMapper.createObjectNode().put("t", haProperties.getServiceAvailabilityTopic()))
+                .add(objectMapper.createObjectNode().put("t", haProperties.serviceAvailabilityTopic()))
                 .add(objectMapper.createObjectNode().put("t", "home/availability/" + deviceId));
     }
 

@@ -47,7 +47,7 @@ class EventRunnerTest {
     void shouldSubscribeToHAStatusOnRun() throws Exception {
         MqttClient mqttClient = mock(MqttClient.class);
         when(mqttPublisher.client()).thenReturn(mqttClient);
-        when(haProps.getStatusTopic()).thenReturn(HA_STATUS_TOPIC);
+        when(haProps.statusTopic()).thenReturn(HA_STATUS_TOPIC);
 
         eventRunner.run();
 
@@ -59,7 +59,7 @@ class EventRunnerTest {
     void shouldSendDiscoveryForAllWhenHAStatusIsOnline() throws Exception {
         MqttClient mqttClient = mock(MqttClient.class);
         when(mqttPublisher.client()).thenReturn(mqttClient);
-        when(haProps.getStatusTopic()).thenReturn(HA_STATUS_TOPIC);
+        when(haProps.statusTopic()).thenReturn(HA_STATUS_TOPIC);
 
         SensorHandler handler1 = mock(SensorHandler.class);
         SensorHandler handler2 = mock(SensorHandler.class);

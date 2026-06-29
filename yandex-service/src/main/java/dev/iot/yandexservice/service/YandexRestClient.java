@@ -26,7 +26,7 @@ public class YandexRestClient {
      */
     public DeviceGroupActionResponse sendGroupAction(DeviceGroupActionRequest request, String groupId) {
         return client.post()
-                .uri(yandexProperties.getGroupActionPath(), groupId)
+                .uri(yandexProperties.groupActionPath(), groupId)
                 .body(request)
                 .retrieve()
                 .body(DeviceGroupActionResponse.class);

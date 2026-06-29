@@ -77,7 +77,7 @@ public class EventRunner implements CommandLineRunner {
     }
 
     private void subscribeToHAStatus() throws MqttException {
-        mqttPublisher.client().subscribe(haProperties.getStatusTopic(), (topic, message) -> {
+        mqttPublisher.client().subscribe(haProperties.statusTopic(), (topic, message) -> {
             String status = new String(message.getPayload());
             logger.debug("Received Home Assistant status: {}", status);
             if ("online".equals(status)) {

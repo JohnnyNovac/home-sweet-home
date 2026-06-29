@@ -38,7 +38,7 @@ class YandexRestClientTest {
     @BeforeEach
     void setUp() {
         yandexRestClient = new YandexRestClient(restClient, yandexProperties);
-        when(yandexProperties.getGroupActionPath()).thenReturn(GROUP_ACTION_PATH);
+        when(yandexProperties.groupActionPath()).thenReturn(GROUP_ACTION_PATH);
     }
 
     @Test

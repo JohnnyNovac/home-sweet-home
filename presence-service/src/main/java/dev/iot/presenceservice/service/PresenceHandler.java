@@ -28,8 +28,8 @@ public class PresenceHandler {
     }
 
     private boolean isPresenceDetected(CreateEventDto createEventDTO) {
-        return booleanMeasurement(createEventDTO, measurementsProperties.getRadarPresence().getName())
-                || booleanMeasurement(createEventDTO, measurementsProperties.getPirSensorPresence().getName());
+        return booleanMeasurement(createEventDTO, measurementsProperties.radarPresence().name())
+                || booleanMeasurement(createEventDTO, measurementsProperties.pirSensorPresence().name());
     }
 
     private boolean booleanMeasurement(CreateEventDto createEventDTO, String name) {
@@ -49,8 +49,8 @@ public class PresenceHandler {
         JsonNode root = objectMapper.readTree(jsonData);
         JsonNode measurements = root.path("measurements");
 
-        if (!measurements.has(measurementsProperties.getRadarPresence().getName())
-            || !measurements.has(measurementsProperties.getPirSensorPresence().getName())) {
+        if (!measurements.has(measurementsProperties.radarPresence().name())
+                || !measurements.has(measurementsProperties.pirSensorPresence().name())) {
             throw new IllegalArgumentException("presence sensor requires radarPresence and pirSensorPresence measurements");
         }
     }

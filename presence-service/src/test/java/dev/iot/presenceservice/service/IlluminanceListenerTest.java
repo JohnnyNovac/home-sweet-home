@@ -27,10 +27,8 @@ class IlluminanceListenerTest {
 
     @BeforeEach
     void setUp() {
-        MeasurementsProperties measurementsProperties = new MeasurementsProperties();
-        MeasurementsProperties.Measurement illuminance = new MeasurementsProperties.Measurement();
-        illuminance.setName("illuminance");
-        measurementsProperties.setIlluminance(illuminance);
+        MeasurementsProperties measurementsProperties = new MeasurementsProperties(
+                null, null, new MeasurementsProperties.Measurement("illuminance"));
 
         listener = new IlluminanceListener(new ObjectMapper(), measurementsProperties, lampService);
     }
