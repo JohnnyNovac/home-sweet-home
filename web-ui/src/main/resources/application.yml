@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: web-ui
+
+server:
+  port: 8000

@@ -7,4 +7,5 @@ include 'presence-service'
 include 'yandex-service'
 
 include 'api-gateway'
+include 'web-ui'
 include 'web-support'
