@@ -89,6 +89,11 @@ For local runs (`bootRun`, the `local` profile) the services connect to the loca
 docker-compose only its port is published; the other services are reachable only inside the network. For local runs
 (`bootRun`, the `local` profile) the routes point at `localhost`.
 
+The gateway requires authentication. Only login (`/api/v1/auth/**`) and the health checks are open; every other request
+must carry a token. A token is issued by `POST /api/v1/auth/login` with a `{"username", "password"}` body; the admin
+account is created on first start from the `ADMIN_USERNAME` and `ADMIN_PASSWORD` variables. Pass the token in the
+`Authorization: Bearer <token>` header; it is valid for 15 minutes — a request without a token gets a 401.
+
 ## Monitoring
 
 Prometheus collects metrics, Loki stores logs, and Grafana displays everything — all come up with the same

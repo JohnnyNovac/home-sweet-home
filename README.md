@@ -81,6 +81,7 @@ flowchart LR
 - Spring AMQP (RabbitMQ) — межсервисная шина
 - Spring gRPC — синхронные вызовы между presence-service и yandex-service
 - Spring Cloud Gateway (WebMVC) — API-шлюз, единая точка входа
+- Spring Security (OAuth2 Resource Server, JWT) — аутентификация на шлюзе
 - Eclipse Paho — MQTT-клиент
 - Spring Boot Actuator + Micrometer — метрики (экспорт в Prometheus)
 
@@ -110,7 +111,7 @@ flowchart LR
 | `event-service`    | Приём MQTT-событий, сохранение в MongoDB, ретрансляция в Home Assistant |
 | `presence-service` | Логика автоматизации по присутствию, gRPC-клиент к yandex-service       |
 | `yandex-service`   | gRPC-сервер, прокси к Yandex Smart Home API                             |
-| `api-gateway`      | Единая точка входа: маршрутизирует REST-запросы к сервисам              |
+| `api-gateway`      | Единая точка входа: аутентификация (JWT) и маршрутизация REST-запросов  |
 | `grpc-api`         | Общие protobuf-контракты                                                |
 | `shared`           | Общие DTO и парсеры                                                     |
 | `arduino/`         | Прошивки для `MultiBox`, `ESP-01` (WiFi-мост) и `PresenceBox`           |

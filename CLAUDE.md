@@ -202,7 +202,8 @@ than presence-service hitting a blind `DEADLINE_EXCEEDED`. A timed-out lamp comm
 toggle is not worth retrying.
 
 **API gateway.** `api-gateway` is the single HTTP entry point — a Spring Cloud Gateway Server WebMVC (the servlet
-variant, not the reactive WebFlux one) used as a pure router: no controllers, no response aggregation. Routes are
+variant, not the reactive WebFlux one) used as a router for the domain APIs (no response aggregation); the one piece of
+logic it hosts itself is authentication (below). Routes are
 declared in `application.yml` under `spring.cloud.gateway.server.webmvc.routes` (note the `server.webmvc` segment — the
 bare `spring.cloud.gateway.routes` prefix is the old reactive one and is silently ignored here) and match by path
 prefix, forwarding to the owning service by its in-network name without rewriting the path: `/api/v1/devices/**` and
@@ -211,7 +212,16 @@ whose port is published in `docker-compose.yml` (`8080`); the domain services ha
 `homesweethome_net`, reachable only through the gateway. The Spring Cloud version is pinned via the
 `spring-cloud-dependencies` BOM (train 2025.1.x / Oakwood, which targets Boot 4.0) in `api-gateway/build.gradle`, not
 hardcoded per artifact. `application-local.yml` points the same routes at `localhost:8081`/`localhost:8082` for
-`bootRun`. Auth is not enforced here yet — this is the planned place for it before the API is exposed publicly.
+`bootRun`. **Auth is enforced here** — the gateway is a Spring Security OAuth2 resource server (`SecurityConfig`, with a
+stateless session policy): `/api/v1/auth/**`, `/actuator/health` and `/actuator/prometheus` are `permitAll`, every other
+route requires a valid JWT (`anyRequest().authenticated()`), so a call to `/api/v1/devices`, `/api/v1/sensor-data` or
+`/api/v1/lamp` without an `Authorization: Bearer <token>` header gets `401`. Tokens are issued by
+`POST /api/v1/auth/login`
+(`AuthController` → `AuthService`, body `{username,password}` → `{token}`) and both signed and verified with the same
+HMAC secret `JWT_SECRET` (`NimbusJwtEncoder`/`NimbusJwtDecoder`), with TTL `app.security.access-ttl` (15m). Users live
+in
+the gateway's own `auth` Mongo database (`users` collection, BCrypt-hashed passwords); `DataSeeder` seeds an admin from
+`ADMIN_USERNAME`/`ADMIN_PASSWORD` on first start when the collection is empty.
 
 **Observability.** Each service exposes Spring Boot Actuator with a Micrometer/Prometheus registry at
 `/actuator/prometheus` (event-service 8081, presence-service 8082, yandex-service 8083 — the HTTP port, separate from

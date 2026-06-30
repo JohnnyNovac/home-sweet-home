@@ -82,6 +82,7 @@ Data flow:
 - Spring AMQP (RabbitMQ) — inter-service bus
 - Spring gRPC — synchronous calls between presence-service and yandex-service
 - Spring Cloud Gateway (WebMVC) — API gateway, single entry point
+- Spring Security (OAuth2 resource server, JWT) — authentication at the gateway
 - Eclipse Paho — MQTT client
 - Spring Boot Actuator + Micrometer — metrics (exported to Prometheus)
 
@@ -111,7 +112,7 @@ Data flow:
 | `event-service`    | Receives MQTT events, persists to MongoDB, forwards to Home Assistant |
 | `presence-service` | Presence-based automation logic, gRPC client to yandex-service        |
 | `yandex-service`   | gRPC server, proxy to the Yandex Smart Home API                       |
-| `api-gateway`      | Single entry point: routes REST requests to the services              |
+| `api-gateway`      | Single entry point: JWT authentication and routing of REST requests   |
 | `grpc-api`         | Shared protobuf contracts                                             |
 | `shared`           | Shared DTOs and parsers                                               |
 | `arduino/`         | Firmware for `MultiBox`, `ESP-01` (WiFi bridge) and `PresenceBox`     |
