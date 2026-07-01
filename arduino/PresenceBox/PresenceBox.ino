@@ -50,7 +50,7 @@ void log(String message) {
 }
 
 void publishLog(const String& message, const char* level) {
-  DynamicJsonDocument doc(384);
+  JsonDocument doc;
   doc["level"] = level;
   doc["msg"] = message;
   char payload[384];
@@ -295,8 +295,8 @@ IRAM_ATTR void detectPirSensorPresence() {
 
 void sendData(bool radarPresence, bool pirSensorPresence) {
   // Building the JSON
-  DynamicJsonDocument doc(128);
-  JsonObject measurements = doc.createNestedObject("measurements");
+  JsonDocument doc;
+  JsonObject measurements = doc["measurements"].to<JsonObject>();
   measurements["radarPresence"] = radarPresence;
   measurements["pirSensorPresence"] = pirSensorPresence;
 

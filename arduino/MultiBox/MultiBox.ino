@@ -69,7 +69,12 @@ void loop() {
   processReset();
 
   if (esp8266.available()) {
-    Serial.println("Received: " + esp8266.readStringUntil('\n'));
+    String received = esp8266.readStringUntil('\n');
+    Serial.println("Received: " + received);
+    received.trim();
+    if (received.equals("MEASURE")) {
+      measureAndSend();
+    }
   }
 
   processEncoderSignal();
@@ -78,16 +83,7 @@ void loop() {
 
   if (currentMillis - lastSensorSend >= sensorSendInterval) {
     lastSensorSend = currentMillis;
-
-    float temperature = dht.readTemperature();
-    float humidity = dht.readHumidity();
-    float illuminance = lightMeter.readLightLevel();
-
-    // Build string "temperature,humidity,illuminance"
-    String payload = String(temperature) + "," + String(humidity) + "," + String(illuminance);
-
-    esp8266.println(payload);
-    Serial.println("Sent: " + payload);
+    measureAndSend();
   }
 
   if (modeChangedByEncoder) {
@@ -139,6 +135,18 @@ void loop() {
         lcd.print(h);
     }
   }
+}
+
+void measureAndSend() {
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  float illuminance = lightMeter.readLightLevel();
+
+  // Build string "temperature,humidity,illuminance"
+  String payload = String(temperature) + "," + String(humidity) + "," + String(illuminance);
+
+  esp8266.println(payload);
+  Serial.println("Sent: " + payload);
 }
 
 void processReset() {

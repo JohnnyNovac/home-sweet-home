@@ -29,12 +29,14 @@ const char* MQTT_BROKER_IP = "192.168.1.77";  // ← your broker IP here
 const char* DEVICE_ID = "ESP-01";
 const char* AVAILABILITY_TOPIC = "home/availability/esp-01-1";
 const char* DATA_TOPIC = "home/climate/esp-01-1/data";
+const char* COMMAND_TOPIC = "home/cmd/esp-01-1";
 const char* LOG_TOPIC = "home/logs/esp-01-1";
 
 bool isFirstValuePublished = false;
+String receivedPayload;
 
 void publishLog(const String& message, const char* level) {
-  DynamicJsonDocument doc(384);
+  JsonDocument doc;
   doc["level"] = level;
   doc["msg"] = message;
   char payload[384];
@@ -99,11 +101,21 @@ bool connectToMQTT() {
     mqttClient.publish(AVAILABILITY_TOPIC, "online");
     flushPendingLogs();  // отправляем то, что накопилось до подключения
     log("MQTT connected!");
+    mqttClient.subscribe(COMMAND_TOPIC);
     return true;
   } else {
     log("MQTT not connected after " + String(maxAttempts) + " attempts, skipping");
     return false;
   }
+}
+
+void messageReceived(String& topic, String& payload) {
+  receivedPayload = payload;
+
+  // Note: Do not use the client in the callback to publish, subscribe or
+  // unsubscribe as it may cause deadlocks when other things arrive while
+  // sending and receiving acknowledgments. Instead, change a global variable,
+  // or push to a queue and handle it in the loop after calling `client.loop()`.
 }
 
 void setup() {
@@ -114,6 +126,7 @@ void setup() {
   initWebServer();
 
   mqttClient.begin(MQTT_BROKER_IP, net);
+  mqttClient.onMessage(messageReceived);
   mqttClient.setWill(AVAILABILITY_TOPIC, "offline");
   connectToMQTT();
 
@@ -128,6 +141,24 @@ void loop() {
 
   server.handleClient();
   ArduinoOTA.handle();
+
+  if (receivedPayload.length() > 0) {
+    JsonDocument doc;
+
+    // Deserialize the JSON document
+    DeserializationError error = deserializeJson(doc, receivedPayload);
+
+    // Test if parsing succeeds
+    if (error) {
+      log(String("deserializeJson() failed: ") + error.f_str());
+    } else {
+      if (doc["cmd"] == "MEASURE") {
+        Serial.println("MEASURE");
+      }
+    }
+  }
+
+  receivedPayload = "";
 
   if (!Serial.available()) return;
 
@@ -230,8 +261,8 @@ void sendData(float temperature, float humidity) {
 
 void sendData(float temperature, float humidity, float illuminance) {
   // Building the JSON
-  DynamicJsonDocument doc(128);
-  JsonObject measurements = doc.createNestedObject("measurements");
+  JsonDocument doc;
+  JsonObject measurements = doc["measurements"].to<JsonObject>();
   measurements["temperature"] = temperature;
   measurements["humidity"] = humidity;
   if (!isnan(illuminance)) {
