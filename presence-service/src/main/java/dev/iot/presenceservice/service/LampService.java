@@ -79,7 +79,7 @@ public class LampService {
         this.present = present;
         if (present) {
             cancelPendingOff();
-            reevaluate();
+            reevaluate("presence");
         } else {
             scheduleLampOff();
         }
@@ -87,12 +87,14 @@ public class LampService {
 
     public synchronized void onIlluminance(double illuminance) {
         this.illuminance = illuminance;
-        reevaluate();
+        reevaluate("illuminance");
     }
 
-    private void reevaluate() {
-        logger.debug("Reevaluating lamp: present={}, illuminance={}, lampOn={}", present, illuminance, lampOn);
-        if (Boolean.TRUE.equals(present) && isDark() && !lampOn) {
+    private void reevaluate(String trigger) {
+        boolean shouldTurnOn = Boolean.TRUE.equals(present) && isDark() && !lampOn;
+        logger.debug("Reevaluating lamp (triggered by {}): present={}, illuminance={}, lampOn={} -> {}",
+                trigger, present, illuminance, lampOn, shouldTurnOn ? "turn on" : "no change");
+        if (shouldTurnOn) {
             if (turnOnOffLamp(true)) {
                 lampOn = true;
             }
@@ -131,7 +133,7 @@ public class LampService {
         illuminanceThreshold = threshold;
         lampSettingsRepository.save(new LampSettings(ILLUMINANCE_THRESHOLD_SETTING_ID, threshold));
         logger.info("Lamp illuminance threshold changed to {} lx", threshold);
-        reevaluate();
+        reevaluate("threshold change");
     }
 
     public synchronized long getLampOffDelay() {
