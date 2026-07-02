@@ -21,6 +21,8 @@ app:
   rabbitmq:
     presence-data-queue: presence-data
     illuminance-data-queue: presence-illuminance
+    exchange: amq.topic
+    command-key-prefix: home.cmd.
   grpc:
     lamp-deadline: 12s
   lamp:
@@ -33,7 +35,9 @@ app:
       name: pirSensorPresence
     illuminance:
       name: illuminance
-
+  device:
+    command:
+      measure: MEASURE
 management:
   endpoints:
     web:
