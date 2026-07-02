@@ -55,32 +55,39 @@ event-service
 is subscribed to `homeassistant/status` and re-publishes discovery with the updated `suggested_area` and name when HA
 transitions to `online`.
 
-## MongoDB users
+## MongoDB: replica set and users
 
-Each service has its own database and a user with `readWrite` rights on that database only: event-service — database
-`events`, presence-service — `presence`, api-gateway — `auth`. That is why the connection strings no longer carry
-`authSource=admin`: the user lives in the same database it connects to, which is also where its password is checked by
-default. The root account (`MONGO_INITDB_ROOT_*`) stays only on the MongoDB container itself, for initial setup.
+MongoDB runs as a single-node replica set (`rs0`), required for multi-document transactions, so the connection strings
+carry `replicaSet=rs0`. Each service has its own database and a user with `readWrite` rights on that database only:
+event-service — database `events`, presence-service — `presence`, api-gateway — `auth`. That is why the connection
+strings no longer carry `authSource=admin` (the user lives in the same database it connects to, where its password is
+also checked by default). The root account (`MONGO_INITDB_ROOT_*`) stays only on the MongoDB container.
 
-The users are created by `docker/mongodb/init/00-create-app-users.sh`: it passes the passwords from environment
-variables and runs `docker/mongodb/init/create-app-users.js` with the `createUser` commands via `load()`. The script
-runs only on the first initialization — when the `mongodb_data` volume is empty. On an already running server with a
-populated volume the users must be created once by hand as root (the password values are the same as in the
-`*_MONGO_USER`/`*_MONGO_PASS` variables):
+Because the replica set has access control on, its members authenticate to each other with a keyfile — a shared secret
+supplied as `MONGO_KEYFILE` (generated with `openssl rand -base64 741 | tr -d '\n'`, kept out of git — in CI/CD
+variables and `docker/.env`).
+
+`docker/mongodb/entrypoint.sh` drives everything: it writes the keyfile, starts `mongod --replSet rs0 --keyFile`, runs
+`rs.initiate` once, and seeds the users — root first, then the per-service users via
+`docker/mongodb/init/create-app-users.js` (passwords are injected as variables because the legacy `mongo` shell cannot
+read the environment itself). Each step is idempotent, so no manual `rs.initiate` is needed on a fresh volume.
+
+The exception is an already running server with a populated volume: there the set must be initiated once by hand as
+root (the users already exist, auto-initiation leaves them untouched):
 
 ```bash
 docker exec -it mongodb mongo -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD \
-  --authenticationDatabase admin --eval "
-    var EVENT_MONGO_USER='...'; var EVENT_MONGO_PASS='...';
-    var PRESENCE_MONGO_USER='...'; var PRESENCE_MONGO_PASS='...';
-    var GATEWAY_MONGO_USER='...'; var GATEWAY_MONGO_PASS='...';
-    load('/scripts/create-app-users.js');
-  "
+  --authenticationDatabase admin \
+  --eval 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongodb:27017"}]})'
 ```
+
+Port `27017` is published only on `127.0.0.1`, not exposed externally. To reach it from another host (Compass, `mongo`)
+use an SSH tunnel: `ssh -L 27017:127.0.0.1:27017 user@server`, then connect to `localhost:27017`.
 
 For local runs (`bootRun`, the `local` profile) the services connect to the local MongoDB as `eventsjohnny` /
 `presencejohnny` (see `application-local.yml`); these users must be created once in the local database with the same
-`createUser`.
+`createUser`. For transactions the local MongoDB must also be a single-node replica set — access control can stay off
+there (no keyfile needed), with `directConnection=true` in the connection string.
 
 ## API gateway
 
@@ -142,8 +149,10 @@ logs panel on the overview dashboard shows them together with `{source=~"arduino
    ```
 3. GitLab Runner installed and added to the `docker` group.
 4. Gradle installed.
-5. CI/CD Variables added via the UI — for RabbitMQ, MongoDB (the root account `MONGO_INITDB_ROOT_*` and a
-   `*_MONGO_USER`/`*_MONGO_PASS` pair per service), Yandex and Grafana (admin username and password).
+5. CI/CD Variables added via the UI — for RabbitMQ, MongoDB (the root account `MONGO_INITDB_ROOT_*`, the keyfile
+   `MONGO_KEYFILE` and a `*_MONGO_USER`/`*_MONGO_PASS` pair per service), Yandex, Grafana (admin username and
+   password), api-gateway (`JWT_SECRET` and the `ADMIN_USERNAME`/`ADMIN_PASSWORD` admin) and Alertmanager
+   (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`).
 6. A Home Assistant account is set up with the MQTT integration. The `homeassistant/status` topic must be retained —
    `event-service` reads it on startup to determine HA's state.
 7. The `local` Spring profile is active for local development.

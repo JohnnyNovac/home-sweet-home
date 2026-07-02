@@ -1,7 +1,3 @@
-// Creates one least-privilege user per service database, so each service
-// authenticates against its own database and no longer needs authSource=admin.
-// Credential values are injected as globals by 00-create-app-users.sh, because
-// the legacy mongo shell in this image (4.4, no mongosh) has no process.env.
 db.getSiblingDB('events').createUser({
     user: EVENT_MONGO_USER,
     pwd: EVENT_MONGO_PASS,

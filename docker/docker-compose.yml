@@ -63,11 +63,13 @@ services:
   mongodb:
     image: mongodb/mongodb-community-server:4.4.29-ubuntu2004
     container_name: mongodb
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_KEYFILE=${MONGO_KEYFILE}
       - EVENT_MONGO_USER=${EVENT_MONGO_USER}
       - EVENT_MONGO_PASS=${EVENT_MONGO_PASS}
       - PRESENCE_MONGO_USER=${PRESENCE_MONGO_USER}
@@ -76,7 +78,7 @@ services:
       - GATEWAY_MONGO_PASS=${GATEWAY_MONGO_PASS}
     volumes:
       - mongodb_data:/data/db
-      - ./mongodb/init/00-create-app-users.sh:/docker-entrypoint-initdb.d/00-create-app-users.sh:ro
+      - ./mongodb/entrypoint.sh:/entrypoint.sh:ro
       - ./mongodb/init/create-app-users.js:/scripts/create-app-users.js:ro
     restart: unless-stopped
     networks:

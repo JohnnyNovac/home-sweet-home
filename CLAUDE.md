@@ -33,16 +33,18 @@ Local dev uses the `local` Spring profile (`application-local.yml` in each servi
 reads RabbitMQ / Mongo / Yandex / Grafana credentials from env vars (`RABBITMQ_DEFAULT_USER/PASS`,
 `MONGO_INITDB_ROOT_USERNAME/PASSWORD`, `YANDEX_OAUTH_TOKEN`, `YANDEX_CHANDELIER_ID`, `GRAFANA_ADMIN_USER/PASSWORD`).
 
-**MongoDB users.** Each service has its own database and a `readWrite`-only user scoped to it (event-service → `events`,
-presence-service → `presence`, api-gateway → `auth`), so connection URIs no longer carry `authSource=admin` — the user
-lives in the database it connects to, which is also its default auth source. The root account
-(`MONGO_INITDB_ROOT_*`) stays only on the `mongodb` container. The per-service users are created on first init by
-`docker/mongodb/init/00-create-app-users.sh`, which injects the `*_MONGO_USER`/`*_MONGO_PASS` env vars as globals and
-`load()`s `create-app-users.js` (the `.js` is mounted under `/scripts`, not `/docker-entrypoint-initdb.d`, so the
-entrypoint does not also run it without those globals; the image ships the legacy `mongo` shell, which has no
-`process.env`). Because init scripts run only on an empty data volume, an existing deployment needs the same
-`createUser`
-run once by hand — see `NOTES.md`.
+**MongoDB.** Runs as a single-node replica set (`rs0`), required for multi-document transactions, so every connection
+URI carries `replicaSet=rs0`. Each service has its own database and a `readWrite`-only user scoped to it (event-service
+→ `events`, presence-service → `presence`, api-gateway → `auth`), so URIs no longer carry `authSource=admin` — the user
+lives in the database it connects to, which is also its default auth source. The root account (`MONGO_INITDB_ROOT_*`)
+stays only on the `mongodb` container. Because the replica set has access control on, its members authenticate to each
+other with a keyfile — a shared secret supplied as `MONGO_KEYFILE` (kept out of git, in CI variables / `docker/.env`).
+`docker/mongodb/entrypoint.sh` drives all of it: it writes the keyfile, starts `mongod --replSet rs0 --keyFile`, runs
+`rs.initiate` once, and seeds the users (root, then the per-service users via `docker/mongodb/init/create-app-users.js`,
+which injects the `*_MONGO_USER`/`*_MONGO_PASS` env vars as globals because the legacy `mongo` shell has no
+`process.env`). Each step is idempotent (`|| true` skips what is already done), so no manual `rs.initiate` is needed on
+a fresh volume; an already-populated standalone volume needs the one-time `rs.initiate` run by hand — see `NOTES.md`.
+The container's `27017` is published only to `127.0.0.1`; reach it from another host over an SSH tunnel.
 
 ## Architecture notes that span multiple files
 
