@@ -2,12 +2,16 @@ package dev.iot.eventservice.service;
 
 import dev.iot.eventservice.dto.CreateDeviceDto;
 import dev.iot.eventservice.dto.DeviceDto;
+import dev.iot.eventservice.dto.OutboxPayloadDto;
 import dev.iot.eventservice.dto.UpdateDeviceDto;
 import dev.iot.eventservice.exception.DeviceAlreadyExistsException;
 import dev.iot.eventservice.exception.DeviceNotFoundException;
 import dev.iot.eventservice.mapper.DeviceMapper;
 import dev.iot.eventservice.model.Device;
+import dev.iot.eventservice.model.OutboxEvent;
+import dev.iot.eventservice.model.OutboxEventType;
 import dev.iot.eventservice.repository.DeviceRepository;
+import dev.iot.eventservice.repository.OutboxRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -19,6 +23,8 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,15 +41,26 @@ public class DeviceService {
     private static final Logger logger = LoggerFactory.getLogger(DeviceService.class);
 
     private final MongoTemplate mongoTemplate;
-    private final DeviceRepository repository;
+    private final DeviceRepository deviceRepository;
+    private final OutboxRepository outboxRepository;
     private final DeviceMapper deviceMapper;
+    private final ObjectMapper objectMapper;
 
-    public DeviceService(MongoTemplate mongoTemplate, DeviceRepository repository, DeviceMapper deviceMapper) {
+    public DeviceService(
+            MongoTemplate mongoTemplate,
+            DeviceRepository deviceRepository,
+            OutboxRepository outboxRepository,
+            DeviceMapper deviceMapper,
+            ObjectMapper objectMapper
+    ) {
         this.mongoTemplate = mongoTemplate;
-        this.repository = repository;
+        this.deviceRepository = deviceRepository;
+        this.outboxRepository = outboxRepository;
         this.deviceMapper = deviceMapper;
+        this.objectMapper = objectMapper;
     }
 
+    @Transactional
     public DeviceDto create(CreateDeviceDto createDeviceDto) {
         String deviceId = createDeviceDto.deviceId();
 
@@ -52,7 +69,10 @@ public class DeviceService {
         }
 
         try {
-            Device device = repository.insert(deviceMapper.toDevice(createDeviceDto, deviceId));
+            Device device = deviceRepository.insert(deviceMapper.toDevice(createDeviceDto, deviceId));
+
+            createOutboxEvent(deviceId, device);
+
             return deviceMapper.toDeviceDto(device);
         } catch (DuplicateKeyException e) {
             throw new DeviceAlreadyExistsException(deviceId);
@@ -65,11 +85,24 @@ public class DeviceService {
 
     public List<DeviceDto> getDevices(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return repository.findAll(pageable).stream().map(deviceMapper::toDeviceDto).toList();
+        return deviceRepository.findAll(pageable).stream().map(deviceMapper::toDeviceDto).toList();
     }
 
+    @Transactional
     public void delete(String id) {
-        repository.deleteById(id);
+        Device existing = deviceRepository.findById(id)
+                .orElseThrow(() -> new DeviceNotFoundException(id));
+
+        OutboxEvent outboxEvent = new OutboxEvent();
+        outboxEvent.setAggregateType("device");
+        outboxEvent.setAggregateId(existing.getDeviceId());
+        outboxEvent.setEventType(OutboxEventType.DEVICE_DELETED);
+        outboxEvent.setPayload(objectMapper.writeValueAsString(
+                new OutboxPayloadDto(existing.getDeviceId(), null, null)
+        ));
+        outboxRepository.insert(outboxEvent);
+
+        deviceRepository.deleteById(id);
     }
 
     /**
@@ -83,9 +116,10 @@ public class DeviceService {
      * @return the updated device
      * @throws DeviceNotFoundException if no device with this id exists
      */
+    @Transactional
     public DeviceDto update(String deviceId, UpdateDeviceDto updateDeviceDto) {
         if (updateDeviceDto.room() == null && updateDeviceDto.name() == null) {
-            Device existing = repository.findById(deviceId)
+            Device existing = deviceRepository.findById(deviceId)
                     .orElseThrow(() -> new DeviceNotFoundException(deviceId));
             return deviceMapper.toDeviceDto(existing);
         }
@@ -106,7 +140,22 @@ public class DeviceService {
             throw new DeviceNotFoundException(deviceId);
         }
 
+        if (updated.getRoom() != null) {
+            createOutboxEvent(deviceId, updated);
+        }
+
         return deviceMapper.toDeviceDto(updated);
+    }
+
+    private void createOutboxEvent(String deviceId, Device updated) {
+        OutboxEvent outboxEvent = new OutboxEvent();
+        outboxEvent.setAggregateType("device");
+        outboxEvent.setAggregateId(deviceId);
+        outboxEvent.setEventType(OutboxEventType.DEVICE_UPSERTED);
+        outboxEvent.setPayload(objectMapper.writeValueAsString(
+                new OutboxPayloadDto(deviceId, updated.getRoom(), updated.getSensorType())
+        ));
+        outboxRepository.insert(outboxEvent);
     }
 
     /**
@@ -144,7 +193,7 @@ public class DeviceService {
      */
     public Optional<String> roomFor(String deviceId) {
         try {
-            return repository.findById(deviceId).map(Device::getRoom);
+            return deviceRepository.findById(deviceId).map(Device::getRoom);
         } catch (RuntimeException e) {
             logger.warn("Room lookup for {} failed, publishing discovery without suggested_area", deviceId, e);
             return Optional.empty();
@@ -162,7 +211,7 @@ public class DeviceService {
      */
     public Optional<String> nameFor(String deviceId) {
         try {
-            return repository.findById(deviceId).map(Device::getName);
+            return deviceRepository.findById(deviceId).map(Device::getName);
         } catch (RuntimeException e) {
             logger.warn("Name lookup for {} failed, publishing discovery with deviceId as name", deviceId, e);
             return Optional.empty();

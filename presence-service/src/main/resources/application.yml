@@ -21,6 +21,7 @@ app:
   rabbitmq:
     presence-data-queue: presence-data
     illuminance-data-queue: presence-illuminance
+    device-events-queue: presence-device-events
     exchange: amq.topic
     command-key-prefix: home.cmd.
   grpc:

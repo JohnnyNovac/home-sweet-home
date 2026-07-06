@@ -6,6 +6,10 @@ spring:
     port: 5672
     username: ${RABBITMQ_DEFAULT_USER}
     password: ${RABBITMQ_DEFAULT_PASS}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   mongodb:
     uri: mongodb://${EVENT_MONGO_USER}:${EVENT_MONGO_PASS}@mongodb:27017/events?replicaSet=rs0&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000&socketTimeoutMS=5000
 
@@ -16,6 +20,8 @@ app:
   rabbitmq:
     event-data-queue: event-data
     device-availability-queue: device-availability
+    device-events-exchange: device-events
+    device-events-key-prefix: device.event.
   ha:
     discovery-prefix: homeassistant
     service-availability-topic: homeassistant/event-service/availability

@@ -8,7 +8,17 @@
       "auto_delete": false,
       "internal": false,
       "arguments": {}
+    },
+    {
+      "name": "device-events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
     }
+
   ],
   "queues": [
     {
@@ -62,6 +72,16 @@
       }
     },
     {
+      "name": "presence-device-events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "dlx",
+        "x-dead-letter-routing-key": "presence-device-events.dlq"
+      }
+    },
+    {
       "name": "event-data.dlq",
       "vhost": "/",
       "durable": true,
@@ -91,6 +111,13 @@
     },
     {
       "name": "device-logs.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "presence-device-events.dlq",
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
@@ -139,6 +166,14 @@
       "arguments": {}
     },
     {
+      "source": "device-events",
+      "vhost": "/",
+      "destination": "presence-device-events",
+      "destination_type": "queue",
+      "routing_key": "device.event.*",
+      "arguments": {}
+    },
+    {
       "source": "dlx",
       "vhost": "/",
       "destination": "event-data.dlq",
@@ -176,6 +211,14 @@
       "destination": "device-logs.dlq",
       "destination_type": "queue",
       "routing_key": "device-logs.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "dlx",
+      "vhost": "/",
+      "destination": "presence-device-events.dlq",
+      "destination_type": "queue",
+      "routing_key": "presence-device-events.dlq",
       "arguments": {}
     }
   ]
