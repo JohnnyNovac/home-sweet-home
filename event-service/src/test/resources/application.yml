@@ -2,8 +2,7 @@ spring:
   autoconfigure:
     exclude: org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration
   mongodb:
-    host: localhost
-    port: ${mongodb.container.port}
+    uri: ${mongodb.container.uri}
 
 app:
   mqtt:

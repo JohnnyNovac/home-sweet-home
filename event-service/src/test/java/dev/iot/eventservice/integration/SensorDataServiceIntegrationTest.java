@@ -1,6 +1,7 @@
 package dev.iot.eventservice.integration;
 
 import dev.iot.eventservice.config.MqttTestConfig;
+import dev.iot.eventservice.config.RabbitTestConfig;
 import dev.iot.eventservice.model.SensorData;
 import dev.iot.eventservice.service.SensorDataService;
 import org.junit.jupiter.api.DisplayName;
@@ -14,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Testcontainers
-@Import(MqttTestConfig.class)
+@Import({MqttTestConfig.class, RabbitTestConfig.class})
 class SensorDataServiceIntegrationTest {
 
     private final SensorDataService sensorDataService;

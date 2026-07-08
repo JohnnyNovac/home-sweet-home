@@ -8,11 +8,10 @@ import org.testcontainers.mongodb.MongoDBContainer;
 public class MongoDBTestContainerConfig {
 
     @Container
-    public static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:latest");
+    public static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:7.0").withReplicaSet();
 
     static {
         mongoDBContainer.start();
-        Integer mappedPort = mongoDBContainer.getMappedPort(27017);
-        System.setProperty("mongodb.container.port", String.valueOf(mappedPort));
+        System.setProperty("mongodb.container.uri", mongoDBContainer.getReplicaSetUrl());
     }
 }

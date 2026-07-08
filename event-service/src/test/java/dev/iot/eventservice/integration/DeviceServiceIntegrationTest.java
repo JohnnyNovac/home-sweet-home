@@ -1,6 +1,7 @@
 package dev.iot.eventservice.integration;
 
 import dev.iot.eventservice.config.MqttTestConfig;
+import dev.iot.eventservice.config.RabbitTestConfig;
 import dev.iot.eventservice.dto.CreateDeviceDto;
 import dev.iot.eventservice.dto.DeviceDto;
 import dev.iot.eventservice.dto.UpdateDeviceDto;
@@ -22,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @Testcontainers
-@Import(MqttTestConfig.class)
+@Import({MqttTestConfig.class, RabbitTestConfig.class})
 class DeviceServiceIntegrationTest {
 
     private final DeviceService deviceService;
