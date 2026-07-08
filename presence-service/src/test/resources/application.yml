@@ -18,6 +18,8 @@ app:
     presence-data-queue: presence-data
     illuminance-data-queue: presence-illuminance
     device-events-queue: presence-device-events
+  event-service:
+    seed-enabled: false
 
 logging:
   level:

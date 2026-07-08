@@ -39,6 +39,8 @@ app:
   device:
     command:
       measure: MEASURE
+  event-service:
+    url: http://event-service:8081
 management:
   endpoints:
     web:
