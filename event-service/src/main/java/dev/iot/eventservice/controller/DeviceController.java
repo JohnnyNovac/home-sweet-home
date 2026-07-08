@@ -5,11 +5,9 @@ import dev.iot.eventservice.dto.DeviceDto;
 import dev.iot.eventservice.dto.UpdateDeviceDto;
 import dev.iot.eventservice.service.DeviceService;
 import jakarta.validation.Valid;
+import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
 
 @RestController
 @RequestMapping("/api/v1/devices")
@@ -28,9 +26,9 @@ public class DeviceController {
     }
 
     @GetMapping
-    public List<DeviceDto> getDevices(@RequestParam(required = false, defaultValue = "0") int pageNumber,
-                                      @RequestParam(required = false, defaultValue = "20") int pageSize) {
-        return deviceService.getDevices(pageNumber, pageSize);
+    public PagedModel<DeviceDto> getDevices(@RequestParam(required = false, defaultValue = "0") int pageNumber,
+                                            @RequestParam(required = false, defaultValue = "20") int pageSize) {
+        return new PagedModel<>(deviceService.getDevices(pageNumber, pageSize));
     }
 
     @PutMapping("/{id}")

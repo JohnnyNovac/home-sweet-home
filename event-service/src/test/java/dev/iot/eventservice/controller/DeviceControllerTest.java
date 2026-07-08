@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -72,11 +73,12 @@ class DeviceControllerTest {
     @DisplayName("GET returns the paged device list")
     void getReturnsDevices() throws Exception {
         when(deviceService.getDevices(0, 20))
-                .thenReturn(List.of(new DeviceDto("esp01", "climate", "bedroom", "NodeMCU-1", null)));
+                .thenReturn(new PageImpl<>(List.of(new DeviceDto("esp01", "climate", "bedroom", "NodeMCU-1", null))));
 
         mockMvc.perform(get("/api/v1/devices"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].deviceId").value("esp01"));
+                .andExpect(jsonPath("$.content[0].deviceId").value("esp01"))
+                .andExpect(jsonPath("$.page.totalElements").value(1));
     }
 
     @Test
