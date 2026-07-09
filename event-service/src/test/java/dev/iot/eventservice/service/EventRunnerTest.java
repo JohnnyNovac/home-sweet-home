@@ -102,10 +102,10 @@ class EventRunnerTest {
     }
 
     @Test
-    @DisplayName("Should ignore a malformed routing key without dispatching or throwing")
-    void shouldIgnoreMalformedRoutingKey() {
-        assertThatCode(() -> eventRunner.handleEventMessage("{}", "home.climate"))
-                .doesNotThrowAnyException();
+    @DisplayName("Should reject a malformed routing key so it is dead-lettered")
+    void shouldRejectMalformedRoutingKey() {
+        assertThatThrownBy(() -> eventRunner.handleEventMessage("{}", "home.climate"))
+                .isInstanceOf(AmqpRejectAndDontRequeueException.class);
 
         verifyNoInteractions(sensorHandlerFactory, deviceService);
     }

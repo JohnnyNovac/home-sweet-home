@@ -47,10 +47,12 @@ public class EventRunner implements CommandLineRunner {
 
     @RabbitListener(queues = "${app.rabbitmq.event-data-queue}")
     public void handleEventMessage(String json, @Header("amqp_receivedRoutingKey") String routingKey) {
-        String[] parts = routingKey.split("\\.");
-        if (parts.length < 4) {
-            logger.warn("Unexpected data routing key: {}", routingKey);
-            return;
+        String[] parts;
+        try {
+            parts = parseSensorTypeAndDeviceId(routingKey);
+        } catch (IllegalArgumentException e) {
+            logger.error("Discarding data message with bad routing key: {}", routingKey, e);
+            throw new AmqpRejectAndDontRequeueException("Unprocessable data message: " + routingKey, e);
         }
 
         String sensorType = parts[1];
@@ -85,5 +87,13 @@ public class EventRunner implements CommandLineRunner {
                 sensorHandlerFactory.getHandlers().forEach(SensorHandler::sendDiscoveryForAll);
             }
         });
+    }
+
+    private String[] parseSensorTypeAndDeviceId(String routingKey) {
+        String[] parts = routingKey.split("\\.");
+        if (parts.length < 4) {
+            throw new IllegalArgumentException("Unexpected data routing key: " + routingKey);
+        }
+        return parts;
     }
 }
