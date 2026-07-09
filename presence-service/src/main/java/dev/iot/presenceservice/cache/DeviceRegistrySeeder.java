@@ -49,7 +49,7 @@ public class DeviceRegistrySeeder {
                 }
             } while (number < totalPages);
         } catch (RestClientException e) {
-            logger.error("Registry seed failed, cache will fill from live events", e);
+            logger.warn("Registry seed failed, cache will fill from live events", e);
         }
     }
 }
