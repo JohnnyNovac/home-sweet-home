@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -25,5 +26,9 @@ public class DeviceRegistryCache {
                 .filter(entry -> Objects.equals(entry.getValue().room(), room) && Objects.equals(entry.getValue().sensorType(), sensorType))
                 .map(Map.Entry::getKey)
                 .toList();
+    }
+
+    public Optional<String> roomOf(String deviceId) {
+        return Optional.ofNullable(cache.get(deviceId)).map(DeviceEntry::room);
     }
 }

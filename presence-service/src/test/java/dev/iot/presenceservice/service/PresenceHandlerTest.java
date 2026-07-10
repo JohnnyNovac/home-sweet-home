@@ -16,11 +16,15 @@ import static org.mockito.Mockito.verify;
 class PresenceHandlerTest {
 
     private static final String DEVICE_ID = "presence-1";
+    private static final String ROOM = "living-room";
 
     private PresenceHandler presenceHandler;
 
     @Mock
     private LampService lampService;
+
+    @Mock
+    private MeasureTrigger measureTrigger;
 
     @BeforeEach
     void setUp() {
@@ -29,7 +33,7 @@ class PresenceHandlerTest {
                 new MeasurementsProperties.Measurement("pirSensorPresence"),
                 null);
 
-        presenceHandler = new PresenceHandler(new ObjectMapper(), measurementsProperties, lampService);
+        presenceHandler = new PresenceHandler(new ObjectMapper(), measurementsProperties, lampService, measureTrigger);
     }
 
     @Test
@@ -44,7 +48,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
+        presenceHandler.handleIncomingData(DEVICE_ID, ROOM, jsonData);
 
         verify(lampService).onPresence(true);
     }
@@ -61,7 +65,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
+        presenceHandler.handleIncomingData(DEVICE_ID, ROOM, jsonData);
 
         verify(lampService).onPresence(true);
     }
@@ -78,7 +82,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        presenceHandler.handleIncomingData(DEVICE_ID, jsonData);
+        presenceHandler.handleIncomingData(DEVICE_ID, ROOM, jsonData);
 
         verify(lampService).onPresence(false);
     }
@@ -88,7 +92,7 @@ class PresenceHandlerTest {
     void shouldRejectDataWithoutRequiredFields() {
         String invalidJsonData = "{}";
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, invalidJsonData))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, ROOM, invalidJsonData))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -103,7 +107,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, invalidJsonData))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, ROOM, invalidJsonData))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -119,7 +123,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, nullPresence))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, ROOM, nullPresence))
                 .isInstanceOf(IllegalArgumentException.class);
 
         String stringPresence = """
@@ -131,7 +135,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, stringPresence))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, ROOM, stringPresence))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

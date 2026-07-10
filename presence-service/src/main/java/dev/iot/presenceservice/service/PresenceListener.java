@@ -15,24 +15,36 @@ public class PresenceListener {
     private static final Logger logger = LoggerFactory.getLogger(PresenceListener.class);
 
     private final PresenceHandler presenceHandler;
+    private final LampGate lampGate;
 
-    public PresenceListener(PresenceHandler presenceHandler) {
+    public PresenceListener(PresenceHandler presenceHandler, LampGate lampGate) {
         this.presenceHandler = presenceHandler;
+        this.lampGate = lampGate;
     }
 
     @RabbitListener(queues = "${app.rabbitmq.presence-data-queue}")
     public void handleMessage(String message, @Header(AmqpHeaders.RECEIVED_ROUTING_KEY) String routingKey) {
-        String[] parts = routingKey.split("\\.");
-        if (parts.length < 4) {
-            logger.warn("Unexpected presence routing key: {}", routingKey);
-            return;
-        }
-        String deviceId = parts[2];
+        String deviceId;
         try {
-            presenceHandler.handleIncomingData(deviceId, message);
+            deviceId = parseDeviceId(routingKey);
+        } catch (IllegalArgumentException e) {
+            logger.error("Discarding presence message with bad routing key: {}", routingKey, e);
+            throw new AmqpRejectAndDontRequeueException("Unprocessable presence message: " + routingKey, e);
+        }
+
+        try {
+            lampGate.lampRoomFor(deviceId).ifPresent(room -> presenceHandler.handleIncomingData(deviceId, room, message));
         } catch (JacksonException | IllegalArgumentException | ClassCastException e) {
             logger.error("Discarding unprocessable presence message, routingKey={}, payload={}", routingKey, message, e);
             throw new AmqpRejectAndDontRequeueException("Unprocessable presence message: " + routingKey, e);
         }
+    }
+
+    private String parseDeviceId(String routingKey) {
+        String[] parts = routingKey.split("\\.");
+        if (parts.length < 4) {
+            throw new IllegalArgumentException("Unexpected presence routing key: " + routingKey);
+        }
+        return parts[2];
     }
 }

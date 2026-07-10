@@ -10,10 +10,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class IlluminanceListenerTest {
@@ -25,12 +28,15 @@ class IlluminanceListenerTest {
     @Mock
     private LampService lampService;
 
+    @Mock
+    private LampGate lampGate;
+
     @BeforeEach
     void setUp() {
         MeasurementsProperties measurementsProperties = new MeasurementsProperties(
                 null, null, new MeasurementsProperties.Measurement("illuminance"));
 
-        listener = new IlluminanceListener(new ObjectMapper(), measurementsProperties, lampService);
+        listener = new IlluminanceListener(new ObjectMapper(), measurementsProperties, lampService, lampGate);
     }
 
     @Test
@@ -45,6 +51,7 @@ class IlluminanceListenerTest {
                     }
                 }
                 """;
+        when(lampGate.lampRoomFor("esp-01-1")).thenReturn(Optional.of("living-room"));
 
         listener.handleMessage(message, ROUTING_KEY);
 

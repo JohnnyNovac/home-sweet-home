@@ -13,18 +13,27 @@ public class PresenceHandler {
     private final ObjectMapper objectMapper;
     private final MeasurementsProperties measurementsProperties;
     private final LampService lampService;
+    private final MeasureTrigger measureTrigger;
 
-    public PresenceHandler(ObjectMapper objectMapper, MeasurementsProperties measurementsProperties, LampService lampService) {
+    public PresenceHandler(
+            ObjectMapper objectMapper,
+            MeasurementsProperties measurementsProperties,
+            LampService lampService,
+            MeasureTrigger measureTrigger
+    ) {
         this.objectMapper = objectMapper;
         this.measurementsProperties = measurementsProperties;
         this.lampService = lampService;
+        this.measureTrigger = measureTrigger;
     }
 
-    public void handleIncomingData(String deviceId, String jsonData) {
+    public void handleIncomingData(String deviceId, String room, String jsonData) {
         validateJsonFormat(jsonData);
 
         CreateEventDto createEventDTO = new CreateEventDto(deviceId, JsonDtoParser.parseMeasurements(jsonData));
-        lampService.onPresence(isPresenceDetected(createEventDTO));
+        boolean isPresenceDetected = isPresenceDetected(createEventDTO);
+        lampService.onPresence(isPresenceDetected);
+        measureTrigger.onPresence(deviceId, room, isPresenceDetected);
     }
 
     private boolean isPresenceDetected(CreateEventDto createEventDTO) {

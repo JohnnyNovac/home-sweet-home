@@ -20,26 +20,49 @@ public class IlluminanceListener {
     private final ObjectMapper objectMapper;
     private final MeasurementsProperties measurementsProperties;
     private final LampService lampService;
+    private final LampGate lampGate;
 
-    public IlluminanceListener(ObjectMapper objectMapper, MeasurementsProperties measurementsProperties, LampService lampService) {
+    public IlluminanceListener(
+            ObjectMapper objectMapper,
+            MeasurementsProperties measurementsProperties,
+            LampService lampService,
+            LampGate lampGate
+    ) {
         this.objectMapper = objectMapper;
         this.measurementsProperties = measurementsProperties;
         this.lampService = lampService;
+        this.lampGate = lampGate;
     }
 
     @RabbitListener(queues = "${app.rabbitmq.illuminance-data-queue}")
     public void handleMessage(String message, @Header(AmqpHeaders.RECEIVED_ROUTING_KEY) String routingKey) {
+        String deviceId;
+        try {
+            deviceId = parseDeviceId(routingKey);
+        } catch (IllegalArgumentException e) {
+            logger.error("Discarding illuminance message with bad routing key: {}", routingKey, e);
+            throw new AmqpRejectAndDontRequeueException("Unprocessable illuminance message: " + routingKey, e);
+        }
+
         try {
             JsonNode measurements = objectMapper.readTree(message).path("measurements");
             JsonNode illuminance = measurements.path(measurementsProperties.illuminance().name());
 
             // Climate messages from devices without a light sensor carry no illuminance — just skip them.
             if (illuminance.isNumber()) {
-                lampService.onIlluminance(illuminance.asDouble());
+                lampGate.lampRoomFor(deviceId).ifPresent(room -> lampService.onIlluminance(illuminance.asDouble()));
             }
         } catch (JacksonException e) {
-            logger.error("Discarding unprocessable climate message, routingKey={}, payload={}", routingKey, message, e);
-            throw new AmqpRejectAndDontRequeueException("Unprocessable climate message: " + routingKey, e);
+            logger.error("Discarding unprocessable illuminance message, routingKey={}, payload={}", routingKey, message, e);
+            throw new AmqpRejectAndDontRequeueException("Unprocessable illuminance message: " + routingKey, e);
         }
+    }
+
+    private String parseDeviceId(String routingKey) {
+        String[] parts = routingKey.split("\\.");
+        if (parts.length < 4) {
+            throw new IllegalArgumentException("Unexpected illuminance routing key: " + routingKey);
+        }
+        return parts[2];
     }
 }
