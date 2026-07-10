@@ -11,54 +11,48 @@ automatically controls lighting via the Yandex Smart Home API.
 ```mermaid
 flowchart LR
     CLIENT([API clients])
-
-    subgraph Gateway["📱 api-gateway"]
-        GW[api-gateway]
-        DBA[(auth)]
-        GW --> DBA
-    end
-
-    subgraph Hardware["🔌 Hardware"]
-        MB[MultiBox<br/>temperature / humidity / illuminance]
-        ESP[ESP-01<br/>WiFi bridge]
-        PB[PresenceBox<br/>presence]
-        MB -->|Serial| ESP
-    end
-
-    BROKER[(RabbitMQ<br/>MQTT/AMQP)]
-
-    subgraph EventSvc["⚙️ event-service"]
-        ES[event-service]
-        DBE[(events)]
-        ES --> DBE
-    end
-
-    subgraph PresenceSvc["⚙️ presence-service"]
-        PS[presence-service]
-        DBP[(presence)]
-        PS --> DBP
-    end
-
-    subgraph External["🌐 External"]
-        HA[Home Assistant]
-        YAPI[Yandex Smart Home API]
-        LIGHTNING[💡 Lighting]
-    end
-
+    MB[MultiBox<br/>temperature · humidity · illuminance]
+    ESP[ESP-01<br/>WiFi bridge]
+    PB[PresenceBox<br/>presence]
+    GW[api-gateway<br/>:8080]
+    BROKER[(RabbitMQ<br/>MQTT · AMQP)]
+    ES[event-service]
+    PS[presence-service]
+    HA[Home Assistant]
     YS[yandex-service]
+    YAPI[Yandex Smart Home API]
+    LIGHT([💡 Lighting])
 
-    CLIENT -->|HTTP :8080| GW
+    %% data flow
+    MB -->|Serial| ESP
     ESP -->|MQTT| BROKER
     PB -->|MQTT| BROKER
     BROKER -->|AMQP| ES
     BROKER -->|AMQP| PS
+    CLIENT -->|HTTP| GW
     GW -->|REST| ES
     GW -->|REST| PS
     ES -->|MQTT| HA
     PS -->|gRPC| YS
     YS -->|HTTPS| YAPI
-    YAPI --> LIGHTNING
+    YAPI --> LIGHT
+
+    %% control plane
+    ES -. device registry .-> PS
+    PS -. MEASURE .-> BROKER
+
+    classDef hw fill:#e8f0fe,stroke:#4285f4,color:#202124;
+    classDef infra fill:#fef7e0,stroke:#f9ab00,color:#202124;
+    classDef svc fill:#e6f4ea,stroke:#1e8e3e,color:#202124;
+    classDef ext fill:#fce8e6,stroke:#d93025,color:#202124;
+
+    class MB,ESP,PB hw
+    class BROKER,GW infra
+    class ES,PS,YS svc
+    class HA,YAPI,LIGHT ext
 ```
+
+Solid arrows are the data flow; dashed arrows are the control plane (device-registry replication and the `MEASURE` command).
 
 Data flow:
 
@@ -69,9 +63,16 @@ Data flow:
    queues.
 3. **event-service** picks up all sensor events from the sensor AMQP queues, persists them to MongoDB, and forwards them
    to Home Assistant over MQTT — for dashboard visualization (temperature/humidity graphs, presence indicator,
-   illuminance). **presence-service** receives presence and illuminance data from its own AMQP queues in parallel.
-4. **presence-service** decides whether to switch the light on/off based on presence and illuminance (turns it on only in the dark, off when presence ends) and calls **yandex-service** over gRPC.
-5. **yandex-service** invokes the Yandex Smart Home API and toggles the lighting.
+   illuminance). It also owns the device registry — which device is in which room and of which type. **presence-service**
+   receives presence and illuminance data from its own AMQP queues in parallel.
+4. **presence-service** needs the device registry too — to pair a sensor with a lamp in the same room. Room and type
+   changes are replicated from event-service to presence-service through a transactional outbox (messages over AMQP), so
+   presence-service keeps a consistent copy and never queries event-service on the hot path.
+5. **presence-service** controls the light only for sensors that share a room with a lamp: it turns the lamp on by
+   presence when the room is dark, off when presence ends, and calls **yandex-service** over gRPC. When presence appears
+   in such a room it also sends the climate sensor a `MEASURE` command (down-link over MQTT) to get fresh illuminance at
+   once, without waiting for the next 60-second cycle.
+6. **yandex-service** invokes the Yandex Smart Home API and toggles the lighting.
 
 ## Stack
 

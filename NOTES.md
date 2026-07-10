@@ -35,8 +35,11 @@ WiFi-мост между MultiBox и брокером: принимает пок
 | `home/<sensorType>/<deviceId>/data`  | JSON с измерениями                                            |
 | `home/availability/<deviceId>`       | `online` / `offline` (MQTT LWT непосредственно от устройства) |
 | `home/logs/<deviceId>`               | Диагностические логи устройства (JSON `{level,msg}`)          |
+| `home/cmd/<deviceId>`                | Команда устройству (JSON `{cmd}`, например `MEASURE`)         |
 
-`sensorType` — `climate` или `presence`. `deviceId` задаётся константой `DEVICE_ID` в прошивке `.ino`.
+`sensorType` — `climate` или `presence`. `deviceId` задаётся константой `DEVICE_ID` в прошивке `.ino`. Все топики, кроме
+последнего, устройство публикует само; на `home/cmd/<deviceId>` оно подписано — туда presence-service отправляет
+`MEASURE` (см. раздел про лампу ниже).
 
 ## Назначение комнаты и имени устройству
 
@@ -51,6 +54,23 @@ docker exec -it mongodb mongo -u $EVENT_MONGO_USER -p $EVENT_MONGO_PASS events
 Если `name` не задано, Home Assistant показывает устройство по его `deviceId`. После изменения нужно перезапустить Home
 Assistant: event-service подписан на `homeassistant/status` и при переходе в `online` повторно публикует discovery
 с актуальными `suggested_area` и именем.
+
+## Лампа и привязка к комнате
+
+Освещением управляет presence-service, и решение он принимает по комнате: показания датчика влияют на лампу, только если
+в той же комнате есть устройство-лампа. Поэтому лампу заводят в реестре как обычное устройство типа `lamp` с той же
+`room`, что и у датчиков комнаты — через REST (`POST /api/v1/devices` с телом `{"sensorType": "lamp", "room":
+"bedroom"}`, `deviceId` сгенерируется сам) или напрямую в mongo:
+
+```bash
+docker exec -it mongodb mongo -u $EVENT_MONGO_USER -p $EVENT_MONGO_PASS events
+> db.devices.insertOne({_id: "lamp-bedroom", sensorType: "lamp", room: "bedroom"})
+```
+
+Лампа ничего не публикует по MQTT — это запись каталога без `lastSeenAt`. Комнаты датчиков и саму лампу presence-service
+получает из реестра event-service, который реплицируется в него через outbox (см. CLAUDE.md, «Device registry
+replication»). Поэтому, в отличие от discovery в Home Assistant, для автоматики перезапуск HA не нужен: изменение `room`
+доходит до presence-service в течение одного цикла ретрансляции (около 10 с).
 
 ## MongoDB: репликасет и пользователи
 

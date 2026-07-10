@@ -36,8 +36,11 @@ and state topics published by event-service.
 | `home/<sensorType>/<deviceId>/data`  | JSON with measurements                          |
 | `home/availability/<deviceId>`       | `online` / `offline` (MQTT LWT from the device) |
 | `home/logs/<deviceId>`               | Device diagnostic logs (JSON `{level,msg}`)     |
+| `home/cmd/<deviceId>`                | Down-link command to the device (JSON `{cmd}`, e.g. `MEASURE`) |
 
 `sensorType` is either `climate` or `presence`. `deviceId` is set by the `DEVICE_ID` constant in the `.ino` firmware.
+Every topic except the last is published by the device; `home/cmd/<deviceId>` is the one the device subscribes to —
+presence-service publishes `MEASURE` to it (see the lamp section below).
 
 ## Assigning a room and name to a device
 
@@ -54,6 +57,23 @@ If `name` is not set, Home Assistant shows the device by its `deviceId`. Restart
 event-service
 is subscribed to `homeassistant/status` and re-publishes discovery with the updated `suggested_area` and name when HA
 transitions to `online`.
+
+## Lamp and room binding
+
+presence-service controls the lighting and decides by room: a sensor's readings affect the lamp only if the same room
+also contains a lamp device. So the lamp is registered as an ordinary device of type `lamp` with the same `room` as the
+room's sensors — via REST (`POST /api/v1/devices` with body `{"sensorType": "lamp", "room": "bedroom"}`, the `deviceId`
+is generated automatically) or straight in mongo:
+
+```bash
+docker exec -it mongodb mongo -u $EVENT_MONGO_USER -p $EVENT_MONGO_PASS events
+> db.devices.insertOne({_id: "lamp-bedroom", sensorType: "lamp", room: "bedroom"})
+```
+
+The lamp publishes nothing over MQTT — it is a catalog row with no `lastSeenAt`. presence-service learns the sensors'
+rooms and the lamp itself from event-service's registry, which is replicated to it through an outbox (see CLAUDE.md,
+"Device registry replication"). So, unlike Home Assistant discovery, the automation needs no HA restart: a `room` change
+reaches presence-service within one relay tick (about 10 s).
 
 ## MongoDB: replica set and users
 

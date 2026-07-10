@@ -11,54 +11,48 @@
 ```mermaid
 flowchart LR
     CLIENT([Клиенты API])
-
-    subgraph Gateway["📱 api-gateway"]
-        GW[api-gateway]
-        DBA[(auth)]
-        GW --> DBA
-    end
-
-    subgraph Hardware["🔌 Hardware"]
-        MB[MultiBox<br/>температура / влажность / освещённость]
-        ESP[ESP-01<br/>WiFi-мост]
-        PB[PresenceBox<br/>присутствие]
-        MB -->|Serial| ESP
-    end
-
-    BROKER[(RabbitMQ<br/>MQTT/AMQP)]
-
-    subgraph EventSvc["⚙️ event-service"]
-        ES[event-service]
-        DBE[(events)]
-        ES --> DBE
-    end
-
-    subgraph PresenceSvc["⚙️ presence-service"]
-        PS[presence-service]
-        DBP[(presence)]
-        PS --> DBP
-    end
-
-    subgraph External["🌐 External"]
-        HA[Home Assistant]
-        YAPI[Yandex Smart Home API]
-        LIGHTNING[💡 Освещение]
-    end
-
+    MB[MultiBox<br/>температура · влажность · освещённость]
+    ESP[ESP-01<br/>WiFi-мост]
+    PB[PresenceBox<br/>присутствие]
+    GW[api-gateway<br/>:8080]
+    BROKER[(RabbitMQ<br/>MQTT · AMQP)]
+    ES[event-service]
+    PS[presence-service]
+    HA[Home Assistant]
     YS[yandex-service]
+    YAPI[Yandex Smart Home API]
+    LIGHT([💡 Освещение])
 
-    CLIENT -->|HTTP :8080| GW
+    %% поток данных
+    MB -->|Serial| ESP
     ESP -->|MQTT| BROKER
     PB -->|MQTT| BROKER
     BROKER -->|AMQP| ES
     BROKER -->|AMQP| PS
+    CLIENT -->|HTTP| GW
     GW -->|REST| ES
     GW -->|REST| PS
     ES -->|MQTT| HA
     PS -->|gRPC| YS
     YS -->|HTTPS| YAPI
-    YAPI --> LIGHTNING
+    YAPI --> LIGHT
+
+    %% плоскость управления
+    ES -. реестр устройств .-> PS
+    PS -. MEASURE .-> BROKER
+
+    classDef hw fill:#e8f0fe,stroke:#4285f4,color:#202124;
+    classDef infra fill:#fef7e0,stroke:#f9ab00,color:#202124;
+    classDef svc fill:#e6f4ea,stroke:#1e8e3e,color:#202124;
+    classDef ext fill:#fce8e6,stroke:#d93025,color:#202124;
+
+    class MB,ESP,PB hw
+    class BROKER,GW infra
+    class ES,PS,YS svc
+    class HA,YAPI,LIGHT ext
 ```
+
+Сплошные стрелки — поток данных; пунктирные — плоскость управления (репликация реестра устройств и команда `MEASURE`).
 
 Поток данных:
 
@@ -68,9 +62,16 @@ flowchart LR
 2. Брокер — RabbitMQ с MQTT-плагином — принимает сообщения по MQTT и раздаёт их подписчикам через AMQP-очереди.
 3. **event-service** забирает все сенсорные события из AMQP-очередей для датчиков, сохраняет в MongoDB и ретранслирует в
    Home Assistant по MQTT — для визуализации на дашборде (графики температуры/влажности, индикатор присутствия,
-   освещённость). **presence-service** параллельно получает данные присутствия и освещённости из своих AMQP-очередей.
-4. **presence-service** принимает решение о включении/выключении света по присутствию и освещённости (включает только в темноте, выключает при уходе) и вызывает **yandex-service** по gRPC.
-5. **yandex-service** вызывает Yandex Smart Home API и переключает освещение.
+   освещённость). Он же ведёт реестр устройств — какое устройство в какой комнате и какого типа. **presence-service**
+   параллельно получает данные присутствия и освещённости из своих AMQP-очередей.
+4. Реестр устройств нужен и **presence-service** — чтобы связать датчик с лампой в той же комнате. Изменения комнаты и
+   типа реплицируются из event-service в presence-service через транзакционный outbox (сообщения по AMQP), поэтому
+   presence-service держит согласованную копию и не обращается к event-service на горячем пути.
+5. **presence-service** управляет светом только для датчиков, которые находятся в одной комнате с лампой: включает по
+   присутствию, если темно, выключает при уходе, и вызывает **yandex-service** по gRPC. При появлении присутствия в
+   такой комнате он дополнительно посылает климатическому датчику команду `MEASURE` (down-link по MQTT), чтобы сразу
+   получить свежую освещённость, не дожидаясь очередного 60-секундного цикла.
+6. **yandex-service** вызывает Yandex Smart Home API и переключает освещение.
 
 ## Стек
 

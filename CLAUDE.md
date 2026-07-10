@@ -61,6 +61,7 @@ reserved for HA auto-discovery and HA-facing state topics published by event-ser
 | `home/<sensorType>/<deviceId>/data`  | `home.<sensorType>.<deviceId>.data`  | Sensor measurements (JSON in `measurements`)  |
 | `home/availability/<deviceId>`       | `home.availability.<deviceId>`       | `online`/`offline` (MQTT LWT from the device) |
 | `home/logs/<deviceId>`               | `home.logs.<deviceId>`               | Device diagnostic logs (JSON `{level,msg}`)   |
+| `home/cmd/<deviceId>`                | `home.cmd.<deviceId>`                | Down-link command to a device (JSON `{cmd}`, e.g. `MEASURE`) |
 
 Bindings in `docker/rabbitmq/definitions.json`:
 
@@ -73,6 +74,10 @@ Bindings in `docker/rabbitmq/definitions.json`:
 
 `deviceId` lives only in the routing key — never in the JSON payload. Adding a new physical device = flash firmware with
 its own `DEVICE_ID` and matching topics; no service-side config or code changes are needed.
+
+All rows above except the last are up-link (device → service). `home/cmd/<deviceId>` is the one down-link
+(service → device): `presence-service` publishes it to `amq.topic` and the device subscribes to it over MQTT — see
+**Lamp control path** for the `MEASURE` command that uses it.
 
 **Poison-message handling / dead-lettering.** Each work queue (`event-data`, `presence-data`, `presence-illuminance`,
 `device-availability`) is
@@ -160,6 +165,31 @@ them, with the response DTOs (`ErrorResponse`, `FieldError`, `ValidationErrorRes
 paths are a separate entry point from the MQTT/AMQP flow — a reading inserted over `POST` is not mirrored to HA and does
 not update the registry the way `EventRunner` does.
 
+**Device registry replication (event-service → presence-service).** `presence-service` needs each device's `room` to
+make room-aware decisions (the lamp gate and the `MEASURE` trigger under **Lamp control path**), but the registry lives
+in event-service. Room/type changes are replicated with a **transactional outbox** so presence-service holds an
+eventually-consistent copy without querying event-service on the hot path. Write side: every registry mutation that
+matters (`DeviceService.create`, `update` when `room` is set, `delete`) inserts an `OutboxEvent` into the `outbox`
+collection (`aggregateType=device`, `aggregateId=deviceId`, `eventType` `DEVICE_UPSERTED`/`DEVICE_DELETED`, JSON
+`payload` = `OutboxPayloadDto{deviceId, room, sensorType}`) **in the same `@Transactional`** as the device write, so the
+device row and the outbox row commit atomically — no lost or phantom events (this is the multi-document transaction the
+`rs0` replica set is required for; see **MongoDB**). Relay: `OutboxPublisher` polls unsent rows oldest-first
+(`findBySentFalseOrderByCreatedAt`) on a `@Scheduled(fixedDelay=10s)` tick and publishes each to the `device-events`
+topic exchange with routing key `device.event.<deviceId>` and an `event_type` header. It confirms delivery with
+publisher confirms + returns and marks a row `sent=true` **only** when the broker both acks *and* the message was
+routable (`ack && getReturned() == null`); otherwise the row stays unsent and the next tick republishes — at-least-once,
+so the consumer is idempotent. Wire: `device-events` → `device.event.*` → `presence-device-events` queue (dead-letters to
+`presence-device-events.dlq`), bindings in `definitions.json`. Read side: `DeviceEventListener` consumes
+`presence-device-events`, reads the `event_type` header, and applies it to the in-memory `DeviceRegistryCache`
+(`ConcurrentHashMap<deviceId, DeviceEntry{room, sensorType}>`) — `DEVICE_UPSERTED` → `upsert`, `DEVICE_DELETED` →
+`remove`; an event with a missing header or bad JSON is dead-lettered. Cold start: `DeviceRegistrySeeder`
+(`@PostConstruct`, gated on `app.event-service.seed-enabled`, default on, disabled in tests) pulls the full device list
+over HTTP from event-service `GET /api/v1/devices` (paged, via the `eventServiceRestClient` `RestClient`) and seeds the
+cache, skipping rows without a `room`. A failed seed logs a WARN and continues — the cache then fills from live delta
+events instead. `@PostConstruct` runs before the `@RabbitListener` containers start, so the seed completes before the
+first delta is applied. The cache is the room source of truth for the lamp gate and `MEASURE` targeting below; a room
+edit in event-service becomes visible to presence-service within one relay tick.
+
 **Lamp control path.** The lamp decision lives in `presence-service`, not on the device, and depends on both presence
 and illuminance. The decision is a small stateful engine (`LampService`) fed by two independent listeners:
 `PresenceListener` (presence data, `radarPresence || pirSensorPresence`) and `IlluminanceListener` (the `illuminance`
@@ -189,6 +219,26 @@ so an unchanged heartbeat is dropped (the `lastPresence` map is updated only aft
 is still retried on redelivery). A failed lamp command leaves
 the tracked state unchanged so it is retried on the next presence/illuminance update. The two listeners run on separate
 threads, so `LampService` is synchronised.
+
+**Room gate.** Both listeners feed the engine only for sensors that share a room with a lamp. Each parses the sensor's
+`deviceId` from the routing key and consults `LampGate.lampRoomFor(deviceId)`, which reads the device's room from
+`DeviceRegistryCache` (see **Device registry replication**) and returns it *only if* that room also contains a `lamp`
+device (`getDevicesByRoomAndSensorType(room, "lamp")` non-empty); otherwise the message is skipped. So a presence or
+illuminance reading from a room with no lamp — or from a device not yet in the cache — never drives the engine. Sensor
+types are the `DeviceType` enum (`CLIMATE`/`PRESENCE`/`LAMP`), whose string values are the lowercase `sensorType` used on
+the wire and in the registry. The lamp is itself a registry device with `sensorType=lamp` and a `room`, catalog-only
+(added through the devices API — it publishes no sensor data of its own); actuation is still a single hardcoded Yandex
+chandelier, so the room only gates *whether* to run the decision, not *which* lamp is switched.
+
+**MEASURE trigger.** On a presence transition absent→present in a lamp room, `MeasureTrigger` (called from
+`PresenceHandler`) sends a `MEASURE` down-link to every `climate` device in that room, so fresh illuminance arrives at
+once instead of waiting for the 60s `climate` cadence — letting the lamp react the moment someone enters a dark room.
+The transition is detected per presence device with `ConcurrentHashMap.put` returning the previous value (fires on
+`present && previous != TRUE`, so the first reading after start counts too); a repeated `present=true` heartbeat is not a
+transition and sends nothing. `DeviceCommandPublisher` publishes the command to `amq.topic` with routing key
+`home.cmd.<deviceId>` and body `{"cmd":"MEASURE"}` (see the down-link row in **Topic / routing-key convention**).
+Sending is best-effort: a publish failure is caught and logged per device rather than propagated, since a stale
+real-time measure is not worth requeuing the presence message.
 
 The engine calls `yandex-service` via the gRPC stub declared in `grpc-api/src/main/proto/yandex.proto`
 (`YandexService.TurnOnOffLamp`). Client channel is configured in `presence-service/application.yml` as
