@@ -27,6 +27,13 @@
 - `LampServiceTest` — lamp on and delayed-off logic driven by presence and illuminance (including cancelling the
   switch-off when presence returns within the delay, and persisting the threshold and off-delay).
 - `IlluminanceListenerTest` — handling of the `illuminance` measurement from `climate` data.
+- `MeasureTriggerTest` — sends the `MEASURE` command to climate devices on an absent→present presence transition in a
+  lamp room (fires once, not on a repeated presence heartbeat; tolerates a publish failure).
+- `LampGateTest` — the room gate: a room is returned only when it also contains a `lamp` device.
+- `DeviceEventListenerTest` — consumes registry events from event-service (`DEVICE_UPSERTED` / `DEVICE_DELETED`) and
+  dead-letters an event with a missing `event_type` header, an unknown type, or an unparseable payload.
+- `PresenceListenerTest` — routing-key parsing, the lamp gate, and dead-lettering on a malformed key or a handler
+  failure.
 - `LampControllerTest` (`@WebMvcTest`) — the `/api/v1/lamp` REST endpoint (state, threshold, forced toggle).
 - `PresenceServiceApplicationTest` — verifies the Spring context loads.
 
@@ -40,6 +47,7 @@
 - **JUnit 5**, **Mockito** (via javaagent — wired in the root `build.gradle`), **AssertJ**
 - **Spring Boot Test**
 - **Testcontainers** — MongoDB in `event-service`
+- **JaCoCo** — test coverage reports (lines and branches)
 
 ## Configuration
 
@@ -62,4 +70,8 @@ MQTT clients try to reach a real broker on context startup.
 ./gradlew test                                                        # all tests
 ./gradlew :event-service:test                                         # tests for one module
 ./gradlew :event-service:test --tests "*SensorDataServiceTest"    # one test class
+./gradlew test jacocoTestReport                                       # tests plus coverage reports
 ```
+
+The per-module HTML coverage report is at `<module>/build/reports/jacoco/test/html/index.html`. Coverage is computed
+after a **full** module run; a report produced with `--tests` reflects only the selected class.

@@ -27,6 +27,13 @@
 - `LampServiceTest` — логика включения и отложенного выключения лампы по присутствию и освещённости (в том числе отмена
   выключения при возврате присутствия в течение задержки и сохранение порога и задержки в БД).
 - `IlluminanceListenerTest` — обработка измерения `illuminance` из `climate`-данных.
+- `MeasureTriggerTest` — отправка команды `MEASURE` climate-устройствам при переходе присутствия «нет → есть» в комнате
+  с лампой (однократность на повторном сигнале присутствия, устойчивость к ошибке публикации).
+- `LampGateTest` — отбор комнаты по наличию лампы: комната возвращается, только если в ней есть устройство `lamp`.
+- `DeviceEventListenerTest` — приём событий реестра из event-service (`DEVICE_UPSERTED` / `DEVICE_DELETED`) и отправка в
+  dead-letter при отсутствии заголовка `event_type`, неизвестном типе или неразбираемом сообщении.
+- `PresenceListenerTest` — разбор ключа маршрутизации, отбор по лампе и dead-letter при некорректном ключе или отказе
+  обработчика.
 - `LampControllerTest` (`@WebMvcTest`) — REST-эндпоинт `/api/v1/lamp` (состояние, порог, принудительное переключение).
 - `PresenceServiceApplicationTest` — проверка загрузки Spring-контекста.
 
@@ -40,6 +47,7 @@
 - **JUnit 5**, **Mockito** (через javaagent — настроено в корневом `build.gradle`), **AssertJ**
 - **Spring Boot Test**
 - **Testcontainers** — MongoDB в `event-service`
+- **JaCoCo** — отчёты о покрытии тестами (строки и ветви)
 
 ## Конфигурация
 
@@ -62,4 +70,8 @@
 ./gradlew test                                                        # все тесты
 ./gradlew :event-service:test                                         # тесты одного модуля
 ./gradlew :event-service:test --tests "*SensorDataServiceTest"    # один тестовый класс
+./gradlew test jacocoTestReport                                       # тесты и отчёты о покрытии
 ```
+
+HTML-отчёт о покрытии для каждого модуля — `<модуль>/build/reports/jacoco/test/html/index.html`. Покрытие
+считается после **полного** прогона модуля; отчёт после запуска с `--tests` отражает только выбранный класс.

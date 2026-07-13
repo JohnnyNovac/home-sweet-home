@@ -22,9 +22,14 @@ point; do not look for per-module wrappers.
 ./gradlew :event-service:bootRun           # run a single service
 ./gradlew :event-service:test              # tests for one module
 ./gradlew :event-service:test --tests "*SensorDataServiceTest.methodName"
+./gradlew test jacocoTestReport            # tests + JaCoCo coverage (per-module HTML in build/reports/jacoco/test/html)
 
 docker compose -f docker/docker-compose.yml up -d     # infrastructure (RabbitMQ, MongoDB, Home Assistant, Prometheus, Grafana) + services
 ```
+
+The `jacoco` plugin is applied to every module in the root `build.gradle`; `jacocoTestReport` runs as part of each
+module's `test` task. Line/branch coverage is meaningful only after a full module run — a report built with `--tests`
+reflects only the selected class.
 
 `grpc-api` generates Java stubs from `grpc-api/src/main/proto/yandex.proto` via the protobuf plugin — regenerate with
 `./gradlew :grpc-api:generateProto` (runs automatically as part of `build`).
