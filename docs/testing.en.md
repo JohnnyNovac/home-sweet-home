@@ -75,3 +75,7 @@ MQTT clients try to reach a real broker on context startup.
 
 The per-module HTML coverage report is at `<module>/build/reports/jacoco/test/html/index.html`. Coverage is computed
 after a **full** module run; a report produced with `--tests` reflects only the selected class.
+
+**Planned:** a coverage threshold in CI via `jacocoTestCoverageVerification` (`violationRules`), so the build fails when
+coverage drops. Set the threshold on branches; exclude DTOs, config, `*Application`, and unreachable branches (such as
+the synthetic `default` of an enum `switch`) from the check.
