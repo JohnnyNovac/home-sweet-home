@@ -81,4 +81,21 @@ class IlluminanceListenerTest {
         assertThatThrownBy(() -> listener.handleMessage("{not json", ROUTING_KEY))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
     }
+
+    @Test
+    @DisplayName("Should dead-letter a message with a malformed routing key")
+    void shouldThrowAmqpExceptionOnInvalidRoutingKey() {
+        String message = """
+                {
+                    "measurements": {
+                        "temperature": 22.5,
+                        "humidity": 65,
+                        "illuminance": 123.4
+                    }
+                }
+                """;
+
+        assertThatThrownBy(() -> listener.handleMessage(message, "home.climate.data"))
+                .isInstanceOf(AmqpRejectAndDontRequeueException.class);
+    }
 }
