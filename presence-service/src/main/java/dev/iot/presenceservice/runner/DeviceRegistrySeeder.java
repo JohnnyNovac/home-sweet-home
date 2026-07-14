@@ -1,5 +1,6 @@
-package dev.iot.presenceservice.cache;
+package dev.iot.presenceservice.runner;
 
+import dev.iot.presenceservice.cache.DeviceRegistryCache;
 import dev.iot.presenceservice.dto.DevicePage;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;

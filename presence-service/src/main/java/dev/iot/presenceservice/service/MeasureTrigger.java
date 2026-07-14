@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static dev.iot.presenceservice.cache.DeviceType.CLIMATE;
+import static dev.iot.presenceservice.model.DeviceType.CLIMATE;
 
 @Component
 public class MeasureTrigger {

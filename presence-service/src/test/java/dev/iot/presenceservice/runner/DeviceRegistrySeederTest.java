@@ -1,5 +1,6 @@
-package dev.iot.presenceservice.cache;
+package dev.iot.presenceservice.runner;
 
+import dev.iot.presenceservice.cache.DeviceRegistryCache;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

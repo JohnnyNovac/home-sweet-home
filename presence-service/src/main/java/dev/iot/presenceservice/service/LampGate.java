@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-import static dev.iot.presenceservice.cache.DeviceType.LAMP;
+import static dev.iot.presenceservice.model.DeviceType.LAMP;
 
 @Component
 public class LampGate {

@@ -1,7 +1,7 @@
 package dev.iot.presenceservice.service;
 
 import dev.iot.presenceservice.cache.DeviceRegistryCache;
-import dev.iot.presenceservice.cache.DeviceType;
+import dev.iot.presenceservice.model.DeviceType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

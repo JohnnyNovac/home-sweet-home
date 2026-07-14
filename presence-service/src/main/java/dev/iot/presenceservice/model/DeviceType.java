@@ -1,4 +1,4 @@
-package dev.iot.presenceservice.cache;
+package dev.iot.presenceservice.model;
 
 public enum DeviceType {
     CLIMATE("climate"),
