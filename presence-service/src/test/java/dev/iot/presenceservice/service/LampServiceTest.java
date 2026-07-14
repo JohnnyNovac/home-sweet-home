@@ -15,6 +15,7 @@ import yandex.YandexServiceGrpc;
 
 import java.time.Duration;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -159,5 +160,69 @@ class LampServiceTest {
         lampService.setLampOffDelay(Duration.ofSeconds(30));
 
         verify(lampSettingsRepository).save(argThat(s -> s.id().equals("lampOffDelay") && s.value() == 30));
+    }
+
+    @Test
+    @DisplayName("Should force the lamp on")
+    void shouldForceLampOn() throws StatusException {
+        stubDeadline();
+
+        lampService.setLamp(true);
+
+        verify(yandexServiceStub).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
+        assertThat(lampService.isLampOn()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should force the lamp off")
+    void shouldForceLampOff() throws StatusException {
+        stubDeadline();
+
+        lampService.setLamp(false);
+
+        verify(yandexServiceStub).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+        assertThat(lampService.isLampOn()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should keep the lamp off when the force command fails")
+    void shouldNotForceLampOnWhenCommandFails() throws StatusException {
+        stubDeadline();
+        when(yandexServiceStub.turnOnOffLamp(any())).thenThrow(new RuntimeException("down"));
+
+        lampService.setLamp(true);
+
+        verify(yandexServiceStub).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
+        assertThat(lampService.isLampOn()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should not reschedule the off when one is already pending")
+    void shouldNotRescheduleOffWhenAlreadyPending() throws StatusException {
+        stubDeadline();
+
+        lampService.onIlluminance(10);
+        lampService.onPresence(true);   // lamp on
+        lampService.onPresence(false);  // schedules the delayed off
+        lampService.onPresence(false);  // off already pending -> early return
+
+        verify(yandexServiceStub, timeout(1000).times(1)).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+    }
+
+    @Test
+    @DisplayName("Should keep the lamp on when the delayed off command fails")
+    void shouldKeepLampOnWhenDelayedOffCommandFails() throws StatusException {
+        stubDeadline();
+        // Only the OFF call fails; the ON call is left to the default answer, so the stub is lenient
+        // (turnOnOffLamp is also invoked with a non-matching ON argument, which strict stubs would flag).
+        lenient().when(yandexServiceStub.turnOnOffLamp(argThat(request -> !request.getTurnOn())))
+                .thenThrow(new RuntimeException("down"));
+
+        lampService.onIlluminance(10);
+        lampService.onPresence(true);   // lamp on
+        lampService.onPresence(false);  // after the delay the OFF call fails
+
+        verify(yandexServiceStub, timeout(1000)).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+        assertThat(lampService.isLampOn()).isTrue();
     }
 }
