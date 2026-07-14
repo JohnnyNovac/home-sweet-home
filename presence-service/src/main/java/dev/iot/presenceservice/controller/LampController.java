@@ -6,9 +6,7 @@ import dev.iot.presenceservice.dto.OffDelayRequest;
 import dev.iot.presenceservice.dto.ThresholdRequest;
 import dev.iot.presenceservice.service.LampService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 

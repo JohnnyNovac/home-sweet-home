@@ -1,7 +1,6 @@
 package dev.iot.presenceservice.service;
 
 import dev.iot.presenceservice.cache.DeviceRegistryCache;
-import dev.iot.presenceservice.config.MeasurementsProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
