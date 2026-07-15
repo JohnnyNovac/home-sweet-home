@@ -2,7 +2,7 @@ package dev.iot.yandexservice.service;
 
 import dev.iot.yandexservice.config.YandexProperties;
 import dev.iot.yandexservice.dto.Capability;
-import dev.iot.yandexservice.dto.CapabilityState;
+import dev.iot.yandexservice.dto.State;
 import dev.iot.yandexservice.dto.DeviceGroupActionRequest;
 import dev.iot.yandexservice.dto.DeviceGroupActionResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +48,7 @@ class YandexRestClientTest {
                 List.of(
                         new Capability(
                                 "devices.capabilities.on_off",
-                                new CapabilityState("on", true)
+                                new State("on", true)
                         )
                 )
         );

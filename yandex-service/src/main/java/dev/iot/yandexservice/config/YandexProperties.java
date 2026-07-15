@@ -9,7 +9,12 @@ import java.time.Duration;
 public record YandexProperties(
         String oauthToken,
         String baseUrl,
+        String userInfoPath,
+        String devicePath,
+        String deviceActionPath,
+        String groupPath,
         String groupActionPath,
+        String scenarioActionPath,
         String chandelierId,
         @DefaultValue("3s") Duration connectTimeout,
         @DefaultValue("5s") Duration readTimeout

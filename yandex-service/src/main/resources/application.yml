@@ -1,6 +1,8 @@
 spring:
   application:
     name: yandex-service
+  jackson:
+    property-naming-strategy: SNAKE_CASE
 
 server:
   port: 8083
@@ -8,7 +10,12 @@ server:
 yandex:
   oauth-token: ${YANDEX_OAUTH_TOKEN}
   base-url: https://api.iot.yandex.net
+  user-info-path: /v1.0/user/info
+  device-path: /v1.0/devices/{device_id}
+  device-action-path: /v1.0/devices/actions
+  group-path: /v1.0/groups/{group_id}
   group-action-path: /v1.0/groups/{group_id}/actions
+  scenario-action-path: /v1.0/scenarios/{scenario_id}/actions
   chandelier-id: ${YANDEX_CHANDELIER_ID}
   connect-timeout: 3s
   read-timeout: 5s
