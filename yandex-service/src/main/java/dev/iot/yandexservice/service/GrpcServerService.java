@@ -5,6 +5,7 @@ import dev.iot.yandexservice.dto.Capability;
 import dev.iot.yandexservice.dto.State;
 import dev.iot.yandexservice.dto.DeviceGroupActionRequest;
 import dev.iot.yandexservice.dto.DeviceGroupActionResponse;
+import dev.iot.yandexservice.exception.YandexApiException;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +45,7 @@ public class GrpcServerService extends YandexServiceGrpc.YandexServiceImplBase {
             logger.info("Yandex group action response (turnOn={}): {}", request.getTurnOn(), response);
 
             if (!"ok".equals(response.status())) {
-                throw new RuntimeException("Yandex API failed: " + response.status());
+                throw new YandexApiException(200, response.requestId(), "Yandex API returned status=" + response.status());
             }
 
             responseObserver.onNext(
@@ -54,6 +55,10 @@ public class GrpcServerService extends YandexServiceGrpc.YandexServiceImplBase {
             );
             responseObserver.onCompleted();
 
+        } catch (YandexApiException e) {
+            logger.error("Yandex API rejected the lamp command (turnOn={}, httpStatus={}, requestId={}): {}",
+                    request.getTurnOn(), e.getStatusCode(), e.getRequestId(), e.getMessage());
+            responseObserver.onError(e);
         } catch (Exception e) {
             logger.error("turnOnOffLamp failed (turnOn={})", request.getTurnOn(), e);
             responseObserver.onError(e);
