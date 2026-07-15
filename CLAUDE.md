@@ -258,6 +258,19 @@ both are needed. The gRPC deadline is deliberately larger than the worst-case HT
 than presence-service hitting a blind `DEADLINE_EXCEEDED`. A timed-out lamp command is logged and the message is acked (not requeued), since a stale real-time
 toggle is not worth retrying.
 
+**Yandex API error contract.** The Yandex Smart Home API answers with an envelope — `request_id` plus `status` — and
+branches from there: on success the payload fields, on failure only a `message`. The response shape is therefore per
+(endpoint × status code), so the success records in `yandex-service/dto` deliberately carry no `message` and the error
+body has its own record (`YandexErrorResponse`). `YandexRestClient` registers an `onStatus(HttpStatusCode::isError, …)`
+handler that parses that body and throws `YandexApiException` (HTTP status + `request_id` + `message`) — without it
+`retrieve()` raises `HttpClientErrorException` before the body is ever deserialized, and the message survives only as a
+substring of the exception text. A body that is not the documented JSON (a proxy's HTML error page) leaves the parse
+returning `null`, so the exception keeps the raw HTTP status rather than dressing a gateway failure up as a Yandex one.
+An HTTP `200` carrying `status != "ok"` is the second failure signal; `GrpcServerService` turns it into the same
+exception. `request_id` is logged on every failure — Yandex asks for it when investigating incidents. This mirrors
+event-service's own `GlobalExceptionHandler`/`ErrorResponse` pair, with the roles swapped: there the error shape is
+written, here it is read.
+
 **API gateway.** `api-gateway` is the single HTTP entry point — a Spring Cloud Gateway Server WebMVC (the servlet
 variant, not the reactive WebFlux one) used as a router for the domain APIs (no response aggregation); the one piece of
 logic it hosts itself is authentication (below). Routes are
@@ -349,6 +362,13 @@ parser live in `shared/` (`JsonDtoParser`, the inbound `CreateEventDto`/`CreateM
 `EventDto`/`MeasurementDto` returned by the REST read endpoints). The `Create*` records carry only what an incoming
 payload has; the read records add stored fields (`id`, `timestamp`, `unit`). Entity↔DTO conversion is done by the
 hand-written `@Component` mappers in `event-service` (`SensorDataMapper`, `MeasurementMapper`, `DeviceMapper`).
+
+`yandex-service` sets `spring.jackson.property-naming-strategy: SNAKE_CASE` in its `application.yml`, since every field
+of the Yandex API is snake_case — which is why its DTOs carry no `@JsonProperty` and name their components in plain
+camelCase (`householdId` → `household_id`, `lastUpdated` → `last_updated`). The strategy does not rename `Map` keys, so
+the free-form `parameters` object of a capability keeps the raw keys Yandex sent. A unit test that builds its own
+`ObjectMapper` for these DTOs must apply the same strategy, or it will pass against a mapper the application never
+uses.
 
 **Configuration properties.** `@ConfigurationPropertiesScan` on each `*Application` class picks up
 `@ConfigurationProperties` classes (`HAConfigProperties`, `RabbitMQConfigProperties`, `MeasurementsProperties`,

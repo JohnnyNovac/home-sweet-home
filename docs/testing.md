@@ -40,7 +40,9 @@
 ### `yandex-service`
 
 - `GrpcServerServiceTest` — gRPC-сервер и маппинг запроса в `DeviceGroupActionRequest`.
-- `YandexRestClientTest` — HTTP-клиент к Yandex Smart Home API.
+- `YandexRestClientTest` — HTTP-клиент к Yandex Smart Home API, включая преобразование ответа с ошибкой в
+  `YandexApiException` (на `MockRestServiceServer`: разбор документированного тела ошибки и запасной вариант, когда
+  тело не является ожидаемым JSON).
 
 ## Стек
 
