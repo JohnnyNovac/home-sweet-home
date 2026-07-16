@@ -45,7 +45,13 @@ public class DeviceRegistrySeeder {
                     if (page.content() != null && !page.content().isEmpty()) {
                         page.content().stream()
                                 .filter(d -> d.room() != null)
-                                .forEach(d -> cache.upsert(d.deviceId(), d.room(), d.sensorType()));
+                                .forEach(d -> cache.upsert(
+                                        d.deviceId(),
+                                        d.room(),
+                                        d.sensorType(),
+                                        d.externalId(),
+                                        d.parentExternalId()
+                                ));
                     }
                 }
             } while (number < totalPages);

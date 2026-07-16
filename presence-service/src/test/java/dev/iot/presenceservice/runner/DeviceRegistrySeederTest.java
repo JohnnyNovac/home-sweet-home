@@ -35,7 +35,7 @@ public class DeviceRegistrySeederTest {
         String json = """
                 {
                   "content": [
-                    {"deviceId":"esp01-1","sensorType":"climate","room":"bedroom","name":null,"lastSeenAt":null}
+                    {"deviceId":"lamp-1","sensorType":"lamp","room":"bedroom","name":null,"lastSeenAt":null,"externalId":"bulb-1","parentExternalId":"chandelier-7"}
                   ],
                   "page": {"size":20,"number":0,"totalElements":1,"totalPages":1}
                 }
@@ -47,7 +47,7 @@ public class DeviceRegistrySeederTest {
         seeder.init();
 
         mockServer.verify();
-        verify(cache).upsert("esp01-1", "bedroom", "climate");
+        verify(cache).upsert("lamp-1", "bedroom", "lamp", "bulb-1", "chandelier-7");
     }
 
     @Test
@@ -80,8 +80,8 @@ public class DeviceRegistrySeederTest {
         seeder.init();
 
         mockServer.verify();
-        verify(cache).upsert("esp01-1", "bedroom", "climate");
-        verify(cache).upsert("esp01-2", "kitchen", "climate");
+        verify(cache).upsert("esp01-1", "bedroom", "climate", null, null);
+        verify(cache).upsert("esp01-2", "kitchen", "climate", null, null);
     }
 
     @Test
@@ -105,8 +105,8 @@ public class DeviceRegistrySeederTest {
         seeder.init();
 
         mockServer.verify();
-        verify(cache).upsert("esp01-1", "bedroom", "climate");
-        verify(cache, never()).upsert(eq("esp01-2"), any(), any());
+        verify(cache).upsert("esp01-1", "bedroom", "climate", null, null);
+        verify(cache, never()).upsert(eq("esp01-2"), any(), any(), any(), any());
     }
 
     @Test

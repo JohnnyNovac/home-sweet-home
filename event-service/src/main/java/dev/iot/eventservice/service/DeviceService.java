@@ -98,7 +98,7 @@ public class DeviceService {
         outboxEvent.setAggregateId(existing.getDeviceId());
         outboxEvent.setEventType(OutboxEventType.DEVICE_DELETED);
         outboxEvent.setPayload(objectMapper.writeValueAsString(
-                new OutboxPayloadDto(existing.getDeviceId(), null, null)
+                new OutboxPayloadDto(existing.getDeviceId(), null, null, null, null)
         ));
         outboxRepository.insert(outboxEvent);
 
@@ -133,6 +133,12 @@ public class DeviceService {
         if (updateDeviceDto.name() != null) {
             update.set("name", updateDeviceDto.name());
         }
+        if (updateDeviceDto.externalId() != null) {
+            update.set("externalId", updateDeviceDto.externalId());
+        }
+        if (updateDeviceDto.parentExternalId() != null) {
+            update.set("parentExternalId", updateDeviceDto.parentExternalId());
+        }
 
         FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true);
         Device updated = mongoTemplate.findAndModify(byId, update, options, Device.class);
@@ -153,7 +159,13 @@ public class DeviceService {
         outboxEvent.setAggregateId(deviceId);
         outboxEvent.setEventType(OutboxEventType.DEVICE_UPSERTED);
         outboxEvent.setPayload(objectMapper.writeValueAsString(
-                new OutboxPayloadDto(deviceId, updated.getRoom(), updated.getSensorType())
+                new OutboxPayloadDto(
+                        deviceId,
+                        updated.getRoom(),
+                        updated.getSensorType(),
+                        updated.getExternalId(),
+                        updated.getParentExternalId()
+                )
         ));
         outboxRepository.insert(outboxEvent);
     }

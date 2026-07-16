@@ -20,9 +20,11 @@ public class DeviceEventListenerTest {
 
     private static final String VALID_MESSAGE = """
             {
-                "deviceId":"esp-01-1",
+                "deviceId":"lamp-1",
                 "room":"living-room",
-                "sensorType":"climate"
+                "sensorType":"lamp",
+                "externalId":"bulb-1",
+                "parentExternalId":"chandelier-7"
             }
             """;
 
@@ -39,30 +41,30 @@ public class DeviceEventListenerTest {
     @Test
     @DisplayName("Should upsert the device into the cache on DEVICE_UPSERTED")
     void shouldUpsertDevice() {
-        deviceEventListener.handleMessage(VALID_MESSAGE, "device.event.esp-01-1", DEVICE_UPSERTED.name());
+        deviceEventListener.handleMessage(VALID_MESSAGE, "device.event.lamp-1", DEVICE_UPSERTED.name());
 
-        verify(cache).upsert("esp-01-1", "living-room", "climate");
+        verify(cache).upsert("lamp-1", "living-room", "lamp", "bulb-1", "chandelier-7");
     }
 
     @Test
     @DisplayName("Should remove the device from the cache on DEVICE_DELETED")
     void shouldDeleteDevice() {
-        deviceEventListener.handleMessage(VALID_MESSAGE, "device.event.esp-01-1", DEVICE_DELETED.name());
+        deviceEventListener.handleMessage(VALID_MESSAGE, "device.event.lamp-1", DEVICE_DELETED.name());
 
-        verify(cache).remove("esp-01-1");
+        verify(cache).remove("lamp-1");
     }
 
     @Test
     @DisplayName("Should dead-letter an event with a missing event_type header")
     void shouldThrowAmqpExceptionOnNullEventType() {
-        assertThatThrownBy(() -> deviceEventListener.handleMessage(VALID_MESSAGE, "device.event.esp-01-1", null))
+        assertThatThrownBy(() -> deviceEventListener.handleMessage(VALID_MESSAGE, "device.event.lamp-1", null))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
     }
 
     @Test
     @DisplayName("Should dead-letter an event with an unknown event_type")
     void shouldThrowAmqpExceptionOnUnknownEventType() {
-        assertThatThrownBy(() -> deviceEventListener.handleMessage(VALID_MESSAGE, "device.event.esp-01-1", "UNKNOWN_TYPE"))
+        assertThatThrownBy(() -> deviceEventListener.handleMessage(VALID_MESSAGE, "device.event.lamp-1", "UNKNOWN_TYPE"))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
     }
 
@@ -71,7 +73,7 @@ public class DeviceEventListenerTest {
     void shouldThrowAmqpExceptionOnInvalidMessage() {
         String invalidMessage = "{not json";
 
-        assertThatThrownBy(() -> deviceEventListener.handleMessage(invalidMessage, "device.event.esp-01-1", DEVICE_UPSERTED.name()))
+        assertThatThrownBy(() -> deviceEventListener.handleMessage(invalidMessage, "device.event.lamp-1", DEVICE_UPSERTED.name()))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
     }
 }

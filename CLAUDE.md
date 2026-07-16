@@ -129,7 +129,11 @@ device registry and sets the `device_up` gauge (1 for `online`, 0 for `offline`,
 availability monitoring described under **Observability**.
 
 **Device registry.** `DeviceService` maintains the `devices` MongoDB collection (fields: `deviceId` as `_id`,
-`sensorType`, `room`, `name`, `lastSeenAt`). `recordSeen(deviceId, sensorType)` is called on every data message (from
+`sensorType`, `room`, `name`, `lastSeenAt`, and — for Yandex-controlled actuators — `externalId` (the actuator's id in
+the Yandex smart home) and `parentExternalId` (the `externalId` of its parent group, for UI nesting and to keep the lamp
+automation off individual child bulbs); these two ride the replication chain below but have no consumer yet — the Yandex
+sync that fills them and the lamp targeting that reads them are still to come). `recordSeen(deviceId, sensorType)` is
+called on every data message (from
 `EventRunner`) and every availability message (from `AvailabilityHandler`, with `sensorType = null`). It is a single
 atomic field-level upsert (`findAndModify` with `$set`), not a read-modify-write: it always sets `lastSeenAt` and
 creates the row if missing; data messages also set `sensorType` (they always carry the device's fixed, correct type),
@@ -176,7 +180,7 @@ in event-service. Room/type changes are replicated with a **transactional outbox
 eventually-consistent copy without querying event-service on the hot path. Write side: every registry mutation that
 matters (`DeviceService.create`, `update` when `room` is set, `delete`) inserts an `OutboxEvent` into the `outbox`
 collection (`aggregateType=device`, `aggregateId=deviceId`, `eventType` `DEVICE_UPSERTED`/`DEVICE_DELETED`, JSON
-`payload` = `OutboxPayloadDto{deviceId, room, sensorType}`) **in the same `@Transactional`** as the device write, so the
+`payload` = `OutboxPayloadDto{deviceId, room, sensorType, externalId, parentExternalId}`) **in the same `@Transactional`** as the device write, so the
 device row and the outbox row commit atomically — no lost or phantom events (this is the multi-document transaction the
 `rs0` replica set is required for; see **MongoDB**). Relay: `OutboxPublisher` polls unsent rows oldest-first
 (`findBySentFalseOrderByCreatedAt`) on a `@Scheduled(fixedDelay=10s)` tick and publishes each to the `device-events`
@@ -186,7 +190,7 @@ routable (`ack && getReturned() == null`); otherwise the row stays unsent and th
 so the consumer is idempotent. Wire: `device-events` → `device.event.*` → `presence-device-events` queue (dead-letters to
 `presence-device-events.dlq`), bindings in `definitions.json`. Read side: `DeviceEventListener` consumes
 `presence-device-events`, reads the `event_type` header, and applies it to the in-memory `DeviceRegistryCache`
-(`ConcurrentHashMap<deviceId, DeviceEntry{room, sensorType}>`) — `DEVICE_UPSERTED` → `upsert`, `DEVICE_DELETED` →
+(`ConcurrentHashMap<deviceId, DeviceEntry{room, sensorType, externalId, parentExternalId}>`) — `DEVICE_UPSERTED` → `upsert`, `DEVICE_DELETED` →
 `remove`; an event with a missing header or bad JSON is dead-lettered. Cold start: `DeviceRegistrySeeder`
 (`@PostConstruct`, gated on `app.event-service.seed-enabled`, default on, disabled in tests) pulls the full device list
 over HTTP from event-service `GET /api/v1/devices` (paged, via the `eventServiceRestClient` `RestClient`) and seeds the

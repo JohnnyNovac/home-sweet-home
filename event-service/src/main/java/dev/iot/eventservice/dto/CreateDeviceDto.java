@@ -6,6 +6,8 @@ public record CreateDeviceDto(
         String deviceId,
         @NotBlank String sensorType,
         @NotBlank String room,
-        String name
+        String name,
+        String externalId,
+        String parentExternalId
 ) {
 }

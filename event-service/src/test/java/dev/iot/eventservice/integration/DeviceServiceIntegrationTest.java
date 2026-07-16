@@ -72,7 +72,7 @@ class DeviceServiceIntegrationTest {
     @Test
     @DisplayName("recordSeen does not overwrite a manually assigned room")
     void recordSeenKeepsRoom() {
-        mongoTemplate.save(new Device("esp01", null, "bedroom", null));
+        mongoTemplate.save(new Device("esp01", null, "bedroom", null, null, null));
 
         deviceService.recordSeen("esp01", "climate");
 
@@ -85,7 +85,7 @@ class DeviceServiceIntegrationTest {
     @Test
     @DisplayName("create stores the device and returns it")
     void createStoresDevice() {
-        DeviceDto created = deviceService.create(new CreateDeviceDto("esp01", "climate", "bedroom", "NodeMCU-1"));
+        DeviceDto created = deviceService.create(new CreateDeviceDto("esp01", "climate", "bedroom", "NodeMCU-1", null, null));
 
         assertThat(created.deviceId()).isEqualTo("esp01");
         Device stored = mongoTemplate.findById("esp01", Device.class);
@@ -97,7 +97,7 @@ class DeviceServiceIntegrationTest {
     @Test
     @DisplayName("create generates a stable id from sensorType when deviceId is blank")
     void createGeneratesIdWhenBlank() {
-        DeviceDto created = deviceService.create(new CreateDeviceDto(null, "climate", "bedroom", "NodeMCU-1"));
+        DeviceDto created = deviceService.create(new CreateDeviceDto(null, "climate", "bedroom", "NodeMCU-1", null, null));
 
         assertThat(created.deviceId()).startsWith("climate-");
         assertThat(created.deviceId()).doesNotContain("bedroom");
@@ -107,9 +107,9 @@ class DeviceServiceIntegrationTest {
     @Test
     @DisplayName("create is insert-only: a duplicate id throws instead of overwriting")
     void createRejectsDuplicate() {
-        deviceService.create(new CreateDeviceDto("esp01", "climate", "bedroom", "NodeMCU-1"));
+        deviceService.create(new CreateDeviceDto("esp01", "climate", "bedroom", "NodeMCU-1", null, null));
 
-        assertThatThrownBy(() -> deviceService.create(new CreateDeviceDto("esp01", "presence", "kitchen", "other")))
+        assertThatThrownBy(() -> deviceService.create(new CreateDeviceDto("esp01", "presence", "kitchen", "other", null, null)))
                 .isInstanceOf(DeviceAlreadyExistsException.class);
 
         Device stored = mongoTemplate.findById("esp01", Device.class);
@@ -124,7 +124,7 @@ class DeviceServiceIntegrationTest {
         Device before = mongoTemplate.findById("esp01", Device.class);
         assertThat(before).isNotNull();
 
-        DeviceDto updated = deviceService.update("esp01", new UpdateDeviceDto("kitchen", "NodeMCU-2"));
+        DeviceDto updated = deviceService.update("esp01", new UpdateDeviceDto("kitchen", "NodeMCU-2", null, null));
 
         assertThat(updated.room()).isEqualTo("kitchen");
         assertThat(updated.name()).isEqualTo("NodeMCU-2");
@@ -135,7 +135,7 @@ class DeviceServiceIntegrationTest {
     @Test
     @DisplayName("update throws DeviceNotFoundException for an unknown device")
     void updateThrowsWhenUnknown() {
-        assertThatThrownBy(() -> deviceService.update("ghost", new UpdateDeviceDto("kitchen", null)))
+        assertThatThrownBy(() -> deviceService.update("ghost", new UpdateDeviceDto("kitchen", null, null, null)))
                 .isInstanceOf(DeviceNotFoundException.class);
     }
 

@@ -14,15 +14,19 @@ public class Device {
     private String room;
     private String name;
     private Instant lastSeenAt;
+    private String externalId;
+    private String parentExternalId;
 
     public Device() {
     }
 
-    public Device(String deviceId, String sensorType, String room, String name) {
+    public Device(String deviceId, String sensorType, String room, String name, String externalId, String parentExternalId) {
         this.deviceId = deviceId;
         this.sensorType = sensorType;
         this.room = room;
         this.name = name;
+        this.externalId = externalId;
+        this.parentExternalId = parentExternalId;
     }
 
     public String getDeviceId() {
@@ -59,5 +63,21 @@ public class Device {
 
     public void setLastSeenAt(Instant lastSeenAt) {
         this.lastSeenAt = lastSeenAt;
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public void setExternalId(String externalId) {
+        this.externalId = externalId;
+    }
+
+    public String getParentExternalId() {
+        return parentExternalId;
+    }
+
+    public void setParentExternalId(String parentExternalId) {
+        this.parentExternalId = parentExternalId;
     }
 }

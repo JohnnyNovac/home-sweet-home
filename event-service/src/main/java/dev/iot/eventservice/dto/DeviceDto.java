@@ -7,6 +7,8 @@ public record DeviceDto(
         String sensorType,
         String room,
         String name,
-        Instant lastSeenAt
+        Instant lastSeenAt,
+        String externalId,
+        String parentExternalId
 ) {
 }

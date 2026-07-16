@@ -17,7 +17,9 @@ public class DeviceMapper {
                 deviceId,
                 createDeviceDto.sensorType(),
                 createDeviceDto.room(),
-                createDeviceDto.name()
+                createDeviceDto.name(),
+                createDeviceDto.externalId(),
+                createDeviceDto.parentExternalId()
         );
     }
 
@@ -27,7 +29,9 @@ public class DeviceMapper {
                 device.getSensorType(),
                 device.getRoom(),
                 device.getName(),
-                device.getLastSeenAt()
+                device.getLastSeenAt(),
+                device.getExternalId(),
+                device.getParentExternalId()
         );
     }
 }

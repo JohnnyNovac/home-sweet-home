@@ -13,8 +13,8 @@ public class DeviceRegistryCache {
 
     private final ConcurrentHashMap<String, DeviceEntry> cache = new ConcurrentHashMap<>();
 
-    public void upsert(String deviceId, String room, String sensorType) {
-        cache.put(deviceId, new DeviceEntry(room, sensorType));
+    public void upsert(String deviceId, String room, String sensorType, String externalId, String parentExternalId) {
+        cache.put(deviceId, new DeviceEntry(room, sensorType, externalId, parentExternalId));
     }
 
     public void remove(String deviceId) {

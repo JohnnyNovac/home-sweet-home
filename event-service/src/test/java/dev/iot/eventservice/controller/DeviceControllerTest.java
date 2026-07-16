@@ -35,7 +35,7 @@ class DeviceControllerTest {
     @DisplayName("POST creates a device and returns 201")
     void postCreatesDevice() throws Exception {
         when(deviceService.create(any()))
-                .thenReturn(new DeviceDto("esp01", "climate", "bedroom", "NodeMCU-1", null));
+                .thenReturn(new DeviceDto("esp01", "climate", "bedroom", "NodeMCU-1", null, null, null));
 
         mockMvc.perform(post("/api/v1/devices")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -73,7 +73,7 @@ class DeviceControllerTest {
     @DisplayName("GET returns the paged device list")
     void getReturnsDevices() throws Exception {
         when(deviceService.getDevices(0, 20))
-                .thenReturn(new PageImpl<>(List.of(new DeviceDto("esp01", "climate", "bedroom", "NodeMCU-1", null))));
+                .thenReturn(new PageImpl<>(List.of(new DeviceDto("esp01", "climate", "bedroom", "NodeMCU-1", null, null, null))));
 
         mockMvc.perform(get("/api/v1/devices"))
                 .andExpect(status().isOk())
@@ -85,7 +85,7 @@ class DeviceControllerTest {
     @DisplayName("PUT updates room/name and returns 200")
     void putUpdatesDevice() throws Exception {
         when(deviceService.update(eq("esp01"), any()))
-                .thenReturn(new DeviceDto("esp01", "climate", "kitchen", "NodeMCU-2", null));
+                .thenReturn(new DeviceDto("esp01", "climate", "kitchen", "NodeMCU-2", null, null, null));
 
         mockMvc.perform(put("/api/v1/devices/esp01")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -42,7 +42,13 @@ public class DeviceEventListener {
             DeviceEvent deviceEvent = DeviceEvent.valueOf(eventType);
             switch (deviceEvent) {
                 case DEVICE_UPSERTED ->
-                        cache.upsert(deviceEventDto.deviceId(), deviceEventDto.room(), deviceEventDto.sensorType());
+                        cache.upsert(
+                                deviceEventDto.deviceId(),
+                                deviceEventDto.room(),
+                                deviceEventDto.sensorType(),
+                                deviceEventDto.externalId(),
+                                deviceEventDto.parentExternalId()
+                        );
                 case DEVICE_DELETED -> cache.remove(deviceEventDto.deviceId());
             }
         } catch (JacksonException | IllegalArgumentException e) {
