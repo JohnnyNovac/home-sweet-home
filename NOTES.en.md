@@ -42,6 +42,23 @@ and state topics published by event-service.
 Every topic except the last is published by the device; `home/cmd/<deviceId>` is the one the device subscribes to —
 presence-service publishes `MEASURE` to it (see the lamp section below).
 
+## RabbitMQ queues: changing arguments
+
+Queues and bindings are declared in `docker/rabbitmq/definitions.json` and created when the broker imports it on start.
+The two lamp queues (`presence-data`, `presence-illuminance`) carry `x-message-ttl` (2 minutes): a stale reading is of no
+use to the lamp, so a message that sat longer is dropped and the queue does not grow while its consumer is down.
+TTL-expired messages are dead-lettered to the matching `*.dlq`, so those two DLQs are capped with `x-max-length` +
+`x-overflow: drop-head`.
+
+RabbitMQ queue arguments are immutable: `POST /api/definitions` will not change them on an existing queue. So a TTL or
+limit change is applied by the one-shot `rabbitmq-init` container (`docker/rabbitmq/init.sh`): once the broker is
+healthy, it deletes every declared queue (except `mqtt-subscription-*`, held by a live MQTT client) and re-imports
+`definitions.json`. Dependent services wait for it to finish successfully (`service_completed_successfully`), so nothing
+connects while the queues are being recreated.
+
+So nothing has to be done by hand — after editing `definitions.json`, redeploying the stack is enough and `rabbitmq-init`
+applies the new arguments. The side effect is that recreating the queues drops whatever they held at deploy time.
+
 ## Assigning a room and name to a device
 
 On the first message the device is automatically added to the `devices` collection (Mongo, database `events`). The

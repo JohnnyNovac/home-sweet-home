@@ -93,6 +93,19 @@ classify failures: unrecoverable data errors (malformed JSON, missing required m
 failures (e.g. `MqttPublisherException` when MQTT is briefly down) propagate unchanged and are requeued for a later
 retry. Without this split a single bad device payload would loop on the queue head indefinitely.
 
+**Message TTL on the lamp queues.** The two lamp-only queues (`presence-data`, `presence-illuminance`) carry
+`x-message-ttl: 120000` (2 min). A presence or illuminance reading is only useful fresh — both self-heal within the 60s
+presence-heartbeat / `climate` cadence — so a message that outlived a 2-minute consumer outage is dropped rather than
+acted on, which stops presence-service from reacting to hour-old presence on restart and keeps these queues from growing
+without bound while their consumer is down. The persisting queues are deliberately left without a TTL: `event-data`
+carries measurements to store (expiry would be data loss) and `presence-device-events` carries registry deltas (a lost
+`DEVICE_UPSERTED` would strand a room). Because a TTL-expired message is dead-lettered when a DLX is set (it is on both),
+the expired readings land in `presence-data.dlq` / `presence-illuminance.dlq`, so those two DLQs are capped with
+`x-max-length: 1000` + `x-overflow: drop-head` to bound them too. Queue arguments are immutable (`POST /api/definitions`
+does not touch an existing queue), which is why the one-shot `rabbitmq-init` container (`docker/rabbitmq/init.sh`)
+deletes every declared queue and re-imports `definitions.json` on each stack start — so an edited TTL is applied by a
+redeploy, no manual step needed. See `NOTES.md`.
+
 **Persistence durability.** Messages are consumed by blocking `@RabbitListener`s, and event-service uses the blocking
 MongoDB driver (`MongoRepository` / `MongoTemplate`), not reactive — the listener is sequential and blocking, so a
 reactive stack would buy nothing here and only force `block()` bridges. Persistence is therefore synchronous: the
