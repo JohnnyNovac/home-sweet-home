@@ -1,6 +1,5 @@
 package dev.iot.yandexservice.service;
 
-import dev.iot.yandexservice.config.YandexProperties;
 import dev.iot.yandexservice.dto.DeviceGroupActionRequest;
 import dev.iot.yandexservice.dto.DeviceGroupActionResponse;
 import io.grpc.stub.StreamObserver;
@@ -22,81 +21,83 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class GrpcServerServiceTest {
 
-    private static final String CHANDELIER_ID = "chandelier-123";
+    private static final String EXTERNAL_ID = "chandelier-123";
 
     @Mock
     private YandexRestClient yandexRestClient;
 
     @Mock
-    private YandexProperties yandexProperties;
-
-    @Mock
-    private StreamObserver<Yandex.TurnOnOffLampResponse> responseObserver;
+    private StreamObserver<Yandex.SetStateResponse> responseObserver;
 
     private GrpcServerService grpcServerService;
 
     @BeforeEach
     void setUp() {
-        grpcServerService = new GrpcServerService(yandexRestClient, yandexProperties);
-        when(yandexProperties.chandelierId()).thenReturn(CHANDELIER_ID);
+        grpcServerService = new GrpcServerService(yandexRestClient);
     }
 
     @Test
-    @DisplayName("Should turn the lamp on and forward turnOn=true to Yandex")
+    @DisplayName("Should turn the group lamp on and forward on=true to Yandex")
     void shouldTurnOnLampSuccessfully() {
-        Yandex.TurnOnOffLampRequest request = Yandex.TurnOnOffLampRequest.newBuilder()
-                .setTurnOn(true)
+        Yandex.SetStateRequest request = Yandex.SetStateRequest.newBuilder()
+                .setExternalId(EXTERNAL_ID)
+                .setOn(true)
+                .setKind(Yandex.TargetKind.GROUP)
                 .build();
 
         DeviceGroupActionResponse response = new DeviceGroupActionResponse("id", "ok", List.of());
-        when(yandexRestClient.sendGroupAction(any(DeviceGroupActionRequest.class), eq(CHANDELIER_ID)))
+        when(yandexRestClient.sendGroupAction(any(DeviceGroupActionRequest.class), eq(EXTERNAL_ID)))
                 .thenReturn(response);
 
-        grpcServerService.turnOnOffLamp(request, responseObserver);
+        grpcServerService.setState(request, responseObserver);
 
         ArgumentCaptor<DeviceGroupActionRequest> requestCaptor = ArgumentCaptor.forClass(DeviceGroupActionRequest.class);
-        verify(yandexRestClient).sendGroupAction(requestCaptor.capture(), eq(CHANDELIER_ID));
+        verify(yandexRestClient).sendGroupAction(requestCaptor.capture(), eq(EXTERNAL_ID));
         assertThat(requestCaptor.getValue().actions().getFirst().state().value()).isEqualTo(true);
 
-        verify(responseObserver).onNext(argThat(resp -> resp.getStatus().equals("OK")));
+        verify(responseObserver).onNext(any());
         verify(responseObserver).onCompleted();
         verify(responseObserver, never()).onError(any());
     }
 
     @Test
-    @DisplayName("Should turn the lamp off and forward turnOn=false to Yandex")
+    @DisplayName("Should turn the group lamp off and forward on=false to Yandex")
     void shouldTurnOffLampSuccessfully() {
-        Yandex.TurnOnOffLampRequest request = Yandex.TurnOnOffLampRequest.newBuilder()
-                .setTurnOn(false)
+        Yandex.SetStateRequest request = Yandex.SetStateRequest.newBuilder()
+                .setExternalId(EXTERNAL_ID)
+                .setOn(false)
+                .setKind(Yandex.TargetKind.GROUP)
                 .build();
 
         DeviceGroupActionResponse response = new DeviceGroupActionResponse("id", "ok", List.of());
-        when(yandexRestClient.sendGroupAction(any(DeviceGroupActionRequest.class), eq(CHANDELIER_ID)))
+        when(yandexRestClient.sendGroupAction(any(DeviceGroupActionRequest.class), eq(EXTERNAL_ID)))
                 .thenReturn(response);
 
-        grpcServerService.turnOnOffLamp(request, responseObserver);
+        grpcServerService.setState(request, responseObserver);
 
         ArgumentCaptor<DeviceGroupActionRequest> requestCaptor = ArgumentCaptor.forClass(DeviceGroupActionRequest.class);
-        verify(yandexRestClient).sendGroupAction(requestCaptor.capture(), eq(CHANDELIER_ID));
+        verify(yandexRestClient).sendGroupAction(requestCaptor.capture(), eq(EXTERNAL_ID));
         assertThat(requestCaptor.getValue().actions().getFirst().state().value()).isEqualTo(false);
 
-        verify(responseObserver).onNext(argThat(resp -> resp.getStatus().equals("OK")));
+        verify(responseObserver).onNext(any());
         verify(responseObserver).onCompleted();
         verify(responseObserver, never()).onError(any());
     }
 
     @Test
-    @DisplayName("Should handle API error response")
+    @DisplayName("Should signal an error when Yandex rejects the action")
     void shouldHandleApiErrorResponse() {
-        Yandex.TurnOnOffLampRequest request = Yandex.TurnOnOffLampRequest.newBuilder()
-                .setTurnOn(true)
+        Yandex.SetStateRequest request = Yandex.SetStateRequest.newBuilder()
+                .setExternalId(EXTERNAL_ID)
+                .setOn(true)
+                .setKind(Yandex.TargetKind.GROUP)
                 .build();
 
         DeviceGroupActionResponse response = new DeviceGroupActionResponse("id", "error", List.of());
-        when(yandexRestClient.sendGroupAction(any(DeviceGroupActionRequest.class), eq(CHANDELIER_ID)))
+        when(yandexRestClient.sendGroupAction(any(DeviceGroupActionRequest.class), eq(EXTERNAL_ID)))
                 .thenReturn(response);
 
-        grpcServerService.turnOnOffLamp(request, responseObserver);
+        grpcServerService.setState(request, responseObserver);
 
         verify(responseObserver).onError(any(RuntimeException.class));
         verify(responseObserver, never()).onNext(any());

@@ -1,5 +1,6 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.cache.DeviceEntry;
 import dev.iot.presenceservice.config.MeasurementsProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+
+import java.util.List;
 
 @Service
 public class IlluminanceListener {
@@ -50,7 +53,11 @@ public class IlluminanceListener {
 
             // Climate messages from devices without a light sensor carry no illuminance — just skip them.
             if (illuminance.isNumber()) {
-                lampGate.lampRoomFor(deviceId).ifPresent(room -> lampService.onIlluminance(illuminance.asDouble()));
+                List<DeviceEntry> lamps = lampGate.lampsFor(deviceId);
+                if (!lamps.isEmpty()) {
+                    String room = lamps.getFirst().room();
+                    lampService.onIlluminance(room, illuminance.asDouble());
+                }
             }
         } catch (JacksonException e) {
             logger.error("Discarding unprocessable illuminance message, routingKey={}, payload={}", routingKey, message, e);

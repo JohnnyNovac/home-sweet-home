@@ -32,7 +32,7 @@ public class MeasureTrigger {
             return;
         }
 
-        List<String> climateDevices = deviceRegistryCache.getDevicesByRoomAndSensorType(room, CLIMATE.getType());
+        List<String> climateDevices = deviceRegistryCache.getDevicesBy(room, CLIMATE.getType(), null);
         if (climateDevices.isEmpty()) {
             logger.warn("No climate device in room {} to MEASURE for presence device {}", room, deviceId);
             return;

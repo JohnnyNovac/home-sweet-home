@@ -98,7 +98,7 @@ public class DeviceService {
         outboxEvent.setAggregateId(existing.getDeviceId());
         outboxEvent.setEventType(OutboxEventType.DEVICE_DELETED);
         outboxEvent.setPayload(objectMapper.writeValueAsString(
-                new OutboxPayloadDto(existing.getDeviceId(), null, null, null, null)
+                new OutboxPayloadDto(existing.getDeviceId(), null, null, null, null, null)
         ));
         outboxRepository.insert(outboxEvent);
 
@@ -118,7 +118,9 @@ public class DeviceService {
      */
     @Transactional
     public DeviceDto update(String deviceId, UpdateDeviceDto updateDeviceDto) {
-        if (updateDeviceDto.room() == null && updateDeviceDto.name() == null) {
+        if (updateDeviceDto.room() == null && updateDeviceDto.name() == null
+                && updateDeviceDto.externalId() == null && updateDeviceDto.externalKind() == null
+                && updateDeviceDto.groupExternalIds() == null) {
             Device existing = deviceRepository.findById(deviceId)
                     .orElseThrow(() -> new DeviceNotFoundException(deviceId));
             return deviceMapper.toDeviceDto(existing);
@@ -136,8 +138,11 @@ public class DeviceService {
         if (updateDeviceDto.externalId() != null) {
             update.set("externalId", updateDeviceDto.externalId());
         }
-        if (updateDeviceDto.parentExternalId() != null) {
-            update.set("parentExternalId", updateDeviceDto.parentExternalId());
+        if (updateDeviceDto.externalKind() != null) {
+            update.set("externalKind", updateDeviceDto.externalKind());
+        }
+        if (updateDeviceDto.groupExternalIds() != null) {
+            update.set("groupExternalIds", updateDeviceDto.groupExternalIds());
         }
 
         FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true);
@@ -164,7 +169,8 @@ public class DeviceService {
                         updated.getRoom(),
                         updated.getSensorType(),
                         updated.getExternalId(),
-                        updated.getParentExternalId()
+                        updated.getExternalKind(),
+                        updated.getGroupExternalIds()
                 )
         ));
         outboxRepository.insert(outboxEvent);

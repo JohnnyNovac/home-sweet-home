@@ -1,5 +1,6 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.cache.DeviceEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
@@ -8,6 +9,8 @@ import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
+
+import java.util.List;
 
 @Service
 public class PresenceListener {
@@ -33,7 +36,10 @@ public class PresenceListener {
         }
 
         try {
-            lampGate.lampRoomFor(deviceId).ifPresent(room -> presenceHandler.handleIncomingData(deviceId, room, message));
+            List<DeviceEntry> lamps = lampGate.lampsFor(deviceId);
+            if (!lamps.isEmpty()) {
+                presenceHandler.handleIncomingData(deviceId, lamps, message);
+            }
         } catch (JacksonException | IllegalArgumentException | ClassCastException e) {
             logger.error("Discarding unprocessable presence message, routingKey={}, payload={}", routingKey, message, e);
             throw new AmqpRejectAndDontRequeueException("Unprocessable presence message: " + routingKey, e);

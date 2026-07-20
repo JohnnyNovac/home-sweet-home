@@ -38,8 +38,8 @@ public class LampController {
     }
 
     @PostMapping("/state")
-    public LampStateResponse setState(@RequestBody LampStateRequest request) {
-        lampService.setLamp(request.on());
+    public LampStateResponse setState(@RequestBody @Valid LampStateRequest request) {
+        lampService.setLamp(request.room(), request.on());
         return get();
     }
 }

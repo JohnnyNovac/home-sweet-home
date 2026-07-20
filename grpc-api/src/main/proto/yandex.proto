@@ -2,14 +2,42 @@ syntax = "proto3";
 
 package yandex;
 
-message TurnOnOffLampRequest {
-  bool turnOn = 1;
-}
-
-message TurnOnOffLampResponse {
-  string status = 1;
-}
-
 service YandexService {
-  rpc TurnOnOffLamp(TurnOnOffLampRequest) returns (TurnOnOffLampResponse);
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  rpc SetState(SetStateRequest) returns (SetStateResponse);
 }
+
+message ListDevicesRequest {}
+
+message ListDevicesResponse {
+  repeated DiscoveredDevice devices = 2;
+}
+
+message DiscoveredDevice {
+  string external_id = 1;
+  DeviceType type = 2;
+  string name = 3;
+  repeated string group_external_ids = 4;
+  TargetKind kind = 5;
+}
+
+message SetStateRequest {
+  string external_id = 1;
+  bool on = 2;
+  TargetKind kind = 3;
+}
+
+message SetStateResponse {}
+
+enum DeviceType {
+  DEVICE_TYPE_UNSPECIFIED = 0;
+  LAMP = 1;
+}
+
+enum TargetKind {
+  TARGET_KIND_UNSPECIFIED = 0;
+  DEVICE = 1;
+  GROUP = 2;
+}
+
+

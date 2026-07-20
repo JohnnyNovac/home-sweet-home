@@ -10,6 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -35,7 +37,7 @@ public class DeviceRegistrySeederTest {
         String json = """
                 {
                   "content": [
-                    {"deviceId":"lamp-1","sensorType":"lamp","room":"bedroom","name":null,"lastSeenAt":null,"externalId":"bulb-1","parentExternalId":"chandelier-7"}
+                    {"deviceId":"lamp-1","sensorType":"lamp","room":"bedroom","name":null,"lastSeenAt":null,"externalId":"bulb-1","externalKind":"DEVICE","groupExternalIds":["chandelier-7"]}
                   ],
                   "page": {"size":20,"number":0,"totalElements":1,"totalPages":1}
                 }
@@ -47,7 +49,7 @@ public class DeviceRegistrySeederTest {
         seeder.init();
 
         mockServer.verify();
-        verify(cache).upsert("lamp-1", "bedroom", "lamp", "bulb-1", "chandelier-7");
+        verify(cache).upsert("lamp-1", "bedroom", "lamp", "bulb-1", "DEVICE", List.of("chandelier-7"));
     }
 
     @Test
@@ -80,8 +82,8 @@ public class DeviceRegistrySeederTest {
         seeder.init();
 
         mockServer.verify();
-        verify(cache).upsert("esp01-1", "bedroom", "climate", null, null);
-        verify(cache).upsert("esp01-2", "kitchen", "climate", null, null);
+        verify(cache).upsert("esp01-1", "bedroom", "climate", null, null, null);
+        verify(cache).upsert("esp01-2", "kitchen", "climate", null, null, null);
     }
 
     @Test
@@ -105,8 +107,8 @@ public class DeviceRegistrySeederTest {
         seeder.init();
 
         mockServer.verify();
-        verify(cache).upsert("esp01-1", "bedroom", "climate", null, null);
-        verify(cache, never()).upsert(eq("esp01-2"), any(), any(), any(), any());
+        verify(cache).upsert("esp01-1", "bedroom", "climate", null, null, null);
+        verify(cache, never()).upsert(eq("esp01-2"), any(), any(), any(), any(), any());
     }
 
     @Test

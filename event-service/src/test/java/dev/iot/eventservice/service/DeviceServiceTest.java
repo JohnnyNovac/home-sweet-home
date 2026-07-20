@@ -48,7 +48,7 @@ class DeviceServiceTest {
     @DisplayName("roomFor returns the assigned room when the device has one")
     void roomForReturnsRoom() {
         when(repository.findById(DEVICE_ID))
-                .thenReturn(Optional.of(new Device(DEVICE_ID, "climate", "bedroom", null, null, null)));
+                .thenReturn(Optional.of(new Device(DEVICE_ID, "climate", "bedroom", null, null, null, null)));
 
         assertThat(deviceService.roomFor(DEVICE_ID)).contains("bedroom");
     }
@@ -72,8 +72,8 @@ class DeviceServiceTest {
     @Test
     @DisplayName("create translates a duplicate _id into DeviceAlreadyExistsException")
     void createRejectsDuplicate() {
-        CreateDeviceDto dto = new CreateDeviceDto(DEVICE_ID, "climate", "bedroom", "NodeMCU-1", null, null);
-        Device device = new Device(DEVICE_ID, "climate", "bedroom", "NodeMCU-1", null, null);
+        CreateDeviceDto dto = new CreateDeviceDto(DEVICE_ID, "climate", "bedroom", "NodeMCU-1", null, null, null);
+        Device device = new Device(DEVICE_ID, "climate", "bedroom", "NodeMCU-1", null, null, null);
         when(deviceMapper.toDevice(dto, DEVICE_ID)).thenReturn(device);
         when(repository.insert(device)).thenThrow(new DuplicateKeyException("E11000 duplicate key"));
 
@@ -85,12 +85,12 @@ class DeviceServiceTest {
     @Test
     @DisplayName("update with an empty body returns the existing device without writing")
     void updateEmptyBodyReturnsExistingWithoutWrite() {
-        Device existing = new Device(DEVICE_ID, "climate", "bedroom", "NodeMCU-1", null, null);
-        DeviceDto expected = new DeviceDto(DEVICE_ID, "climate", "bedroom", "NodeMCU-1", null, null, null);
+        Device existing = new Device(DEVICE_ID, "climate", "bedroom", "NodeMCU-1", null, null, null);
+        DeviceDto expected = new DeviceDto(DEVICE_ID, "climate", "bedroom", "NodeMCU-1", null, null, null, null);
         when(repository.findById(DEVICE_ID)).thenReturn(Optional.of(existing));
         when(deviceMapper.toDeviceDto(existing)).thenReturn(expected);
 
-        assertThat(deviceService.update(DEVICE_ID, new UpdateDeviceDto(null, null, null, null))).isEqualTo(expected);
+        assertThat(deviceService.update(DEVICE_ID, new UpdateDeviceDto(null, null, null, null, null))).isEqualTo(expected);
 
         verify(mongoTemplate, never()).findAndModify(any(Query.class), any(Update.class), any(), eq(Device.class));
     }
@@ -100,7 +100,7 @@ class DeviceServiceTest {
     void updateEmptyBodyThrowsWhenUnknown() {
         when(repository.findById(DEVICE_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> deviceService.update(DEVICE_ID, new UpdateDeviceDto(null, null, null, null)))
+        assertThatThrownBy(() -> deviceService.update(DEVICE_ID, new UpdateDeviceDto(null, null, null, null, null)))
                 .isInstanceOf(DeviceNotFoundException.class);
     }
 
@@ -110,7 +110,7 @@ class DeviceServiceTest {
         when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(), eq(Device.class)))
                 .thenReturn(null);
 
-        assertThatThrownBy(() -> deviceService.update(DEVICE_ID, new UpdateDeviceDto("kitchen", null, null, null)))
+        assertThatThrownBy(() -> deviceService.update(DEVICE_ID, new UpdateDeviceDto("kitchen", null, null, null, null)))
                 .isInstanceOf(DeviceNotFoundException.class)
                 .hasMessageContaining(DEVICE_ID);
     }

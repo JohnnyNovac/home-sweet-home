@@ -1,5 +1,6 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.cache.DeviceEntry;
 import dev.iot.presenceservice.config.GrpcClientProperties;
 import dev.iot.presenceservice.config.LampProperties;
 import dev.iot.presenceservice.repository.LampSettingsRepository;
@@ -14,6 +15,7 @@ import yandex.Yandex;
 import yandex.YandexServiceGrpc;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -24,6 +26,8 @@ class LampServiceTest {
 
     private static final double THRESHOLD = 50;
     private static final Duration OFF_DELAY = Duration.ofMillis(50);
+    private static final String ROOM = "living-room";
+    private static final List<DeviceEntry> LAMPS = List.of(new DeviceEntry(ROOM, "lamp", "chandelier-1", "GROUP", List.of()));
 
     @Mock
     private YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub;
@@ -31,12 +35,15 @@ class LampServiceTest {
     @Mock
     private LampSettingsRepository lampSettingsRepository;
 
+    @Mock
+    private LampGate lampGate;
+
     private LampService lampService;
 
     @BeforeEach
     void setUp() {
         LampProperties lampProperties = new LampProperties(THRESHOLD, OFF_DELAY);
-        lampService = new LampService(yandexServiceStub, new GrpcClientProperties(Duration.ofSeconds(12)), lampProperties, lampSettingsRepository);
+        lampService = new LampService(yandexServiceStub, new GrpcClientProperties(Duration.ofSeconds(12)), lampProperties, lampSettingsRepository, lampGate);
     }
 
     private void stubDeadline() {
@@ -48,19 +55,19 @@ class LampServiceTest {
     void shouldTurnOnWhenPresentAndDark() throws StatusException {
         stubDeadline();
 
-        lampService.onIlluminance(10);
-        lampService.onPresence(true);
-        lampService.onPresence(true);
+        lampService.onIlluminance(ROOM, 10);
+        lampService.onPresence(ROOM, LAMPS, true);
+        lampService.onPresence(ROOM, LAMPS, true);
 
-        verify(yandexServiceStub, times(1)).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
+        verify(yandexServiceStub, times(1)).setState(argThat(Yandex.SetStateRequest::getOn));
     }
 
     @Test
     @DisplayName("Should not touch the lamp while illuminance is still unknown")
     void shouldNotActWhileIlluminanceUnknown() throws StatusException {
-        lampService.onPresence(true);
+        lampService.onPresence(ROOM, LAMPS, true);
 
-        verify(yandexServiceStub, never()).turnOnOffLamp(any());
+        verify(yandexServiceStub, never()).setState(any());
     }
 
     @Test
@@ -68,12 +75,12 @@ class LampServiceTest {
     void shouldTurnOnWhenRoomDarkensWhilePresent() throws StatusException {
         stubDeadline();
 
-        lampService.onIlluminance(500);
-        lampService.onPresence(true);
-        verify(yandexServiceStub, never()).turnOnOffLamp(any());
+        lampService.onIlluminance(ROOM, 500);
+        lampService.onPresence(ROOM, LAMPS, true);
+        verify(yandexServiceStub, never()).setState(any());
 
-        lampService.onIlluminance(10);
-        verify(yandexServiceStub, times(1)).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
+        lampService.onIlluminance(ROOM, 10);
+        verify(yandexServiceStub, times(1)).setState(argThat(Yandex.SetStateRequest::getOn));
     }
 
     @Test
@@ -81,11 +88,11 @@ class LampServiceTest {
     void shouldNotTurnOffWhenBright() throws StatusException {
         stubDeadline();
 
-        lampService.onIlluminance(10);
-        lampService.onPresence(true);
-        lampService.onIlluminance(500);
+        lampService.onIlluminance(ROOM, 10);
+        lampService.onPresence(ROOM, LAMPS, true);
+        lampService.onIlluminance(ROOM, 500);
 
-        verify(yandexServiceStub, never()).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+        verify(yandexServiceStub, never()).setState(argThat(request -> !request.getOn()));
     }
 
     @Test
@@ -93,36 +100,36 @@ class LampServiceTest {
     void shouldTurnOffWhenPresenceEnds() throws StatusException {
         stubDeadline();
 
-        lampService.onIlluminance(10);
-        lampService.onPresence(true);
-        lampService.onPresence(false);
+        lampService.onIlluminance(ROOM, 10);
+        lampService.onPresence(ROOM, LAMPS, true);
+        lampService.onPresence(ROOM, LAMPS, false);
 
-        verify(yandexServiceStub, timeout(1000)).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+        verify(yandexServiceStub, timeout(1000)).setState(argThat(request -> !request.getOn()));
     }
 
     @Test
     @DisplayName("Should not turn the lamp off when presence ends but it was never switched on")
     void shouldNotTurnOffWhenNeverOn() throws StatusException {
-        lampService.onIlluminance(500);
-        lampService.onPresence(true);
-        lampService.onPresence(false);
+        lampService.onIlluminance(ROOM, 500);
+        lampService.onPresence(ROOM, LAMPS, true);
+        lampService.onPresence(ROOM, LAMPS, false);
 
-        verify(yandexServiceStub, never()).turnOnOffLamp(any());
+        verify(yandexServiceStub, never()).setState(any());
     }
 
     @Test
     @DisplayName("Should retry on the next trigger after a failed lamp command")
     void shouldRetryAfterFailure() throws StatusException {
         stubDeadline();
-        when(yandexServiceStub.turnOnOffLamp(any()))
+        when(yandexServiceStub.setState(any()))
                 .thenThrow(new RuntimeException("yandex-service down"))
-                .thenReturn(Yandex.TurnOnOffLampResponse.getDefaultInstance());
+                .thenReturn(Yandex.SetStateResponse.getDefaultInstance());
 
-        lampService.onIlluminance(10);
-        lampService.onPresence(true);  // first attempt throws, lamp stays off
-        lampService.onIlluminance(9);  // still present and dark, lamp off -> retry
+        lampService.onIlluminance(ROOM, 10);
+        lampService.onPresence(ROOM, LAMPS, true);  // first attempt throws, lamp stays off
+        lampService.onIlluminance(ROOM, 9);         // still present and dark, lamp off -> retry
 
-        verify(yandexServiceStub, times(2)).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
+        verify(yandexServiceStub, times(2)).setState(argThat(Yandex.SetStateRequest::getOn));
     }
 
     @Test
@@ -130,14 +137,14 @@ class LampServiceTest {
     void shouldReactToThresholdChange() throws StatusException {
         stubDeadline();
 
-        lampService.onIlluminance(60);
-        lampService.onPresence(true);
-        verify(yandexServiceStub, never()).turnOnOffLamp(any());  // 60 >= 50, not dark
+        lampService.onIlluminance(ROOM, 60);
+        lampService.onPresence(ROOM, LAMPS, true);
+        verify(yandexServiceStub, never()).setState(any());  // 60 >= 50, not dark
 
         lampService.setIlluminanceThreshold(70);  // 60 < 70, now dark and present
 
         verify(lampSettingsRepository).save(argThat(s -> s.id().equals("illuminanceThreshold") && s.value() == 70));
-        verify(yandexServiceStub, times(1)).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
+        verify(yandexServiceStub, times(1)).setState(argThat(Yandex.SetStateRequest::getOn));
     }
 
     @Test
@@ -145,13 +152,13 @@ class LampServiceTest {
     void shouldNotTurnOffWhenPresenceReturnsBeforeDelay() throws StatusException {
         stubDeadline();
 
-        lampService.onIlluminance(10);
-        lampService.onPresence(true);
-        lampService.onPresence(false);  // schedules a delayed off
-        lampService.onPresence(true);   // returns in time, cancels it
+        lampService.onIlluminance(ROOM, 10);
+        lampService.onPresence(ROOM, LAMPS, true);
+        lampService.onPresence(ROOM, LAMPS, false);  // schedules a delayed off
+        lampService.onPresence(ROOM, LAMPS, true);   // returns in time, cancels it
 
         verify(yandexServiceStub, after(OFF_DELAY.toMillis() + 200).never())
-                .turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+                .setState(argThat(request -> !request.getOn()));
     }
 
     @Test
@@ -166,10 +173,11 @@ class LampServiceTest {
     @DisplayName("Should force the lamp on")
     void shouldForceLampOn() throws StatusException {
         stubDeadline();
+        when(lampGate.lampsForRoom(ROOM)).thenReturn(LAMPS);
 
-        lampService.setLamp(true);
+        lampService.setLamp(ROOM, true);
 
-        verify(yandexServiceStub).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
+        verify(yandexServiceStub).setState(argThat(Yandex.SetStateRequest::getOn));
         assertThat(lampService.isLampOn()).isTrue();
     }
 
@@ -177,10 +185,11 @@ class LampServiceTest {
     @DisplayName("Should force the lamp off")
     void shouldForceLampOff() throws StatusException {
         stubDeadline();
+        when(lampGate.lampsForRoom(ROOM)).thenReturn(LAMPS);
 
-        lampService.setLamp(false);
+        lampService.setLamp(ROOM, false);
 
-        verify(yandexServiceStub).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+        verify(yandexServiceStub).setState(argThat(request -> !request.getOn()));
         assertThat(lampService.isLampOn()).isFalse();
     }
 
@@ -188,11 +197,12 @@ class LampServiceTest {
     @DisplayName("Should keep the lamp off when the force command fails")
     void shouldNotForceLampOnWhenCommandFails() throws StatusException {
         stubDeadline();
-        when(yandexServiceStub.turnOnOffLamp(any())).thenThrow(new RuntimeException("down"));
+        when(lampGate.lampsForRoom(ROOM)).thenReturn(LAMPS);
+        when(yandexServiceStub.setState(any())).thenThrow(new RuntimeException("down"));
 
-        lampService.setLamp(true);
+        lampService.setLamp(ROOM, true);
 
-        verify(yandexServiceStub).turnOnOffLamp(argThat(Yandex.TurnOnOffLampRequest::getTurnOn));
+        verify(yandexServiceStub).setState(argThat(Yandex.SetStateRequest::getOn));
         assertThat(lampService.isLampOn()).isFalse();
     }
 
@@ -201,12 +211,12 @@ class LampServiceTest {
     void shouldNotRescheduleOffWhenAlreadyPending() throws StatusException {
         stubDeadline();
 
-        lampService.onIlluminance(10);
-        lampService.onPresence(true);   // lamp on
-        lampService.onPresence(false);  // schedules the delayed off
-        lampService.onPresence(false);  // off already pending -> early return
+        lampService.onIlluminance(ROOM, 10);
+        lampService.onPresence(ROOM, LAMPS, true);   // lamp on
+        lampService.onPresence(ROOM, LAMPS, false);  // schedules the delayed off
+        lampService.onPresence(ROOM, LAMPS, false);  // off already pending -> early return
 
-        verify(yandexServiceStub, timeout(1000).times(1)).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+        verify(yandexServiceStub, timeout(1000).times(1)).setState(argThat(request -> !request.getOn()));
     }
 
     @Test
@@ -214,15 +224,15 @@ class LampServiceTest {
     void shouldKeepLampOnWhenDelayedOffCommandFails() throws StatusException {
         stubDeadline();
         // Only the OFF call fails; the ON call is left to the default answer, so the stub is lenient
-        // (turnOnOffLamp is also invoked with a non-matching ON argument, which strict stubs would flag).
-        lenient().when(yandexServiceStub.turnOnOffLamp(argThat(request -> !request.getTurnOn())))
+        // (setState is also invoked with a non-matching ON argument, which strict stubs would flag).
+        lenient().when(yandexServiceStub.setState(argThat(request -> !request.getOn())))
                 .thenThrow(new RuntimeException("down"));
 
-        lampService.onIlluminance(10);
-        lampService.onPresence(true);   // lamp on
-        lampService.onPresence(false);  // after the delay the OFF call fails
+        lampService.onIlluminance(ROOM, 10);
+        lampService.onPresence(ROOM, LAMPS, true);   // lamp on
+        lampService.onPresence(ROOM, LAMPS, false);  // after the delay the OFF call fails
 
-        verify(yandexServiceStub, timeout(1000)).turnOnOffLamp(argThat(request -> !request.getTurnOn()));
+        verify(yandexServiceStub, timeout(1000)).setState(argThat(request -> !request.getOn()));
         assertThat(lampService.isLampOn()).isTrue();
     }
 }

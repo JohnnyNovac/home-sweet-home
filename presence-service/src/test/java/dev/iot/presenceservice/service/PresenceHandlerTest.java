@@ -1,5 +1,6 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.cache.DeviceEntry;
 import dev.iot.presenceservice.config.MeasurementsProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -9,6 +10,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 
@@ -17,6 +20,7 @@ class PresenceHandlerTest {
 
     private static final String DEVICE_ID = "presence-1";
     private static final String ROOM = "living-room";
+    private static final List<DeviceEntry> LAMPS = List.of(new DeviceEntry(ROOM, "lamp", "chandelier-1", "GROUP", List.of()));
 
     private PresenceHandler presenceHandler;
 
@@ -48,9 +52,9 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        presenceHandler.handleIncomingData(DEVICE_ID, ROOM, jsonData);
+        presenceHandler.handleIncomingData(DEVICE_ID, LAMPS, jsonData);
 
-        verify(lampService).onPresence(true);
+        verify(lampService).onPresence(ROOM, LAMPS, true);
     }
 
     @Test
@@ -65,9 +69,9 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        presenceHandler.handleIncomingData(DEVICE_ID, ROOM, jsonData);
+        presenceHandler.handleIncomingData(DEVICE_ID, LAMPS, jsonData);
 
-        verify(lampService).onPresence(true);
+        verify(lampService).onPresence(ROOM, LAMPS, true);
     }
 
     @Test
@@ -82,9 +86,9 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        presenceHandler.handleIncomingData(DEVICE_ID, ROOM, jsonData);
+        presenceHandler.handleIncomingData(DEVICE_ID, LAMPS, jsonData);
 
-        verify(lampService).onPresence(false);
+        verify(lampService).onPresence(ROOM, LAMPS, false);
     }
 
     @Test
@@ -92,7 +96,7 @@ class PresenceHandlerTest {
     void shouldRejectDataWithoutRequiredFields() {
         String invalidJsonData = "{}";
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, ROOM, invalidJsonData))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, LAMPS, invalidJsonData))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -107,7 +111,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, ROOM, invalidJsonData))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, LAMPS, invalidJsonData))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -123,7 +127,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, ROOM, nullPresence))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, LAMPS, nullPresence))
                 .isInstanceOf(IllegalArgumentException.class);
 
         String stringPresence = """
@@ -135,7 +139,7 @@ class PresenceHandlerTest {
                 }
                 """;
 
-        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, ROOM, stringPresence))
+        assertThatThrownBy(() -> presenceHandler.handleIncomingData(DEVICE_ID, LAMPS, stringPresence))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

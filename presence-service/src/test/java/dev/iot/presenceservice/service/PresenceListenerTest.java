@@ -1,5 +1,6 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.cache.DeviceEntry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -8,7 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 
-import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -19,6 +20,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class PresenceListenerTest {
+
+    private static final List<DeviceEntry> LAMPS = List.of(new DeviceEntry("living-room", "lamp", "chandelier-1", "GROUP", List.of()));
 
     private PresenceListener presenceListener;
 
@@ -45,11 +48,11 @@ public class PresenceListenerTest {
                 }
                 """;
 
-        when(lampGate.lampRoomFor("nodemcu-1")).thenReturn(Optional.of("living-room"));
+        when(lampGate.lampsFor("nodemcu-1")).thenReturn(LAMPS);
 
         presenceListener.handleMessage(message, "home.presence.nodemcu-1.data");
 
-        verify(presenceHandler).handleIncomingData("nodemcu-1", "living-room", message);
+        verify(presenceHandler).handleIncomingData("nodemcu-1", LAMPS, message);
     }
 
     @Test
@@ -80,7 +83,7 @@ public class PresenceListenerTest {
                 }
                 """;
 
-        when(lampGate.lampRoomFor("nodemcu-1")).thenReturn(Optional.empty());
+        when(lampGate.lampsFor("nodemcu-1")).thenReturn(List.of());
 
         presenceListener.handleMessage(message, "home.presence.nodemcu-1.data");
 
@@ -92,7 +95,7 @@ public class PresenceListenerTest {
     void shouldThrowAmqpExceptionOnInvalidMessage() {
         String invalidMessage = "{not json";
 
-        when(lampGate.lampRoomFor("nodemcu-1")).thenReturn(Optional.of("living-room"));
+        when(lampGate.lampsFor("nodemcu-1")).thenReturn(LAMPS);
         doThrow(new IllegalArgumentException("boom"))
                 .when(presenceHandler).handleIncomingData(any(), any(), any());
 

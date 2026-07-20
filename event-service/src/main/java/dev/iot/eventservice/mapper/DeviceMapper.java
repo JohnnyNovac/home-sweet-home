@@ -19,7 +19,8 @@ public class DeviceMapper {
                 createDeviceDto.room(),
                 createDeviceDto.name(),
                 createDeviceDto.externalId(),
-                createDeviceDto.parentExternalId()
+                createDeviceDto.externalKind(),
+                createDeviceDto.groupExternalIds()
         );
     }
 
@@ -31,7 +32,8 @@ public class DeviceMapper {
                 device.getName(),
                 device.getLastSeenAt(),
                 device.getExternalId(),
-                device.getParentExternalId()
+                device.getExternalKind(),
+                device.getGroupExternalIds()
         );
     }
 }

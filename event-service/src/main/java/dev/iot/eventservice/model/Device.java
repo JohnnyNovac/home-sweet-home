@@ -4,6 +4,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.List;
 
 @Document(collection = "devices")
 public class Device {
@@ -15,18 +16,20 @@ public class Device {
     private String name;
     private Instant lastSeenAt;
     private String externalId;
-    private String parentExternalId;
+    private String externalKind;
+    private List<String> groupExternalIds;
 
     public Device() {
     }
 
-    public Device(String deviceId, String sensorType, String room, String name, String externalId, String parentExternalId) {
+    public Device(String deviceId, String sensorType, String room, String name, String externalId, String externalKind, List<String> groupExternalIds) {
         this.deviceId = deviceId;
         this.sensorType = sensorType;
         this.room = room;
         this.name = name;
         this.externalId = externalId;
-        this.parentExternalId = parentExternalId;
+        this.externalKind = externalKind;
+        this.groupExternalIds = groupExternalIds;
     }
 
     public String getDeviceId() {
@@ -73,11 +76,19 @@ public class Device {
         this.externalId = externalId;
     }
 
-    public String getParentExternalId() {
-        return parentExternalId;
+    public String getExternalKind() {
+        return externalKind;
     }
 
-    public void setParentExternalId(String parentExternalId) {
-        this.parentExternalId = parentExternalId;
+    public void setExternalKind(String externalKind) {
+        this.externalKind = externalKind;
+    }
+
+    public List<String> getGroupExternalIds() {
+        return groupExternalIds;
+    }
+
+    public void setGroupExternalIds(List<String> groupExternalIds) {
+        this.groupExternalIds = groupExternalIds;
     }
 }

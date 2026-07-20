@@ -1,6 +1,7 @@
 package dev.iot.presenceservice.dto;
 
 import java.time.Instant;
+import java.util.List;
 
 public record DeviceDto(
         String deviceId,
@@ -9,6 +10,7 @@ public record DeviceDto(
         String name,
         Instant lastSeenAt,
         String externalId,
-        String parentExternalId
+        String externalKind,
+        List<String> groupExternalIds
 ) {
 }

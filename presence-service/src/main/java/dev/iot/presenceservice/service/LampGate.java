@@ -1,9 +1,11 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.cache.DeviceEntry;
 import dev.iot.presenceservice.cache.DeviceRegistryCache;
+import dev.iot.presenceservice.model.ExternalKind;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
+import java.util.List;
 
 import static dev.iot.presenceservice.model.DeviceType.LAMP;
 
@@ -16,8 +18,15 @@ public class LampGate {
         this.deviceRegistryCache = deviceRegistryCache;
     }
 
-    public Optional<String> lampRoomFor(String deviceId) {
+    public List<DeviceEntry> lampsForRoom(String room) {
+        return deviceRegistryCache.getDevicesBy(room, LAMP.getType(), ExternalKind.GROUP.name()).stream()
+                .flatMap(id -> deviceRegistryCache.get(id).stream())
+                .toList();
+    }
+
+    public List<DeviceEntry> lampsFor(String deviceId) {
         return deviceRegistryCache.roomOf(deviceId)
-                .filter(room -> !deviceRegistryCache.getDevicesByRoomAndSensorType(room, LAMP.getType()).isEmpty());
+                .map(this::lampsForRoom)
+                .orElse(List.of());
     }
 }

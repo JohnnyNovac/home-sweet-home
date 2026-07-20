@@ -50,7 +50,8 @@ public class DeviceRegistrySeeder {
                                         d.room(),
                                         d.sensorType(),
                                         d.externalId(),
-                                        d.parentExternalId()
+                                        d.externalKind(),
+                                        d.groupExternalIds()
                                 ));
                     }
                 }

@@ -1,5 +1,6 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.cache.DeviceEntry;
 import dev.iot.presenceservice.config.MeasurementsProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,10 +11,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,6 +24,7 @@ import static org.mockito.Mockito.when;
 class IlluminanceListenerTest {
 
     private static final String ROUTING_KEY = "home.climate.esp-01-1.data";
+    private static final List<DeviceEntry> LAMPS = List.of(new DeviceEntry("living-room", "lamp", "chandelier-1", "GROUP", List.of()));
 
     private IlluminanceListener listener;
 
@@ -51,11 +54,11 @@ class IlluminanceListenerTest {
                     }
                 }
                 """;
-        when(lampGate.lampRoomFor("esp-01-1")).thenReturn(Optional.of("living-room"));
+        when(lampGate.lampsFor("esp-01-1")).thenReturn(LAMPS);
 
         listener.handleMessage(message, ROUTING_KEY);
 
-        verify(lampService).onIlluminance(123.4);
+        verify(lampService).onIlluminance("living-room", 123.4);
     }
 
     @Test
@@ -72,7 +75,7 @@ class IlluminanceListenerTest {
 
         listener.handleMessage(message, ROUTING_KEY);
 
-        verify(lampService, never()).onIlluminance(anyDouble());
+        verify(lampService, never()).onIlluminance(anyString(), anyDouble());
     }
 
     @Test

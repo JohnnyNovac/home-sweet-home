@@ -1,7 +1,9 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.cache.DeviceEntry;
 import dev.iot.presenceservice.cache.DeviceRegistryCache;
 import dev.iot.presenceservice.model.DeviceType;
+import dev.iot.presenceservice.model.ExternalKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 public class LampGateTest {
 
+    private static final DeviceEntry LAMP = new DeviceEntry("living-room", "lamp", "chandelier-1", "GROUP", List.of());
+
     private LampGate lampGate;
 
     @Mock
@@ -29,31 +33,34 @@ public class LampGateTest {
     }
 
     @Test
-    @DisplayName("Should return the room when it contains a lamp")
-    void shouldGetRoomWhenDeviceRoomHasLamps() {
+    @DisplayName("Should return the room's group-lamps when it contains one")
+    void shouldGetLampsWhenDeviceRoomHasLamps() {
         when(deviceRegistryCache.roomOf("pir-1")).thenReturn(Optional.of("living-room"));
-        when(deviceRegistryCache.getDevicesByRoomAndSensorType("living-room", DeviceType.LAMP.getType())).thenReturn(List.of("lamp-1"));
+        when(deviceRegistryCache.getDevicesBy("living-room", DeviceType.LAMP.getType(), ExternalKind.GROUP.name()))
+                .thenReturn(List.of("lamp-1"));
+        when(deviceRegistryCache.get("lamp-1")).thenReturn(Optional.of(LAMP));
 
-        Optional<String> room = lampGate.lampRoomFor("pir-1");
-        assertThat(room).contains("living-room");
+        List<DeviceEntry> lamps = lampGate.lampsFor("pir-1");
+        assertThat(lamps).containsExactly(LAMP);
     }
 
     @Test
     @DisplayName("Should return empty when the room has no lamp")
-    void shouldNotGetRoomWhenDeviceRoomHasNoLamps() {
+    void shouldNotGetLampsWhenDeviceRoomHasNoLamps() {
         when(deviceRegistryCache.roomOf("pir-1")).thenReturn(Optional.of("living-room"));
-        when(deviceRegistryCache.getDevicesByRoomAndSensorType("living-room", DeviceType.LAMP.getType())).thenReturn(List.of());
+        when(deviceRegistryCache.getDevicesBy("living-room", DeviceType.LAMP.getType(), ExternalKind.GROUP.name()))
+                .thenReturn(List.of());
 
-        Optional<String> room = lampGate.lampRoomFor("pir-1");
-        assertThat(room).isEmpty();
+        List<DeviceEntry> lamps = lampGate.lampsFor("pir-1");
+        assertThat(lamps).isEmpty();
     }
 
     @Test
     @DisplayName("Should return empty when the device is not in the cache")
-    void shouldNotGetRoomWhenDeviceIsNotInCache() {
+    void shouldNotGetLampsWhenDeviceIsNotInCache() {
         when(deviceRegistryCache.roomOf("ghost")).thenReturn(Optional.empty());
 
-        Optional<String> room = lampGate.lampRoomFor("ghost");
-        assertThat(room).isEmpty();
+        List<DeviceEntry> lamps = lampGate.lampsFor("ghost");
+        assertThat(lamps).isEmpty();
     }
 }

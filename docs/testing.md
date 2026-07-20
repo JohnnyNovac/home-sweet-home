@@ -29,12 +29,12 @@
 - `IlluminanceListenerTest` — обработка измерения `illuminance` из `climate`-данных.
 - `MeasureTriggerTest` — отправка команды `MEASURE` climate-устройствам при переходе присутствия «нет → есть» в комнате
   с лампой (однократность на повторном сигнале присутствия, устойчивость к ошибке публикации).
-- `LampGateTest` — отбор комнаты по наличию лампы: комната возвращается, только если в ней есть устройство `lamp`.
+- `LampGateTest` — отбор ламп комнаты: возвращаются устройства `lamp` типа `GROUP` из комнаты датчика, иначе список пустой.
 - `DeviceEventListenerTest` — приём событий реестра из event-service (`DEVICE_UPSERTED` / `DEVICE_DELETED`) и отправка в
   dead-letter при отсутствии заголовка `event_type`, неизвестном типе или неразбираемом сообщении.
 - `PresenceListenerTest` — разбор ключа маршрутизации, отбор по лампе и dead-letter при некорректном ключе или отказе
   обработчика.
-- `LampControllerTest` (`@WebMvcTest`) — REST-эндпоинт `/api/v1/lamp` (состояние, порог, принудительное переключение).
+- `LampControllerTest` (`@WebMvcTest`) — REST-эндпоинт `/api/v1/lamp` (состояние, порог, принудительное переключение ламп комнаты).
 - `PresenceServiceApplicationTest` — проверка загрузки Spring-контекста.
 
 ### `yandex-service`

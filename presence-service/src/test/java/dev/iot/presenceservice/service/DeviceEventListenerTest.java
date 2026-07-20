@@ -10,6 +10,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
+
 import static dev.iot.presenceservice.model.DeviceEvent.DEVICE_DELETED;
 import static dev.iot.presenceservice.model.DeviceEvent.DEVICE_UPSERTED;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,7 +26,8 @@ public class DeviceEventListenerTest {
                 "room":"living-room",
                 "sensorType":"lamp",
                 "externalId":"bulb-1",
-                "parentExternalId":"chandelier-7"
+                "externalKind":"DEVICE",
+                "groupExternalIds":["chandelier-7"]
             }
             """;
 
@@ -43,7 +46,7 @@ public class DeviceEventListenerTest {
     void shouldUpsertDevice() {
         deviceEventListener.handleMessage(VALID_MESSAGE, "device.event.lamp-1", DEVICE_UPSERTED.name());
 
-        verify(cache).upsert("lamp-1", "living-room", "lamp", "bulb-1", "chandelier-7");
+        verify(cache).upsert("lamp-1", "living-room", "lamp", "bulb-1", "DEVICE", List.of("chandelier-7"));
     }
 
     @Test

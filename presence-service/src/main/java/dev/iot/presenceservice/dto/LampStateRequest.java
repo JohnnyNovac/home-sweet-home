@@ -1,4 +1,6 @@
 package dev.iot.presenceservice.dto;
 
-public record LampStateRequest(boolean on) {
+import jakarta.validation.constraints.NotBlank;
+
+public record LampStateRequest(@NotBlank String room, boolean on) {
 }

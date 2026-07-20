@@ -47,7 +47,8 @@ public class DeviceEventListener {
                                 deviceEventDto.room(),
                                 deviceEventDto.sensorType(),
                                 deviceEventDto.externalId(),
-                                deviceEventDto.parentExternalId()
+                                deviceEventDto.externalKind(),
+                                deviceEventDto.groupExternalIds()
                         );
                 case DEVICE_DELETED -> cache.remove(deviceEventDto.deviceId());
             }

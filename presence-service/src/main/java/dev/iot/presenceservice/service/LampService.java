@@ -1,7 +1,9 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.cache.DeviceEntry;
 import dev.iot.presenceservice.config.GrpcClientProperties;
 import dev.iot.presenceservice.config.LampProperties;
+import dev.iot.presenceservice.model.RoomState;
 import dev.iot.presenceservice.model.LampSettings;
 import dev.iot.presenceservice.repository.LampSettingsRepository;
 import jakarta.annotation.PostConstruct;
@@ -13,8 +15,10 @@ import yandex.Yandex;
 import yandex.YandexServiceGrpc;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -39,27 +43,27 @@ public class LampService {
     private final YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub;
     private final GrpcClientProperties grpcClientProperties;
     private final LampSettingsRepository lampSettingsRepository;
+    private final LampGate lampGate;
 
-    private Boolean present;
-    private Double illuminance;
-    private boolean lampOn;
+    private final Map<String, RoomState> roomsState = new HashMap<>();
     private double illuminanceThreshold;
     private Duration lampOffDelay;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    private Future<?> pendingLampOff;
 
     public LampService(
             YandexServiceGrpc.YandexServiceBlockingV2Stub yandexServiceStub,
             GrpcClientProperties grpcClientProperties,
             LampProperties lampProperties,
-            LampSettingsRepository lampSettingsRepository
+            LampSettingsRepository lampSettingsRepository,
+            LampGate lampGate
     ) {
         this.yandexServiceStub = yandexServiceStub;
         this.grpcClientProperties = grpcClientProperties;
         this.lampSettingsRepository = lampSettingsRepository;
         this.illuminanceThreshold = lampProperties.illuminanceThreshold();
         this.lampOffDelay = lampProperties.lampOffDelay();
+        this.lampGate = lampGate;
     }
 
     @PostConstruct
@@ -75,53 +79,53 @@ public class LampService {
         logger.info("Lamp illuminance threshold is {} lx, off-delay is {} s", illuminanceThreshold, lampOffDelay.toSeconds());
     }
 
-    public synchronized void onPresence(boolean present) {
-        this.present = present;
+    public synchronized void onPresence(String room, List<DeviceEntry> lamps, boolean present) {
+        RoomState roomState = roomState(room);
+        roomState.setLamps(lamps);
+        roomState.setPresent(present);
         if (present) {
-            cancelPendingOff();
-            reevaluate("presence");
+            cancelPendingOff(roomState);
+            reevaluate(roomState, room,"presence");
         } else {
-            scheduleLampOff();
+            scheduleLampOff(roomState);
         }
     }
 
-    public synchronized void onIlluminance(double illuminance) {
-        this.illuminance = illuminance;
-        reevaluate("illuminance");
+    public synchronized void onIlluminance(String room, double illuminance) {
+        RoomState roomState = roomState(room);
+        roomState.setIlluminance(illuminance);
+        reevaluate(roomState, room,"illuminance");
     }
 
-    private void reevaluate(String trigger) {
-        boolean shouldTurnOn = Boolean.TRUE.equals(present) && isDark() && !lampOn;
+    private void reevaluate(RoomState roomState, String room, String trigger) {
+        boolean shouldTurnOn = Boolean.TRUE.equals(roomState.getPresent()) && isDark(roomState) && !roomState.isLampOn();
         logger.debug("Reevaluating lamp (triggered by {}): present={}, illuminance={}, lampOn={} -> {}",
-                trigger, present, illuminance, lampOn, shouldTurnOn ? "turn on" : "no change");
-        if (shouldTurnOn) {
-            if (turnOnOffLamp(true)) {
-                lampOn = true;
-            }
+                trigger, roomState.getPresent(), roomState.getIlluminance(), roomState.isLampOn(), shouldTurnOn ? "turn on" : "no change");
+        if (shouldTurnOn && turnLamps(roomState.getLamps(), true)) {
+            roomState.setLampOn(true);
         }
     }
 
-    private void scheduleLampOff() {
-        if (!lampOn || pendingLampOff != null) {
+    private void scheduleLampOff(RoomState roomState) {
+        if (!roomState.isLampOn() || roomState.getPendingLampOff() != null) {
             return;
         }
-        pendingLampOff = scheduler.schedule(this::turnOffAfterDelay, lampOffDelay.toSeconds(), TimeUnit.SECONDS);
+        roomState.setPendingLampOff(scheduler.schedule(() -> turnOffAfterDelay(roomState), lampOffDelay.toSeconds(), TimeUnit.SECONDS));
     }
 
     // runs on the scheduler thread — must re-check presence, the cancel may have lost the race
-    private synchronized void turnOffAfterDelay() {
-        pendingLampOff = null;
-        if (Boolean.FALSE.equals(present) && lampOn) {
-            if (turnOnOffLamp(false)) {
-                lampOn = false;
-            }
+    private synchronized void turnOffAfterDelay(RoomState roomState) {
+        roomState.setPendingLampOff(null);
+        if (Boolean.FALSE.equals(roomState.getPresent()) && roomState.isLampOn()
+                && turnLamps(roomState.getLamps(), false)) {
+            roomState.setLampOn(false);
         }
     }
 
-    private void cancelPendingOff() {
-        if (pendingLampOff != null) {
-            pendingLampOff.cancel(false);
-            pendingLampOff = null;
+    private void cancelPendingOff(RoomState roomState) {
+        if (roomState.getPendingLampOff() != null) {
+            roomState.getPendingLampOff().cancel(false);
+            roomState.setPendingLampOff(null);
         }
     }
 
@@ -133,7 +137,7 @@ public class LampService {
         illuminanceThreshold = threshold;
         lampSettingsRepository.save(new LampSettings(ILLUMINANCE_THRESHOLD_SETTING_ID, threshold));
         logger.info("Lamp illuminance threshold changed to {} lx", threshold);
-        reevaluate("threshold change");
+        roomsState.forEach((room, roomState) -> reevaluate(roomState, room, "threshold change"));
     }
 
     public synchronized long getLampOffDelay() {
@@ -146,42 +150,51 @@ public class LampService {
         logger.info("Lamp off-delay changed to {} s", offDelay.toSeconds());
     }
 
+    public synchronized void setLamp(String room, boolean on) {
+        List<DeviceEntry> lamps = lampGate.lampsForRoom(room);
+        if (lamps.isEmpty()) {
+            return;                       // no group-lamps in the room — nothing to force
+        }
+        RoomState roomState = roomState(room);
+        roomState.setLamps(lamps);
+        if (turnLamps(roomState.getLamps(), on)) {
+            roomState.setLampOn(on);
+        }
+    }
+
     public synchronized boolean isLampOn() {
-        return lampOn;
+        return roomsState.values().stream().anyMatch(RoomState::isLampOn);
     }
 
-    /**
-     * Manually forces the lamp on or off. The automation may override this on the next presence or
-     * illuminance update (e.g. a manual off while someone is present in a dark room is switched back
-     * on), so this is a direct command, not a sticky override mode.
-     */
-    public synchronized void setLamp(boolean on) {
-        if (turnOnOffLamp(on)) {
-            lampOn = on;
+    private boolean isDark(RoomState roomState) {
+        return roomState.getIlluminance() != null && roomState.getIlluminance() < illuminanceThreshold;
+    }
+
+    private boolean turnLamps(List<DeviceEntry> lamps, boolean on) {
+        boolean allOk = true;
+        for (DeviceEntry lamp : lamps) {
+            Yandex.SetStateRequest request = Yandex.SetStateRequest.newBuilder()
+                    .setExternalId(lamp.externalId())
+                    .setOn(on)
+                    .setKind(Yandex.TargetKind.GROUP)
+                    .build();
+
+            logger.info("Setting lamp state to {}", on ? "ON" : "OFF");
+
+            try {
+                yandexServiceStub
+                        .withDeadlineAfter(grpcClientProperties.lampDeadline().toMillis(), TimeUnit.MILLISECONDS)
+                        .setState(request);
+            } catch (Exception e) {
+                logger.error("Failed to change lamp state", e);
+                allOk = false;
+            }
         }
+        return allOk;
     }
 
-    private boolean isDark() {
-        return illuminance != null && illuminance < illuminanceThreshold;
-    }
-
-    private boolean turnOnOffLamp(boolean turnOn) {
-        Yandex.TurnOnOffLampRequest request = Yandex.TurnOnOffLampRequest.newBuilder()
-                .setTurnOn(turnOn)
-                .build();
-
-        logger.info("Setting lamp state to {}", turnOn ? "ON" : "OFF");
-
-        try {
-            yandexServiceStub
-                    .withDeadlineAfter(grpcClientProperties.lampDeadline().toMillis(), TimeUnit.MILLISECONDS)
-                    .turnOnOffLamp(request);
-
-            return true;
-        } catch (Exception e) {
-            logger.error("Failed to change lamp state", e);
-            return false;
-        }
+    private RoomState roomState(String room) {
+        return roomsState.computeIfAbsent(room, r -> new RoomState());
     }
 
     @PreDestroy

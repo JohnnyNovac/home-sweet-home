@@ -1,4 +1,6 @@
 package dev.iot.presenceservice.dto;
 
-public record DeviceEventDto(String deviceId, String room, String sensorType, String externalId, String parentExternalId) {
+import java.util.List;
+
+public record DeviceEventDto(String deviceId, String room, String sensorType, String externalId, String externalKind, List<String> groupExternalIds) {
 }

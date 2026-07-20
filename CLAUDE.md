@@ -130,9 +130,12 @@ availability monitoring described under **Observability**.
 
 **Device registry.** `DeviceService` maintains the `devices` MongoDB collection (fields: `deviceId` as `_id`,
 `sensorType`, `room`, `name`, `lastSeenAt`, and — for Yandex-controlled actuators — `externalId` (the actuator's id in
-the Yandex smart home) and `parentExternalId` (the `externalId` of its parent group, for UI nesting and to keep the lamp
-automation off individual child bulbs); these two ride the replication chain below but have no consumer yet — the Yandex
-sync that fills them and the lamp targeting that reads them are still to come). `recordSeen(deviceId, sensorType)` is
+the Yandex smart home), `externalKind` (which Yandex endpoint drives it: `GROUP` for a group action, `DEVICE` for a
+single-device action) and `groupExternalIds` (the `externalId`s of the Yandex groups it belongs to — a device can be in
+several, so this is a list, used for UI nesting and to keep the lamp automation off individual grouped bulbs). These
+three ride the replication chain below; the lamp gate and targeting under **Lamp control path** already read
+`externalId`/`externalKind` to switch the room's own lamps, while the Yandex sync that fills them automatically is still
+to come — today they are set through the devices API. `recordSeen(deviceId, sensorType)` is
 called on every data message (from
 `EventRunner`) and every availability message (from `AvailabilityHandler`, with `sensorType = null`). It is a single
 atomic field-level upsert (`findAndModify` with `$set`), not a read-modify-write: it always sets `lastSeenAt` and
@@ -180,7 +183,7 @@ in event-service. Room/type changes are replicated with a **transactional outbox
 eventually-consistent copy without querying event-service on the hot path. Write side: every registry mutation that
 matters (`DeviceService.create`, `update` when `room` is set, `delete`) inserts an `OutboxEvent` into the `outbox`
 collection (`aggregateType=device`, `aggregateId=deviceId`, `eventType` `DEVICE_UPSERTED`/`DEVICE_DELETED`, JSON
-`payload` = `OutboxPayloadDto{deviceId, room, sensorType, externalId, parentExternalId}`) **in the same `@Transactional`** as the device write, so the
+`payload` = `OutboxPayloadDto{deviceId, room, sensorType, externalId, externalKind, groupExternalIds}`) **in the same `@Transactional`** as the device write, so the
 device row and the outbox row commit atomically — no lost or phantom events (this is the multi-document transaction the
 `rs0` replica set is required for; see **MongoDB**). Relay: `OutboxPublisher` polls unsent rows oldest-first
 (`findBySentFalseOrderByCreatedAt`) on a `@Scheduled(fixedDelay=10s)` tick and publishes each to the `device-events`
@@ -190,7 +193,7 @@ routable (`ack && getReturned() == null`); otherwise the row stays unsent and th
 so the consumer is idempotent. Wire: `device-events` → `device.event.*` → `presence-device-events` queue (dead-letters to
 `presence-device-events.dlq`), bindings in `definitions.json`. Read side: `DeviceEventListener` consumes
 `presence-device-events`, reads the `event_type` header, and applies it to the in-memory `DeviceRegistryCache`
-(`ConcurrentHashMap<deviceId, DeviceEntry{room, sensorType, externalId, parentExternalId}>`) — `DEVICE_UPSERTED` → `upsert`, `DEVICE_DELETED` →
+(`ConcurrentHashMap<deviceId, DeviceEntry{room, sensorType, externalId, externalKind, groupExternalIds}>`) — `DEVICE_UPSERTED` → `upsert`, `DEVICE_DELETED` →
 `remove`; an event with a missing header or bad JSON is dead-lettered. Cold start: `DeviceRegistrySeeder`
 (`@PostConstruct`, gated on `app.event-service.seed-enabled`, default on, disabled in tests) pulls the full device list
 over HTTP from event-service `GET /api/v1/devices` (paged, via the `eventServiceRestClient` `RestClient`) and seeds the
@@ -202,9 +205,10 @@ edit in event-service becomes visible to presence-service within one relay tick.
 **Lamp control path.** The lamp decision lives in `presence-service`, not on the device, and depends on both presence
 and illuminance. The decision is a small stateful engine (`LampService`) fed by two independent listeners:
 `PresenceListener` (presence data, `radarPresence || pirSensorPresence`) and `IlluminanceListener` (the `illuminance`
-measurement out of `climate` data). The engine keeps the latest value of each and recomputes on every update: it turns
-the lamp **on** when presence is detected **and** the room is dark (`illuminance` below the threshold), and **off**
-after presence ends — but not immediately: the switch-off is delayed by `app.lamp.lamp-off-delay` (default 15 s) and
+measurement out of `climate` data). The engine holds state **per room** (a `Map<room, RoomState>`, each entry keeping
+that room's latest presence and illuminance, its lamp state and any pending switch-off) and recomputes only the room a
+message belongs to, so rooms decide independently. For a room it turns the lamp **on** when presence is detected **and**
+the room is dark (`illuminance` below the threshold), and **off** after presence ends — but not immediately: the switch-off is delayed by `app.lamp.lamp-off-delay` (default 15 s) and
 scheduled on a single-thread `ScheduledExecutorService`; if presence returns within that window the pending task is
 cancelled (`cancel(false)` — an already-running task is not interrupted), so a brief gap in presence does not flick the
 lamp off. The delayed task itself re-checks presence before acting, since the cancel can lose the race against a task
@@ -214,30 +218,35 @@ collection) as the source of truth: one document per setting, keyed by `_id` (`i
 with a numeric `value` (the off-delay stored as whole seconds). The matching config defaults
 (`app.lamp.illuminance-threshold`, 50 lx; `app.lamp.lamp-off-delay`, 15 s) are used only as the seed when a document is
 still absent. `LampService.loadSettings()` reads both once at startup (seeding the defaults if absent), and the
-`/api/v1/lamp` REST endpoint (`controller.LampController`) exposes them: `GET` returns the lamp state, threshold and
-off-delay, `PUT /threshold` changes the threshold (persisted with a `save`, then the decision is recomputed so a
-now-dark room reacts immediately), `PUT /off-delay` changes the delay (validated `@Positive`, applied to the next
-switch-off rather than a countdown already in flight) and `POST /state` forces the lamp on/off (a direct command, not a
-sticky override — the automation may flip it back on the next presence/illuminance update). Recomputing on illuminance changes
+`/api/v1/lamp` REST endpoint (`controller.LampController`) exposes them: `GET` returns whether any room's lamp is on
+plus the threshold and off-delay, `PUT /threshold` changes the threshold (persisted with a `save`, then every room is
+recomputed so a now-dark room reacts immediately), `PUT /off-delay` changes the delay (validated `@Positive`, applied to
+the next switch-off rather than a countdown already in flight) and `POST /state` (`{room, on}`, `room` `@NotBlank`)
+forces that room's lamps on/off (a direct command, not a sticky override — the automation may flip them back on the next
+presence/illuminance update; a room with no group-lamp is a no-op). Recomputing on illuminance changes
 (not just presence events) is what lets the lamp come on when the room darkens while someone is already present. Both
 inputs start unknown (`null`) and the lamp is switched on only once both are known; after a restart illuminance
 self-heals from the 60s `climate` cadence and presence self-heals from a 60s PresenceBox heartbeat (the device
 re-publishes its held presence so the engine recovers state without any last-value store). event-service de-duplicates
 these heartbeats: its `PresenceHandler` persists to Mongo and re-publishes to HA only when the presence value changes,
 so an unchanged heartbeat is dropped (the `lastPresence` map is updated only after a successful save, so a save failure
-is still retried on redelivery). A failed lamp command leaves
-the tracked state unchanged so it is retried on the next presence/illuminance update. The two listeners run on separate
-threads, so `LampService` is synchronised.
+is still retried on redelivery). A lamp command that fails for any of
+the room's lamps leaves that room's tracked state unchanged, so it is retried on the next presence/illuminance update.
+The two listeners run on separate threads, so `LampService` is synchronised.
 
 **Room gate.** Both listeners feed the engine only for sensors that share a room with a lamp. Each parses the sensor's
-`deviceId` from the routing key and consults `LampGate.lampRoomFor(deviceId)`, which reads the device's room from
-`DeviceRegistryCache` (see **Device registry replication**) and returns it *only if* that room also contains a `lamp`
-device (`getDevicesByRoomAndSensorType(room, "lamp")` non-empty); otherwise the message is skipped. So a presence or
-illuminance reading from a room with no lamp — or from a device not yet in the cache — never drives the engine. Sensor
-types are the `DeviceType` enum (`CLIMATE`/`PRESENCE`/`LAMP`), whose string values are the lowercase `sensorType` used on
-the wire and in the registry. The lamp is itself a registry device with `sensorType=lamp` and a `room`, catalog-only
-(added through the devices API — it publishes no sensor data of its own); actuation is still a single hardcoded Yandex
-chandelier, so the room only gates *whether* to run the decision, not *which* lamp is switched.
+`deviceId` from the routing key and consults `LampGate.lampsFor(deviceId)`, which reads the device's room from
+`DeviceRegistryCache` (see **Device registry replication**) and returns that room's `GROUP`-kind `lamp` entries
+(`getDevicesBy(room, "lamp", "GROUP")` resolved to their `DeviceEntry`s); if the list is empty — no group-lamp in the
+room, or the device is not yet in the cache — the message is skipped. So a presence or illuminance reading from a room
+with no lamp never drives the engine, and the resolved lamps ride along to the engine so it knows *which* lamps to
+switch. Sensor types are the `DeviceType` enum (`CLIMATE`/`PRESENCE`/`LAMP`), whose string values are the lowercase
+`sensorType` used on the wire and in the registry; `externalKind` (`GROUP`/`DEVICE`) is the `ExternalKind` enum — a
+presence-owned copy of the gRPC `TargetKind`, so the Yandex transport type never leaks into the gate. Only `GROUP`-kind
+lamps are automated: a bulb grouped under a chandelier carries `DEVICE` kind and is left to its group. Each lamp is
+itself a registry device with `sensorType=lamp` and a `room`, catalog-only (added through the devices API — it publishes
+no sensor data of its own). The manual `POST /state` path resolves the same way via `LampGate.lampsForRoom(room)`, so a
+forced toggle targets the room's own group-lamps too.
 
 **MEASURE trigger.** On a presence transition absent→present in a lamp room, `MeasureTrigger` (called from
 `PresenceHandler`) sends a `MEASURE` down-link to every `climate` device in that room, so fresh illuminance arrives at
@@ -250,9 +259,12 @@ Sending is best-effort: a publish failure is caught and logged per device rather
 real-time measure is not worth requeuing the presence message.
 
 The engine calls `yandex-service` via the gRPC stub declared in `grpc-api/src/main/proto/yandex.proto`
-(`YandexService.TurnOnOffLamp`). Client channel is configured in `presence-service/application.yml` as
-`spring.grpc.client.channels.yandex-service.address`. `yandex-service` (`GrpcServerService`) translates the call into a
-Yandex Smart Home "group action" HTTP request via `YandexRestClient`. The whole chain is time-bounded so a slow or
+(`YandexService.SetState(external_id, on, kind)` — a vendor-neutral contract, one call per lamp in the room, keyed by
+the lamp's `externalId` and `externalKind`; the room's lamp state flips only if every one of its lamps switches). Client
+channel is configured in `presence-service/application.yml` as `spring.grpc.client.channels.yandex-service.address`.
+`yandex-service` (`GrpcServerService`) routes by `kind`: `GROUP` becomes a Yandex Smart Home "group action" HTTP
+request, `DEVICE` a single-device action, both via `YandexRestClient`. The unary reply (`SetStateResponse`) is empty —
+success or failure travels as the gRPC status, not a body field. The whole chain is time-bounded so a slow or
 hung Yandex cloud cannot block a listener thread indefinitely: `LampService` applies a gRPC deadline
 (`app.grpc.lamp-deadline`, default 12s) per call, and the `RestClient` in `YandexClientConfig` is built
 with connect/read timeouts (`yandex.connect-timeout` 3s / `yandex.read-timeout` 5s). The HTTP timeout frees the

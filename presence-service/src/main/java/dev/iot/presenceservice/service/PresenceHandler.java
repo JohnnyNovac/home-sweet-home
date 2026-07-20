@@ -1,11 +1,14 @@
 package dev.iot.presenceservice.service;
 
+import dev.iot.presenceservice.cache.DeviceEntry;
 import dev.iot.presenceservice.config.MeasurementsProperties;
 import dev.iot.shared.dto.CreateEventDto;
 import dev.iot.shared.utils.JsonDtoParser;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+
+import java.util.List;
 
 @Service
 public class PresenceHandler {
@@ -27,12 +30,13 @@ public class PresenceHandler {
         this.measureTrigger = measureTrigger;
     }
 
-    public void handleIncomingData(String deviceId, String room, String jsonData) {
+    public void handleIncomingData(String deviceId, List<DeviceEntry> lamps, String jsonData) {
         validateJsonFormat(jsonData);
 
         CreateEventDto createEventDTO = new CreateEventDto(deviceId, JsonDtoParser.parseMeasurements(jsonData));
         boolean isPresenceDetected = isPresenceDetected(createEventDTO);
-        lampService.onPresence(isPresenceDetected);
+        String room = lamps.getFirst().room();
+        lampService.onPresence(room, lamps, isPresenceDetected);
         measureTrigger.onPresence(deviceId, room, isPresenceDetected);
     }
 

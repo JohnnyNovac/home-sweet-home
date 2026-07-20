@@ -29,12 +29,12 @@
 - `IlluminanceListenerTest` — handling of the `illuminance` measurement from `climate` data.
 - `MeasureTriggerTest` — sends the `MEASURE` command to climate devices on an absent→present presence transition in a
   lamp room (fires once, not on a repeated presence heartbeat; tolerates a publish failure).
-- `LampGateTest` — the room gate: a room is returned only when it also contains a `lamp` device.
+- `LampGateTest` — the lamp gate: returns the sensor room's `GROUP`-kind `lamp` devices, otherwise an empty list.
 - `DeviceEventListenerTest` — consumes registry events from event-service (`DEVICE_UPSERTED` / `DEVICE_DELETED`) and
   dead-letters an event with a missing `event_type` header, an unknown type, or an unparseable payload.
 - `PresenceListenerTest` — routing-key parsing, the lamp gate, and dead-lettering on a malformed key or a handler
   failure.
-- `LampControllerTest` (`@WebMvcTest`) — the `/api/v1/lamp` REST endpoint (state, threshold, forced toggle).
+- `LampControllerTest` (`@WebMvcTest`) — the `/api/v1/lamp` REST endpoint (state, threshold, per-room forced toggle).
 - `PresenceServiceApplicationTest` — verifies the Spring context loads.
 
 ### `yandex-service`

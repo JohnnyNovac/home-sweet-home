@@ -32,7 +32,7 @@ public class MeasureTriggerTest {
     @Test
     @DisplayName("Should MEASURE every climate device when presence enters a lamp room")
     void shouldSendMeasureOnPresenceAfterAbsence() {
-        when(deviceRegistryCache.getDevicesByRoomAndSensorType("living-room", "climate")).thenReturn(List.of("esp-01-1", "esp-01-2"));
+        when(deviceRegistryCache.getDevicesBy("living-room", "climate", null)).thenReturn(List.of("esp-01-1", "esp-01-2"));
 
         measureTrigger.onPresence("pir-1", "living-room", true);
 
@@ -43,7 +43,7 @@ public class MeasureTriggerTest {
     @Test
     @DisplayName("Should not MEASURE on a repeated presence heartbeat")
     void shouldNotSendMeasureOnRepeatedPresence() {
-        when(deviceRegistryCache.getDevicesByRoomAndSensorType("living-room", "climate")).thenReturn(List.of("esp-01-1", "esp-01-2"));
+        when(deviceRegistryCache.getDevicesBy("living-room", "climate", null)).thenReturn(List.of("esp-01-1", "esp-01-2"));
 
         measureTrigger.onPresence("pir-1", "living-room", true);
         measureTrigger.onPresence("pir-1", "living-room", true);
@@ -63,7 +63,7 @@ public class MeasureTriggerTest {
     @Test
     @DisplayName("Should not MEASURE when the room has no climate device")
     void shouldNotSendMeasureWhenThereAreNoClimateDevices() {
-        when(deviceRegistryCache.getDevicesByRoomAndSensorType("living-room", "climate")).thenReturn(List.of());
+        when(deviceRegistryCache.getDevicesBy("living-room", "climate", null)).thenReturn(List.of());
 
         measureTrigger.onPresence("pir-1", "living-room", true);
 
@@ -73,7 +73,7 @@ public class MeasureTriggerTest {
     @Test
     @DisplayName("Should continue measuring the remaining devices after a publish failure")
     void shouldContinueAfterPublishFailure() {
-        when(deviceRegistryCache.getDevicesByRoomAndSensorType("living-room", "climate")).thenReturn(List.of("esp-01-1", "esp-01-2"));
+        when(deviceRegistryCache.getDevicesBy("living-room", "climate", null)).thenReturn(List.of("esp-01-1", "esp-01-2"));
         doThrow(new RuntimeException("boom")).when(deviceCommandPublisher).measure("esp-01-1");
 
         measureTrigger.onPresence("pir-1", "living-room", true);

@@ -14,11 +14,11 @@ public class DeviceRegistryCacheTest {
     void shouldUpsertAndGetByRoomAndSensorType() {
         DeviceRegistryCache cache = new DeviceRegistryCache();
 
-        cache.upsert("esp-01-1", "kitchen", "climate", null, null);
-        cache.upsert("esp-01-2", "kitchen", "climate", null, null);
-        cache.upsert("nodemcu-1", "kitchen", "presence", null, null);
+        cache.upsert("esp-01-1", "kitchen", "climate", null, null, null);
+        cache.upsert("esp-01-2", "kitchen", "climate", null, null, null);
+        cache.upsert("nodemcu-1", "kitchen", "presence", null, null, null);
 
-        List<String> devices = cache.getDevicesByRoomAndSensorType("kitchen", "climate");
+        List<String> devices = cache.getDevicesBy("kitchen", "climate", null);
         assertThat(devices).containsExactlyInAnyOrder("esp-01-1", "esp-01-2");
     }
 
@@ -27,17 +27,17 @@ public class DeviceRegistryCacheTest {
     void shouldOverwriteDeviceWithTheSameId() {
         DeviceRegistryCache cache = new DeviceRegistryCache();
 
-        cache.upsert("esp-01-1", "kitchen", "climate", null, null);
-        cache.upsert("esp-01-1", "bedroom", "climate", null, null);
-        cache.upsert("esp-01-1", "bathroom", "climate", null, null);
+        cache.upsert("esp-01-1", "kitchen", "climate", null, null, null);
+        cache.upsert("esp-01-1", "bedroom", "climate", null, null, null);
+        cache.upsert("esp-01-1", "bathroom", "climate", null, null, null);
 
-        List<String> bathroomDevices = cache.getDevicesByRoomAndSensorType("bathroom", "climate");
+        List<String> bathroomDevices = cache.getDevicesBy("bathroom", "climate", null);
         assertThat(bathroomDevices).hasSize(1);
 
-        List<String> bedroomDevices = cache.getDevicesByRoomAndSensorType("bedroom", "climate");
+        List<String> bedroomDevices = cache.getDevicesBy("bedroom", "climate", null);
         assertThat(bedroomDevices).isEmpty();
 
-        List<String> kitchenDevices = cache.getDevicesByRoomAndSensorType("kitchen", "climate");
+        List<String> kitchenDevices = cache.getDevicesBy("kitchen", "climate", null);
         assertThat(kitchenDevices).isEmpty();
     }
 
@@ -46,12 +46,12 @@ public class DeviceRegistryCacheTest {
     void shouldRemoveDeviceFromCache() {
         DeviceRegistryCache cache = new DeviceRegistryCache();
 
-        cache.upsert("esp-01-1", "kitchen", "climate", null, null);
-        cache.upsert("esp-01-2", "bedroom", "climate", null, null);
+        cache.upsert("esp-01-1", "kitchen", "climate", null, null, null);
+        cache.upsert("esp-01-2", "bedroom", "climate", null, null, null);
 
         cache.remove("esp-01-1");
 
-        List<String> devices = cache.getDevicesByRoomAndSensorType("kitchen", "climate");
+        List<String> devices = cache.getDevicesBy("kitchen", "climate", null);
         assertThat(devices).isEmpty();
     }
 }
