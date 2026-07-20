@@ -1,6 +1,7 @@
 package dev.iot.presenceservice.runner;
 
 import dev.iot.presenceservice.cache.DeviceRegistryCache;
+import dev.iot.presenceservice.config.EventServiceProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -25,6 +27,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 public class DeviceRegistrySeederTest {
 
     private static final String BASE_URL = "http://event-service:8081";
+    private static final EventServiceProperties PROPERTIES = new EventServiceProperties(BASE_URL, Duration.ofSeconds(30));
 
     @Mock
     private DeviceRegistryCache cache;
@@ -45,11 +48,11 @@ public class DeviceRegistrySeederTest {
         mockServer.expect(requestTo(BASE_URL + "/api/v1/devices?pageNumber=0"))
                 .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
 
-        DeviceRegistrySeeder seeder = new DeviceRegistrySeeder(builder.build(), cache);
-        seeder.init();
+        DeviceRegistrySeeder seeder = new DeviceRegistrySeeder(builder.build(), cache, PROPERTIES);
+        seeder.attemptSeed();
 
         mockServer.verify();
-        verify(cache).upsert("lamp-1", "bedroom", "lamp", "bulb-1", "DEVICE", List.of("chandelier-7"));
+        verify(cache).putIfAbsent("lamp-1", "bedroom", "lamp", "bulb-1", "DEVICE", List.of("chandelier-7"));
     }
 
     @Test
@@ -78,12 +81,12 @@ public class DeviceRegistrySeederTest {
         mockServer.expect(requestTo(BASE_URL + "/api/v1/devices?pageNumber=1"))
                 .andRespond(withSuccess(secondPage, MediaType.APPLICATION_JSON));
 
-        DeviceRegistrySeeder seeder = new DeviceRegistrySeeder(builder.build(), cache);
-        seeder.init();
+        DeviceRegistrySeeder seeder = new DeviceRegistrySeeder(builder.build(), cache, PROPERTIES);
+        seeder.attemptSeed();
 
         mockServer.verify();
-        verify(cache).upsert("esp01-1", "bedroom", "climate", null, null, null);
-        verify(cache).upsert("esp01-2", "kitchen", "climate", null, null, null);
+        verify(cache).putIfAbsent("esp01-1", "bedroom", "climate", null, null, null);
+        verify(cache).putIfAbsent("esp01-2", "kitchen", "climate", null, null, null);
     }
 
     @Test
@@ -103,12 +106,12 @@ public class DeviceRegistrySeederTest {
         mockServer.expect(requestTo(BASE_URL + "/api/v1/devices?pageNumber=0"))
                 .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
 
-        DeviceRegistrySeeder seeder = new DeviceRegistrySeeder(builder.build(), cache);
-        seeder.init();
+        DeviceRegistrySeeder seeder = new DeviceRegistrySeeder(builder.build(), cache, PROPERTIES);
+        seeder.attemptSeed();
 
         mockServer.verify();
-        verify(cache).upsert("esp01-1", "bedroom", "climate", null, null, null);
-        verify(cache, never()).upsert(eq("esp01-2"), any(), any(), any(), any(), any());
+        verify(cache).putIfAbsent("esp01-1", "bedroom", "climate", null, null, null);
+        verify(cache, never()).putIfAbsent(eq("esp01-2"), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -119,8 +122,8 @@ public class DeviceRegistrySeederTest {
         mockServer.expect(requestTo(BASE_URL + "/api/v1/devices?pageNumber=0"))
                 .andRespond(withServerError());
 
-        DeviceRegistrySeeder seeder = new DeviceRegistrySeeder(builder.build(), cache);
-        seeder.init();
+        DeviceRegistrySeeder seeder = new DeviceRegistrySeeder(builder.build(), cache, PROPERTIES);
+        seeder.attemptSeed();
 
         mockServer.verify();
         verifyNoInteractions(cache);

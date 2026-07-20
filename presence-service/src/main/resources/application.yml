@@ -41,6 +41,7 @@ app:
       measure: MEASURE
   event-service:
     url: http://event-service:8081
+    seed-retry-delay: 30s
 management:
   endpoints:
     web:

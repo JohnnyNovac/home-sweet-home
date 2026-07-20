@@ -21,6 +21,10 @@ public class DeviceRegistryCache {
         cache.put(deviceId, new DeviceEntry(room, sensorType, externalId, externalKind, groupExternalIds));
     }
 
+    public void putIfAbsent(String deviceId, String room, String sensorType, String externalId, String externalKind, List<String> groupExternalIds) {
+        cache.putIfAbsent(deviceId, new DeviceEntry(room, sensorType, externalId, externalKind, groupExternalIds));
+    }
+
     public void remove(String deviceId) {
         cache.remove(deviceId);
     }

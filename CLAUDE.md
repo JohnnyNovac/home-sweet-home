@@ -195,12 +195,17 @@ so the consumer is idempotent. Wire: `device-events` → `device.event.*` → `p
 `presence-device-events`, reads the `event_type` header, and applies it to the in-memory `DeviceRegistryCache`
 (`ConcurrentHashMap<deviceId, DeviceEntry{room, sensorType, externalId, externalKind, groupExternalIds}>`) — `DEVICE_UPSERTED` → `upsert`, `DEVICE_DELETED` →
 `remove`; an event with a missing header or bad JSON is dead-lettered. Cold start: `DeviceRegistrySeeder`
-(`@PostConstruct`, gated on `app.event-service.seed-enabled`, default on, disabled in tests) pulls the full device list
+(gated on `app.event-service.seed-enabled`, default on, disabled in tests) pulls the full device list
 over HTTP from event-service `GET /api/v1/devices` (paged, via the `eventServiceRestClient` `RestClient`) and seeds the
-cache, skipping rows without a `room`. A failed seed logs a WARN and continues — the cache then fills from live delta
-events instead. `@PostConstruct` runs before the `@RabbitListener` containers start, so the seed completes before the
-first delta is applied. The cache is the room source of truth for the lamp gate and `MEASURE` targeting below; a room
-edit in event-service becomes visible to presence-service within one relay tick.
+cache, skipping rows without a `room`. The seed runs on a `ScheduledExecutorService` (`@PostConstruct` schedules it with
+a zero initial delay, retried every `app.event-service.seed-retry-delay`, default 30s): a failed attempt logs a WARN and
+is retried, and the scheduler is shut down after the first success — so a seed started while event-service is down keeps
+retrying instead of leaving the cache empty until the next presence-service restart (`attemptSeed` catches every
+`Exception`, since one escaping the task would silently cancel the periodic retry; `@PreDestroy` calls `shutdownNow`).
+Because the retrying seed can land *after* the first live delta, it writes with `putIfAbsent` rather than `upsert` — a
+delta is always newer than an in-flight registry response, so it must win. The cache is the room source of truth for the
+lamp gate and `MEASURE` targeting below; a room edit in event-service becomes visible to presence-service within one
+relay tick.
 
 **Lamp control path.** The lamp decision lives in `presence-service`, not on the device, and depends on both presence
 and illuminance. The decision is a small stateful engine (`LampService`) fed by two independent listeners:
