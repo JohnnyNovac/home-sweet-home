@@ -15,8 +15,8 @@ public class DeviceMapper {
     public Device toDevice(CreateDeviceDto createDeviceDto, String deviceId) {
         return new Device(
                 deviceId,
-                createDeviceDto.sensorType(),
-                createDeviceDto.room(),
+                createDeviceDto.deviceType(),
+                createDeviceDto.roomId(),
                 createDeviceDto.name(),
                 createDeviceDto.externalId(),
                 createDeviceDto.externalKind(),
@@ -27,8 +27,8 @@ public class DeviceMapper {
     public DeviceDto toDeviceDto(Device device) {
         return new DeviceDto(
                 device.getDeviceId(),
-                device.getSensorType(),
-                device.getRoom(),
+                device.getDeviceType(),
+                device.getRoomId(),
                 device.getName(),
                 device.getLastSeenAt(),
                 device.getExternalId(),

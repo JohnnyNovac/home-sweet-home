@@ -40,7 +40,7 @@ public class DeviceRegistrySeederTest {
         String json = """
                 {
                   "content": [
-                    {"deviceId":"lamp-1","sensorType":"lamp","room":"bedroom","name":null,"lastSeenAt":null,"externalId":"bulb-1","externalKind":"DEVICE","groupExternalIds":["chandelier-7"]}
+                    {"deviceId":"lamp-1","deviceType":"lamp","roomId":"bedroom","name":null,"lastSeenAt":null,"externalId":"bulb-1","externalKind":"DEVICE","groupExternalIds":["chandelier-7"]}
                   ],
                   "page": {"size":20,"number":0,"totalElements":1,"totalPages":1}
                 }
@@ -63,7 +63,7 @@ public class DeviceRegistrySeederTest {
         String firstPage = """
                 {
                   "content": [
-                    {"deviceId":"esp01-1","sensorType":"climate","room":"bedroom","name":null,"lastSeenAt":null}
+                    {"deviceId":"esp01-1","deviceType":"climate","roomId":"bedroom","name":null,"lastSeenAt":null}
                   ],
                   "page": {"size":1,"number":0,"totalElements":2,"totalPages":2}
                 }
@@ -71,7 +71,7 @@ public class DeviceRegistrySeederTest {
         String secondPage = """
                 {
                   "content": [
-                    {"deviceId":"esp01-2","sensorType":"climate","room":"kitchen","name":null,"lastSeenAt":null}
+                    {"deviceId":"esp01-2","deviceType":"climate","roomId":"kitchen","name":null,"lastSeenAt":null}
                   ],
                   "page": {"size":1,"number":1,"totalElements":2,"totalPages":2}
                 }
@@ -97,8 +97,8 @@ public class DeviceRegistrySeederTest {
         String json = """
                 {
                   "content": [
-                    {"deviceId":"esp01-1","sensorType":"climate","room":"bedroom","name":null,"lastSeenAt":null},
-                    {"deviceId":"esp01-2","sensorType":"climate","room":null,"name":null,"lastSeenAt":null}
+                    {"deviceId":"esp01-1","deviceType":"climate","roomId":"bedroom","name":null,"lastSeenAt":null},
+                    {"deviceId":"esp01-2","deviceType":"climate","roomId":null,"name":null,"lastSeenAt":null}
                   ],
                   "page": {"size":20,"number":0,"totalElements":2,"totalPages":1}
                 }

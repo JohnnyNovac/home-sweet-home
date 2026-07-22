@@ -74,11 +74,11 @@ public class DeviceRegistrySeeder {
                 totalPages = (int) page.pageMetadata().totalPages();
                 if (page.content() != null && !page.content().isEmpty()) {
                     page.content().stream()
-                            .filter(d -> d.room() != null)
+                            .filter(d -> d.roomId() != null)
                             .forEach(d -> cache.putIfAbsent(
                                     d.deviceId(),
-                                    d.room(),
-                                    d.sensorType(),
+                                    d.roomId(),
+                                    d.deviceType(),
                                     d.externalId(),
                                     d.externalKind(),
                                     d.groupExternalIds()

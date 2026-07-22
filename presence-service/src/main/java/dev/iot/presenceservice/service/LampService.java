@@ -79,25 +79,25 @@ public class LampService {
         logger.info("Lamp illuminance threshold is {} lx, off-delay is {} s", illuminanceThreshold, lampOffDelay.toSeconds());
     }
 
-    public synchronized void onPresence(String room, List<DeviceEntry> lamps, boolean present) {
-        RoomState roomState = roomState(room);
+    public synchronized void onPresence(String roomId, List<DeviceEntry> lamps, boolean present) {
+        RoomState roomState = roomState(roomId);
         roomState.setLamps(lamps);
         roomState.setPresent(present);
         if (present) {
             cancelPendingOff(roomState);
-            reevaluate(roomState, room,"presence");
+            reevaluate(roomState, roomId,"presence");
         } else {
             scheduleLampOff(roomState);
         }
     }
 
-    public synchronized void onIlluminance(String room, double illuminance) {
-        RoomState roomState = roomState(room);
+    public synchronized void onIlluminance(String roomId, double illuminance) {
+        RoomState roomState = roomState(roomId);
         roomState.setIlluminance(illuminance);
-        reevaluate(roomState, room,"illuminance");
+        reevaluate(roomState, roomId,"illuminance");
     }
 
-    private void reevaluate(RoomState roomState, String room, String trigger) {
+    private void reevaluate(RoomState roomState, String roomId, String trigger) {
         boolean shouldTurnOn = Boolean.TRUE.equals(roomState.getPresent()) && isDark(roomState) && !roomState.isLampOn();
         logger.debug("Reevaluating lamp (triggered by {}): present={}, illuminance={}, lampOn={} -> {}",
                 trigger, roomState.getPresent(), roomState.getIlluminance(), roomState.isLampOn(), shouldTurnOn ? "turn on" : "no change");
@@ -137,7 +137,7 @@ public class LampService {
         illuminanceThreshold = threshold;
         lampSettingsRepository.save(new LampSettings(ILLUMINANCE_THRESHOLD_SETTING_ID, threshold));
         logger.info("Lamp illuminance threshold changed to {} lx", threshold);
-        roomsState.forEach((room, roomState) -> reevaluate(roomState, room, "threshold change"));
+        roomsState.forEach((roomId, roomState) -> reevaluate(roomState, roomId, "threshold change"));
     }
 
     public synchronized long getLampOffDelay() {
@@ -150,12 +150,12 @@ public class LampService {
         logger.info("Lamp off-delay changed to {} s", offDelay.toSeconds());
     }
 
-    public synchronized void setLamp(String room, boolean on) {
-        List<DeviceEntry> lamps = lampGate.lampsForRoom(room);
+    public synchronized void setLamp(String roomId, boolean on) {
+        List<DeviceEntry> lamps = lampGate.lampsForRoom(roomId);
         if (lamps.isEmpty()) {
             return;                       // no group-lamps in the room — nothing to force
         }
-        RoomState roomState = roomState(room);
+        RoomState roomState = roomState(roomId);
         roomState.setLamps(lamps);
         if (turnLamps(roomState.getLamps(), on)) {
             roomState.setLampOn(on);
@@ -193,8 +193,8 @@ public class LampService {
         return allOk;
     }
 
-    private RoomState roomState(String room) {
-        return roomsState.computeIfAbsent(room, r -> new RoomState());
+    private RoomState roomState(String roomId) {
+        return roomsState.computeIfAbsent(roomId, r -> new RoomState());
     }
 
     @PreDestroy

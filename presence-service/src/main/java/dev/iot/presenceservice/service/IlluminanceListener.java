@@ -55,8 +55,8 @@ public class IlluminanceListener {
             if (illuminance.isNumber()) {
                 List<DeviceEntry> lamps = lampGate.lampsFor(deviceId);
                 if (!lamps.isEmpty()) {
-                    String room = lamps.getFirst().room();
-                    lampService.onIlluminance(room, illuminance.asDouble());
+                    String roomId = lamps.getFirst().roomId();
+                    lampService.onIlluminance(roomId, illuminance.asDouble());
                 }
             }
         } catch (JacksonException e) {

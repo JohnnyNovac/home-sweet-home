@@ -112,7 +112,7 @@ public class PresenceHandler implements SensorHandler {
         ObjectNode device = payload.putObject("device");
         device.putArray("identifiers").add(deviceId);
         device.put("name", deviceService.nameFor(deviceId).orElse(deviceId));
-        deviceService.roomFor(deviceId).ifPresent(room -> device.put("suggested_area", room));
+        deviceService.roomNameFor(deviceId).ifPresent(roomName -> device.put("suggested_area", roomName));
     }
 
     private void validateJsonFormat(String jsonData) {

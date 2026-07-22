@@ -2,6 +2,8 @@ package dev.iot.yandexservice.service;
 
 import dev.iot.yandexservice.dto.DeviceGroupActionRequest;
 import dev.iot.yandexservice.dto.DeviceGroupActionResponse;
+import dev.iot.yandexservice.mapper.YandexDiscoveredDeviceMapper;
+import dev.iot.yandexservice.mapper.YandexDiscoveredRoomMapper;
 import io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,13 +29,19 @@ class GrpcServerServiceTest {
     private YandexRestClient yandexRestClient;
 
     @Mock
+    private YandexDiscoveredDeviceMapper discoveredDeviceMapper;
+
+    @Mock
+    private YandexDiscoveredRoomMapper discoveredRoomMapper;
+
+    @Mock
     private StreamObserver<Yandex.SetStateResponse> responseObserver;
 
     private GrpcServerService grpcServerService;
 
     @BeforeEach
     void setUp() {
-        grpcServerService = new GrpcServerService(yandexRestClient);
+        grpcServerService = new GrpcServerService(yandexRestClient, discoveredDeviceMapper, discoveredRoomMapper);
     }
 
     @Test

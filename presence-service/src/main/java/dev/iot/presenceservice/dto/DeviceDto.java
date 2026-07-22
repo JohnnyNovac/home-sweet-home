@@ -5,8 +5,8 @@ import java.util.List;
 
 public record DeviceDto(
         String deviceId,
-        String sensorType,
-        String room,
+        String deviceType,
+        String roomId,
         String name,
         Instant lastSeenAt,
         String externalId,

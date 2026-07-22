@@ -39,10 +39,10 @@ class DeviceControllerTest {
 
         mockMvc.perform(post("/api/v1/devices")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"deviceId\":\"esp01\",\"sensorType\":\"climate\",\"room\":\"bedroom\",\"name\":\"NodeMCU-1\"}"))
+                        .content("{\"deviceId\":\"esp01\",\"deviceType\":\"climate\",\"roomId\":\"bedroom\",\"name\":\"NodeMCU-1\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.deviceId").value("esp01"))
-                .andExpect(jsonPath("$.room").value("bedroom"));
+                .andExpect(jsonPath("$.roomId").value("bedroom"));
     }
 
     @Test
@@ -52,13 +52,13 @@ class DeviceControllerTest {
 
         mockMvc.perform(post("/api/v1/devices")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"deviceId\":\"esp01\",\"sensorType\":\"climate\",\"room\":\"bedroom\"}"))
+                        .content("{\"deviceId\":\"esp01\",\"deviceType\":\"climate\",\"roomId\":\"bedroom\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("DEVICE_ALREADY_EXISTS"));
     }
 
     @Test
-    @DisplayName("POST without the required sensorType/room returns 400 and does not touch the service")
+    @DisplayName("POST without the required deviceType/roomId returns 400 and does not touch the service")
     void postMissingRequiredFieldsReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/v1/devices")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,16 +82,16 @@ class DeviceControllerTest {
     }
 
     @Test
-    @DisplayName("PUT updates room/name and returns 200")
+    @DisplayName("PUT updates roomId/name and returns 200")
     void putUpdatesDevice() throws Exception {
         when(deviceService.update(eq("esp01"), any()))
                 .thenReturn(new DeviceDto("esp01", "climate", "kitchen", "NodeMCU-2", null, null, null, null));
 
         mockMvc.perform(put("/api/v1/devices/esp01")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"room\":\"kitchen\",\"name\":\"NodeMCU-2\"}"))
+                        .content("{\"roomId\":\"kitchen\",\"name\":\"NodeMCU-2\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.room").value("kitchen"));
+                .andExpect(jsonPath("$.roomId").value("kitchen"));
     }
 
     @Test
@@ -101,7 +101,7 @@ class DeviceControllerTest {
 
         mockMvc.perform(put("/api/v1/devices/ghost")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"room\":\"kitchen\"}"))
+                        .content("{\"roomId\":\"kitchen\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("DEVICE_NOT_FOUND"));
     }

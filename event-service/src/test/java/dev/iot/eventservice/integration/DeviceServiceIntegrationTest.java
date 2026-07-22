@@ -46,31 +46,31 @@ class DeviceServiceIntegrationTest {
         Device device = deviceService.recordSeen("climate-1", "climate");
 
         assertThat(device.getDeviceId()).isEqualTo("climate-1");
-        assertThat(device.getSensorType()).isEqualTo("climate");
+        assertThat(device.getDeviceType()).isEqualTo("climate");
         assertThat(device.getLastSeenAt()).isNotNull();
     }
 
     @Test
-    @DisplayName("Availability message leaves sensorType null, later data message fills it")
+    @DisplayName("Availability message leaves deviceType null, later data message fills it")
     void availabilityThenDataFillsType() {
         Device afterAvailability = deviceService.recordSeen("esp01", null);
-        assertThat(afterAvailability.getSensorType()).isNull();
+        assertThat(afterAvailability.getDeviceType()).isNull();
 
         Device afterData = deviceService.recordSeen("esp01", "climate");
-        assertThat(afterData.getSensorType()).isEqualTo("climate");
+        assertThat(afterData.getDeviceType()).isEqualTo("climate");
     }
 
     @Test
-    @DisplayName("Availability message does not blank a known sensorType")
+    @DisplayName("Availability message does not blank a known deviceType")
     void availabilityDoesNotBlankKnownType() {
         deviceService.recordSeen("esp01", "climate");
 
         Device afterAvailability = deviceService.recordSeen("esp01", null);
-        assertThat(afterAvailability.getSensorType()).isEqualTo("climate");
+        assertThat(afterAvailability.getDeviceType()).isEqualTo("climate");
     }
 
     @Test
-    @DisplayName("recordSeen does not overwrite a manually assigned room")
+    @DisplayName("recordSeen does not overwrite a manually assigned roomId")
     void recordSeenKeepsRoom() {
         mongoTemplate.save(new Device("esp01", null, "bedroom", null, null, null, null));
 
@@ -78,8 +78,8 @@ class DeviceServiceIntegrationTest {
 
         Device stored = mongoTemplate.findById("esp01", Device.class);
         assertThat(stored).isNotNull();
-        assertThat(stored.getRoom()).isEqualTo("bedroom");
-        assertThat(stored.getSensorType()).isEqualTo("climate");
+        assertThat(stored.getRoomId()).isEqualTo("bedroom");
+        assertThat(stored.getDeviceType()).isEqualTo("climate");
     }
 
     @Test
@@ -90,12 +90,12 @@ class DeviceServiceIntegrationTest {
         assertThat(created.deviceId()).isEqualTo("esp01");
         Device stored = mongoTemplate.findById("esp01", Device.class);
         assertThat(stored).isNotNull();
-        assertThat(stored.getRoom()).isEqualTo("bedroom");
+        assertThat(stored.getRoomId()).isEqualTo("bedroom");
         assertThat(stored.getName()).isEqualTo("NodeMCU-1");
     }
 
     @Test
-    @DisplayName("create generates a stable id from sensorType when deviceId is blank")
+    @DisplayName("create generates a stable id from deviceType when deviceId is blank")
     void createGeneratesIdWhenBlank() {
         DeviceDto created = deviceService.create(new CreateDeviceDto(null, "climate", "bedroom", "NodeMCU-1", null, null, null));
 
@@ -114,11 +114,11 @@ class DeviceServiceIntegrationTest {
 
         Device stored = mongoTemplate.findById("esp01", Device.class);
         assertThat(stored).isNotNull();
-        assertThat(stored.getRoom()).isEqualTo("bedroom");
+        assertThat(stored.getRoomId()).isEqualTo("bedroom");
     }
 
     @Test
-    @DisplayName("update changes room/name without clobbering lastSeenAt or sensorType")
+    @DisplayName("update changes roomId/name without clobbering lastSeenAt or deviceType")
     void updateKeepsPipelineFields() {
         deviceService.recordSeen("esp01", "climate");
         Device before = mongoTemplate.findById("esp01", Device.class);
@@ -126,9 +126,9 @@ class DeviceServiceIntegrationTest {
 
         DeviceDto updated = deviceService.update("esp01", new UpdateDeviceDto("kitchen", "NodeMCU-2", null, null, null));
 
-        assertThat(updated.room()).isEqualTo("kitchen");
+        assertThat(updated.roomId()).isEqualTo("kitchen");
         assertThat(updated.name()).isEqualTo("NodeMCU-2");
-        assertThat(updated.sensorType()).isEqualTo("climate");
+        assertThat(updated.deviceType()).isEqualTo("climate");
         assertThat(updated.lastSeenAt()).isEqualTo(before.getLastSeenAt());
     }
 

@@ -60,33 +60,35 @@ TTL или лимита применяет одноразовый контейн
 
 ## Назначение комнаты и имени устройству
 
-При первом сообщении устройство автоматически добавляется в коллекцию `devices` (Mongo, БД `events`). Поля `room`
-(комната в Home Assistant) и `name` (отображаемое имя устройства в Home Assistant) задаются вручную через `mongo`:
+При первом сообщении устройство автоматически добавляется в коллекцию `devices` (Mongo, БД `events`). Комнаты хранятся
+отдельной коллекцией `rooms`, и устройство ссылается на комнату полем `roomId`. Комнаты из умного дома Яндекса
+создаются при синхронизации сами (см. раздел про лампу ниже); свою комнату можно создать запросом `POST /api/v1/rooms`
+с телом `{"name": "bedroom"}`. Поля `roomId` (комната в Home Assistant) и `name` (отображаемое имя устройства в Home
+Assistant) задаются запросом `PUT /api/v1/devices/{id}` или вручную через `mongo`:
 
 ```bash
 docker exec -it mongodb mongo -u $EVENT_MONGO_USER -p $EVENT_MONGO_PASS events
-> db.devices.updateOne({_id: "esp-01-1"}, {$set: {room: "bedroom", name: "ESP-01-1"}})
+> db.rooms.find()
+> db.devices.updateOne({_id: "esp-01-1"}, {$set: {roomId: "<_id комнаты>", name: "ESP-01-1"}})
 ```
 
 Если `name` не задано, Home Assistant показывает устройство по его `deviceId`. После изменения нужно перезапустить Home
 Assistant: event-service подписан на `homeassistant/status` и при переходе в `online` повторно публикует discovery
-с актуальными `suggested_area` и именем.
+с актуальными `suggested_area` (в него подставляется имя комнаты из `rooms`) и именем.
 
 ## Лампа и привязка к комнате
 
 Освещением управляет presence-service, и решение он принимает по комнате: показания датчика влияют на лампу, только если
-в той же комнате есть устройство-лампа. Поэтому лампу заводят в реестре как обычное устройство типа `lamp` с той же
-`room`, что и у датчиков комнаты — через REST (`POST /api/v1/devices` с телом `{"sensorType": "lamp", "room":
-"bedroom"}`, `deviceId` сгенерируется сам) или напрямую в mongo:
+в той же комнате есть устройство-лампа. Лампы и комнаты из умного дома Яндекса появляются в реестре автоматически:
+event-service раз в 15 минут запрашивает у yandex-service список устройств по gRPC и заводит комнаты в `rooms`
+(идентификатор вида `room-<externalId>`), а лампы — в `devices` (идентификатор вида `lamp-<externalId>`, тип `lamp`).
+Запустить синхронизацию сразу, не дожидаясь очередного запуска, можно запросом `POST /api/v1/devices/sync` (через шлюз,
+с токеном). Датчикам остаётся назначить `roomId` их комнаты — запросом `PUT /api/v1/devices/{id}`.
 
-```bash
-docker exec -it mongodb mongo -u $EVENT_MONGO_USER -p $EVENT_MONGO_PASS events
-> db.devices.insertOne({_id: "lamp-bedroom", sensorType: "lamp", room: "bedroom"})
-```
-
-Лампа ничего не публикует по MQTT — это запись каталога без `lastSeenAt`. Комнаты датчиков и саму лампу presence-service
+Лампа ничего не публикует по MQTT — это запись каталога без `lastSeenAt`. Комнаты датчиков и сами лампы presence-service
 получает из реестра event-service, который реплицируется в него через outbox (см. CLAUDE.md, «Device registry
-replication»). Поэтому, в отличие от discovery в Home Assistant, для автоматики перезапуск HA не нужен: изменение `room`
+replication»); сама коллекция `rooms` не реплицируется — presence-service использует `roomId` только как ключ
+группировки. Поэтому, в отличие от discovery в Home Assistant, для автоматики перезапуск HA не нужен: изменение `roomId`
 доходит до presence-service в течение одного цикла ретрансляции (около 10 с).
 
 ## MongoDB: репликасет и пользователи

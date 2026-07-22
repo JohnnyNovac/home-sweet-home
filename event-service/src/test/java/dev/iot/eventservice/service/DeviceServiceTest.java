@@ -7,7 +7,9 @@ import dev.iot.eventservice.exception.DeviceAlreadyExistsException;
 import dev.iot.eventservice.exception.DeviceNotFoundException;
 import dev.iot.eventservice.mapper.DeviceMapper;
 import dev.iot.eventservice.model.Device;
+import dev.iot.eventservice.model.Room;
 import dev.iot.eventservice.repository.DeviceRepository;
+import dev.iot.eventservice.repository.RoomRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,34 +41,38 @@ class DeviceServiceTest {
     private DeviceRepository repository;
 
     @Mock
+    private RoomRepository roomRepository;
+
+    @Mock
     private DeviceMapper deviceMapper;
 
     @InjectMocks
     private DeviceService deviceService;
 
     @Test
-    @DisplayName("roomFor returns the assigned room when the device has one")
-    void roomForReturnsRoom() {
-        when(repository.findById(DEVICE_ID))
-                .thenReturn(Optional.of(new Device(DEVICE_ID, "climate", "bedroom", null, null, null, null)));
+    @DisplayName("roomNameFor resolves the device's roomId to the room name")
+    void roomNameForResolvesName() {
+        when(repository.findByDeviceIdAndRoomIdIsNotNull(DEVICE_ID))
+                .thenReturn(Optional.of(new Device(DEVICE_ID, "climate", "room-1", null, null, null, null)));
+        when(roomRepository.findById("room-1")).thenReturn(Optional.of(new Room("bedroom")));
 
-        assertThat(deviceService.roomFor(DEVICE_ID)).contains("bedroom");
+        assertThat(deviceService.roomNameFor(DEVICE_ID)).contains("bedroom");
     }
 
     @Test
-    @DisplayName("roomFor returns empty when the device is unknown")
-    void roomForReturnsEmptyWhenUnknown() {
-        when(repository.findById(DEVICE_ID)).thenReturn(Optional.empty());
+    @DisplayName("roomNameFor returns empty when the device has no room")
+    void roomNameForReturnsEmptyWhenNoRoom() {
+        when(repository.findByDeviceIdAndRoomIdIsNotNull(DEVICE_ID)).thenReturn(Optional.empty());
 
-        assertThat(deviceService.roomFor(DEVICE_ID)).isEmpty();
+        assertThat(deviceService.roomNameFor(DEVICE_ID)).isEmpty();
     }
 
     @Test
-    @DisplayName("roomFor degrades to empty when the lookup fails instead of propagating")
-    void roomForDegradesOnError() {
-        when(repository.findById(DEVICE_ID)).thenThrow(new RuntimeException("mongo down"));
+    @DisplayName("roomNameFor degrades to empty when the lookup fails instead of propagating")
+    void roomNameForDegradesOnError() {
+        when(repository.findByDeviceIdAndRoomIdIsNotNull(DEVICE_ID)).thenThrow(new RuntimeException("mongo down"));
 
-        assertThat(deviceService.roomFor(DEVICE_ID)).isEmpty();
+        assertThat(deviceService.roomNameFor(DEVICE_ID)).isEmpty();
     }
 
     @Test

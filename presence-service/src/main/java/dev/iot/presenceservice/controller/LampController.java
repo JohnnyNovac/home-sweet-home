@@ -39,7 +39,7 @@ public class LampController {
 
     @PostMapping("/state")
     public LampStateResponse setState(@RequestBody @Valid LampStateRequest request) {
-        lampService.setLamp(request.room(), request.on());
+        lampService.setLamp(request.roomId(), request.on());
         return get();
     }
 }

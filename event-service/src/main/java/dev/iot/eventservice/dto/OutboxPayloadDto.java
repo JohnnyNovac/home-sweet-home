@@ -4,8 +4,8 @@ import java.util.List;
 
 public record OutboxPayloadDto(
         String deviceId,
-        String room,
-        String sensorType,
+        String roomId,
+        String deviceType,
         String externalId,
         String externalKind,
         List<String> groupExternalIds

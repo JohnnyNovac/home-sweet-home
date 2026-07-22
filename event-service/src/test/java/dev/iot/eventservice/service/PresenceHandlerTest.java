@@ -60,7 +60,7 @@ class PresenceHandlerTest {
                 """;
 
         when(haProperties.discoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomNameFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -91,7 +91,7 @@ class PresenceHandlerTest {
                 """;
 
         when(haProperties.discoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomNameFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -119,7 +119,7 @@ class PresenceHandlerTest {
                 """;
 
         when(haProperties.discoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomNameFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -155,7 +155,7 @@ class PresenceHandlerTest {
                 """;
 
         when(haProperties.discoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomNameFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 

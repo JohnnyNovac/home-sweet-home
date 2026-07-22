@@ -1,13 +1,9 @@
 package dev.iot.yandexservice.service;
 
-import dev.iot.yandexservice.dto.Capability;
-import dev.iot.yandexservice.dto.DeviceAction;
-import dev.iot.yandexservice.dto.DeviceActionRequest;
-import dev.iot.yandexservice.dto.DeviceActionResponse;
-import dev.iot.yandexservice.dto.DeviceGroupActionRequest;
-import dev.iot.yandexservice.dto.DeviceGroupActionResponse;
-import dev.iot.yandexservice.dto.State;
+import dev.iot.yandexservice.dto.*;
 import dev.iot.yandexservice.exception.YandexApiException;
+import dev.iot.yandexservice.mapper.YandexDiscoveredDeviceMapper;
+import dev.iot.yandexservice.mapper.YandexDiscoveredRoomMapper;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +19,17 @@ public class GrpcServerService extends YandexServiceGrpc.YandexServiceImplBase {
     private static final Logger logger = LoggerFactory.getLogger(GrpcServerService.class);
 
     private final YandexRestClient client;
+    private final YandexDiscoveredDeviceMapper discoveredDeviceMapper;
+    private final YandexDiscoveredRoomMapper discoveredRoomMapper;
 
-    public GrpcServerService(YandexRestClient client) {
+    public GrpcServerService(
+            YandexRestClient client,
+            YandexDiscoveredDeviceMapper discoveredDeviceMapper,
+            YandexDiscoveredRoomMapper discoveredRoomMapper
+    ) {
         this.client = client;
+        this.discoveredDeviceMapper = discoveredDeviceMapper;
+        this.discoveredRoomMapper = discoveredRoomMapper;
     }
 
     @Override
@@ -63,6 +67,27 @@ public class GrpcServerService extends YandexServiceGrpc.YandexServiceImplBase {
             responseObserver.onError(e);
         } catch (Exception e) {
             logger.error("setState failed (externalId={}, kind={}, on={})", externalId, kind, on, e);
+            responseObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void listDevices(Yandex.ListDevicesRequest request, StreamObserver<Yandex.ListDevicesResponse> responseObserver) {
+        try {
+            UserInfoResponse userInfo = client.getUserInfo();
+            verifyOk(userInfo.status(), userInfo.requestId());
+            Yandex.ListDevicesResponse listDevicesResponse = Yandex.ListDevicesResponse.newBuilder()
+                    .addAllDevices(discoveredDeviceMapper.toDiscoveredDevices(userInfo))
+                    .addAllRooms(discoveredRoomMapper.toDiscoveredRooms(userInfo))
+                    .build();
+            responseObserver.onNext(listDevicesResponse);
+            responseObserver.onCompleted();
+        } catch (YandexApiException e) {
+            logger.error("Yandex API rejected the device-list request (httpStatus={}, requestId={}): {}",
+                    e.getStatusCode(), e.getRequestId(), e.getMessage());
+            responseObserver.onError(e);
+        } catch (Exception e) {
+            logger.error("listDevices failed", e);
             responseObserver.onError(e);
         }
     }

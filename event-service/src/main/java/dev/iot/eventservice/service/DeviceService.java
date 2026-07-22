@@ -10,8 +10,10 @@ import dev.iot.eventservice.mapper.DeviceMapper;
 import dev.iot.eventservice.model.Device;
 import dev.iot.eventservice.model.OutboxEvent;
 import dev.iot.eventservice.model.OutboxEventType;
+import dev.iot.eventservice.model.Room;
 import dev.iot.eventservice.repository.DeviceRepository;
 import dev.iot.eventservice.repository.OutboxRepository;
+import dev.iot.eventservice.repository.RoomRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -28,12 +30,14 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
  * Device registry: maintains the {@code devices} collection in MongoDB, keyed by {@code deviceId},
- * also holding {@code sensorType}, {@code room}, {@code name} and {@code lastSeenAt}.
+ * also holding {@code deviceType}, {@code roomId}, {@code name} and {@code lastSeenAt}.
  */
 @Service
 public class DeviceService {
@@ -42,6 +46,7 @@ public class DeviceService {
 
     private final MongoTemplate mongoTemplate;
     private final DeviceRepository deviceRepository;
+    private final RoomRepository roomRepository;
     private final OutboxRepository outboxRepository;
     private final DeviceMapper deviceMapper;
     private final ObjectMapper objectMapper;
@@ -49,12 +54,14 @@ public class DeviceService {
     public DeviceService(
             MongoTemplate mongoTemplate,
             DeviceRepository deviceRepository,
+            RoomRepository roomRepository,
             OutboxRepository outboxRepository,
             DeviceMapper deviceMapper,
             ObjectMapper objectMapper
     ) {
         this.mongoTemplate = mongoTemplate;
         this.deviceRepository = deviceRepository;
+        this.roomRepository = roomRepository;
         this.outboxRepository = outboxRepository;
         this.deviceMapper = deviceMapper;
         this.objectMapper = objectMapper;
@@ -80,7 +87,7 @@ public class DeviceService {
     }
 
     private String generateDeviceId(CreateDeviceDto dto) {
-        return dto.sensorType() + "-" + UUID.randomUUID();
+        return dto.deviceType() + "-" + UUID.randomUUID();
     }
 
     public Page<DeviceDto> getDevices(int page, int size) {
@@ -106,19 +113,19 @@ public class DeviceService {
     }
 
     /**
-     * Updates the manually managed fields ({@code room}, {@code name}) of an existing device with a
-     * field-level {@code $set}, mirroring {@link #recordSeen}: {@code lastSeenAt} and {@code sensorType}
+     * Updates the manually managed fields ({@code roomId}, {@code name}) of an existing device with a
+     * field-level {@code $set}, mirroring {@link #recordSeen}: {@code lastSeenAt} and {@code deviceType}
      * stay under the pipeline's control and are never touched here, so a concurrent data message can't be
      * clobbered. Only non-null fields are written, so a partial update leaves the rest intact.
      *
      * @param deviceId        device identifier from the request path
-     * @param updateDeviceDto the new {@code room}/{@code name} values
+     * @param updateDeviceDto the new {@code roomId}/{@code name} values
      * @return the updated device
      * @throws DeviceNotFoundException if no device with this id exists
      */
     @Transactional
     public DeviceDto update(String deviceId, UpdateDeviceDto updateDeviceDto) {
-        if (updateDeviceDto.room() == null && updateDeviceDto.name() == null
+        if (updateDeviceDto.roomId() == null && updateDeviceDto.name() == null
                 && updateDeviceDto.externalId() == null && updateDeviceDto.externalKind() == null
                 && updateDeviceDto.groupExternalIds() == null) {
             Device existing = deviceRepository.findById(deviceId)
@@ -129,8 +136,8 @@ public class DeviceService {
         Query byId = Query.query(Criteria.where("_id").is(deviceId));
 
         Update update = new Update();
-        if (updateDeviceDto.room() != null) {
-            update.set("room", updateDeviceDto.room());
+        if (updateDeviceDto.roomId() != null) {
+            update.set("roomId", updateDeviceDto.roomId());
         }
         if (updateDeviceDto.name() != null) {
             update.set("name", updateDeviceDto.name());
@@ -151,11 +158,54 @@ public class DeviceService {
             throw new DeviceNotFoundException(deviceId);
         }
 
-        if (updated.getRoom() != null) {
+        if (updated.getRoomId() != null) {
             createOutboxEvent(deviceId, updated);
         }
 
         return deviceMapper.toDeviceDto(updated);
+    }
+
+    @Transactional
+    public void upsertFromSync(
+            String deviceId,
+            String deviceType,
+            String roomId,
+            String externalId,
+            String externalKind,
+            List<String> groupExternalIds
+    ) {
+        Device existing = deviceRepository.findById(deviceId).orElse(null);
+        if (existing != null && unchanged(existing, deviceType, roomId, externalId, externalKind, groupExternalIds)) {
+            return;
+        }
+
+        Query byId = Query.query(Criteria.where("_id").is(deviceId));
+
+        Update update = new Update()
+                .set("deviceType", deviceType)
+                .set("roomId", roomId)
+                .set("externalId", externalId)
+                .set("externalKind", externalKind)
+                .set("groupExternalIds", groupExternalIds);
+
+        FindAndModifyOptions options = FindAndModifyOptions.options().upsert(true).returnNew(true);
+        Device updated = mongoTemplate.findAndModify(byId, update, options, Device.class);
+        createOutboxEvent(deviceId, updated);
+    }
+
+    private boolean unchanged(
+            Device device,
+            String deviceType,
+            String roomId,
+            String externalId,
+            String externalKind,
+            List<String> groupExternalIds
+    ) {
+        return Objects.equals(device.getDeviceType(), deviceType)
+                && Objects.equals(device.getRoomId(), roomId)
+                && Objects.equals(device.getExternalId(), externalId)
+                && Objects.equals(device.getExternalKind(), externalKind)
+                && Objects.equals(device.getGroupExternalIds(), groupExternalIds);
     }
 
     private void createOutboxEvent(String deviceId, Device updated) {
@@ -166,8 +216,8 @@ public class DeviceService {
         outboxEvent.setPayload(objectMapper.writeValueAsString(
                 new OutboxPayloadDto(
                         deviceId,
-                        updated.getRoom(),
-                        updated.getSensorType(),
+                        updated.getRoomId(),
+                        updated.getDeviceType(),
                         updated.getExternalId(),
                         updated.getExternalKind(),
                         updated.getGroupExternalIds()
@@ -179,39 +229,31 @@ public class DeviceService {
     /**
      * Records that a message was received from a device with a single atomic upsert: updates
      * {@code lastSeenAt} and creates the row if it does not exist yet. Only data messages write
-     * {@code sensorType} (they always carry the correct type); an availability message passes {@code null}
-     * and leaves the {@code sensorType} field untouched, so a known type is not blanked. The update changes
-     * only the listed fields (it does not replace the whole document), so {@code room} and concurrent
+     * {@code deviceType} (they always carry the correct type); an availability message passes {@code null}
+     * and leaves the {@code deviceType} field untouched, so a known type is not blanked. The update changes
+     * only the listed fields (it does not replace the whole document), so {@code roomId} and concurrent
      * messages from the same device do not lose anything.
      *
      * @param deviceId   device identifier
-     * @param sensorType sensor type from a data message, or {@code null} for the availability channel
+     * @param deviceType device type from a data message, or {@code null} for the availability channel
      * @return the saved device
      */
-    public Device recordSeen(String deviceId, String sensorType) {
+    public Device recordSeen(String deviceId, String deviceType) {
         Query byId = Query.query(Criteria.where("_id").is(deviceId));
 
         Update update = new Update().set("lastSeenAt", Instant.now());
-        if (sensorType != null) {
-            update.set("sensorType", sensorType);
+        if (deviceType != null) {
+            update.set("deviceType", deviceType);
         }
 
         FindAndModifyOptions options = FindAndModifyOptions.options().upsert(true).returnNew(true);
         return mongoTemplate.findAndModify(byId, update, options, Device.class);
     }
 
-    /**
-     * Returns the room assigned to the device, used to set {@code suggested_area} in the discovery config.
-     * If the Mongo query fails, returns {@link Optional#empty()} — discovery is published without
-     * {@code suggested_area}, and the room is picked up on the next HA restart. The wait is bounded by the
-     * MongoDB driver timeouts in the connection string.
-     *
-     * @param deviceId device identifier
-     * @return the assigned room, or {@link Optional#empty()} if it is not set or unavailable
-     */
-    public Optional<String> roomFor(String deviceId) {
+    public Optional<String> roomNameFor(String deviceId) {
         try {
-            return deviceRepository.findById(deviceId).map(Device::getRoom);
+            return deviceRepository.findByDeviceIdAndRoomIdIsNotNull(deviceId).flatMap(device ->
+                    roomRepository.findById(device.getRoomId())).map(Room::getName);
         } catch (RuntimeException e) {
             logger.warn("Room lookup for {} failed, publishing discovery without suggested_area", deviceId, e);
             return Optional.empty();

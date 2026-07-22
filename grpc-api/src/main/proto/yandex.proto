@@ -11,14 +11,21 @@ message ListDevicesRequest {}
 
 message ListDevicesResponse {
   repeated DiscoveredDevice devices = 2;
+  repeated DiscoveredRoom rooms = 3;
 }
 
 message DiscoveredDevice {
   string external_id = 1;
   DeviceType type = 2;
   string name = 3;
-  repeated string group_external_ids = 4;
-  TargetKind kind = 5;
+  string room_external_id = 4;
+  repeated string group_external_ids = 5;
+  TargetKind kind = 6;
+}
+
+message DiscoveredRoom {
+  string external_id = 1;
+  string name = 2;
 }
 
 message SetStateRequest {

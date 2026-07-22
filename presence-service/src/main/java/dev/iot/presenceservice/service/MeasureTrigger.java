@@ -25,16 +25,16 @@ public class MeasureTrigger {
         this.deviceCommandPublisher = deviceCommandPublisher;
     }
 
-    public void onPresence(String deviceId, String room, boolean present) {
+    public void onPresence(String deviceId, String roomId, boolean present) {
         Boolean previous = lastPresence.put(deviceId, present);
         boolean enteredRoom = present && !Boolean.TRUE.equals(previous);
         if (!enteredRoom) {
             return;
         }
 
-        List<String> climateDevices = deviceRegistryCache.getDevicesBy(room, CLIMATE.getType(), null);
+        List<String> climateDevices = deviceRegistryCache.getDevicesBy(roomId, CLIMATE.getType(), null);
         if (climateDevices.isEmpty()) {
-            logger.warn("No climate device in room {} to MEASURE for presence device {}", room, deviceId);
+            logger.warn("No climate device in room {} to MEASURE for presence device {}", roomId, deviceId);
             return;
         }
         climateDevices.forEach(id -> {

@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Passive consumer of availability messages ({@code home.availability.<deviceId>}).
- * Updates {@code lastSeenAt} in {@link DeviceService} (with {@code sensorType = null}) and publishes
+ * Updates {@code lastSeenAt} in {@link DeviceService} (with {@code deviceType = null}) and publishes
  * the {@code device_up} metric (1 — online, 0 — offline) tagged with {@code deviceId} for Prometheus.
  * It forwards nothing to Home Assistant — HA reads availability from the device's MQTT topic directly.
  */

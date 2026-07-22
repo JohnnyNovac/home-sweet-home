@@ -61,36 +61,38 @@ applies the new arguments. The side effect is that recreating the queues drops w
 
 ## Assigning a room and name to a device
 
-On the first message the device is automatically added to the `devices` collection (Mongo, database `events`). The
-`room` field (the room in Home Assistant) and the `name` field (the device's display name in Home Assistant) are set
-manually via `mongo`:
+On the first message the device is automatically added to the `devices` collection (Mongo, database `events`). Rooms
+live in their own `rooms` collection, and a device references its room through the `roomId` field. Rooms from the
+Yandex smart home are created automatically by the sync (see the lamp section below); your own room can be created with
+`POST /api/v1/rooms` and a `{"name": "bedroom"}` body. The `roomId` field (the room in Home Assistant) and the `name`
+field (the device's display name in Home Assistant) are set with `PUT /api/v1/devices/{id}` or manually via `mongo`:
 
 ```bash
 docker exec -it mongodb mongo -u $EVENT_MONGO_USER -p $EVENT_MONGO_PASS events
-> db.devices.updateOne({_id: "esp-01-1"}, {$set: {room: "bedroom", name: "ESP-01-1"}})
+> db.rooms.find()
+> db.devices.updateOne({_id: "esp-01-1"}, {$set: {roomId: "<room _id>", name: "ESP-01-1"}})
 ```
 
 If `name` is not set, Home Assistant shows the device by its `deviceId`. Restart Home Assistant afterwards:
 event-service
-is subscribed to `homeassistant/status` and re-publishes discovery with the updated `suggested_area` and name when HA
-transitions to `online`.
+is subscribed to `homeassistant/status` and re-publishes discovery with the updated `suggested_area` (filled with the
+room's name from `rooms`) and name when HA transitions to `online`.
 
 ## Lamp and room binding
 
 presence-service controls the lighting and decides by room: a sensor's readings affect the lamp only if the same room
-also contains a lamp device. So the lamp is registered as an ordinary device of type `lamp` with the same `room` as the
-room's sensors — via REST (`POST /api/v1/devices` with body `{"sensorType": "lamp", "room": "bedroom"}`, the `deviceId`
-is generated automatically) or straight in mongo:
-
-```bash
-docker exec -it mongodb mongo -u $EVENT_MONGO_USER -p $EVENT_MONGO_PASS events
-> db.devices.insertOne({_id: "lamp-bedroom", sensorType: "lamp", room: "bedroom"})
-```
+also contains a lamp device. Lamps and rooms from the Yandex smart home appear in the registry automatically:
+every 15 minutes event-service requests the device list from yandex-service over gRPC and records the rooms in `rooms`
+(id of the form `room-<externalId>`) and the lamps in `devices` (id of the form `lamp-<externalId>`, type `lamp`).
+To run the sync at once, without waiting for the next scheduled run, send `POST /api/v1/devices/sync` (through the
+gateway, with a token). What remains is assigning the sensors the `roomId` of their room — with
+`PUT /api/v1/devices/{id}`.
 
 The lamp publishes nothing over MQTT — it is a catalog row with no `lastSeenAt`. presence-service learns the sensors'
-rooms and the lamp itself from event-service's registry, which is replicated to it through an outbox (see CLAUDE.md,
-"Device registry replication"). So, unlike Home Assistant discovery, the automation needs no HA restart: a `room` change
-reaches presence-service within one relay tick (about 10 s).
+rooms and the lamps themselves from event-service's registry, which is replicated to it through an outbox (see
+CLAUDE.md, "Device registry replication"); the `rooms` collection itself is not replicated — presence-service uses
+`roomId` only as a grouping key. So, unlike Home Assistant discovery, the automation needs no HA restart: a `roomId`
+change reaches presence-service within one relay tick (about 10 s).
 
 ## MongoDB: replica set and users
 

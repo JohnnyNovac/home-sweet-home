@@ -19,6 +19,10 @@ spring:
               uri: http://event-service:8081
               predicates:
                 - Path=/api/v1/sensor-data/**
+            - id: rooms
+              uri: http://event-service:8081
+              predicates:
+                - Path=/api/v1/rooms/**
             - id: lamp
               uri: http://presence-service:8082
               predicates:

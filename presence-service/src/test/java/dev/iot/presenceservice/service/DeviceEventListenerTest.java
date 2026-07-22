@@ -23,8 +23,8 @@ public class DeviceEventListenerTest {
     private static final String VALID_MESSAGE = """
             {
                 "deviceId":"lamp-1",
-                "room":"living-room",
-                "sensorType":"lamp",
+                "roomId":"living-room",
+                "deviceType":"lamp",
                 "externalId":"bulb-1",
                 "externalKind":"DEVICE",
                 "groupExternalIds":["chandelier-7"]

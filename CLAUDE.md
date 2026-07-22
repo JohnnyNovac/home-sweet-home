@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Distributed smart-home system. Arduino sensors publish to RabbitMQ (MQTT plugin). Three Spring Boot services
 consume/route the data: `event-service` persists to MongoDB and mirrors to Home Assistant, `presence-service` makes
-automation decisions and calls `yandex-service` over gRPC, which in turn calls the Yandex Smart Home HTTP API. See
+automation decisions; both call `yandex-service` over gRPC (presence-service to switch lamps, event-service to sync the
+device registry from the Yandex smart home), and yandex-service in turn calls the Yandex Smart Home HTTP API. See
 `README.md` for the full Mermaid data-flow diagram.
 
 ## Build / run
@@ -142,39 +143,51 @@ device registry and sets the `device_up` gauge (1 for `online`, 0 for `offline`,
 availability monitoring described under **Observability**.
 
 **Device registry.** `DeviceService` maintains the `devices` MongoDB collection (fields: `deviceId` as `_id`,
-`sensorType`, `room`, `name`, `lastSeenAt`, and — for Yandex-controlled actuators — `externalId` (the actuator's id in
-the Yandex smart home), `externalKind` (which Yandex endpoint drives it: `GROUP` for a group action, `DEVICE` for a
-single-device action) and `groupExternalIds` (the `externalId`s of the Yandex groups it belongs to — a device can be in
-several, so this is a list, used for UI nesting and to keep the lamp automation off individual grouped bulbs). These
-three ride the replication chain below; the lamp gate and targeting under **Lamp control path** already read
-`externalId`/`externalKind` to switch the room's own lamps, while the Yandex sync that fills them automatically is still
-to come — today they are set through the devices API. `recordSeen(deviceId, sensorType)` is
-called on every data message (from
-`EventRunner`) and every availability message (from `AvailabilityHandler`, with `sensorType = null`). It is a single
-atomic field-level upsert (`findAndModify` with `$set`), not a read-modify-write: it always sets `lastSeenAt` and
-creates the row if missing; data messages also set `sensorType` (they always carry the device's fixed, correct type),
-while availability messages omit `sensorType` from the update so they never blank a known type. Because the update
-touches only the named fields (no full-document replace), concurrent data + availability messages for the same device
-can't lose each other's fields, and a manually assigned `room` or `name` is never clobbered. `roomFor(deviceId)` is
-consumed by handlers when building HA discovery payloads; if `room` is set, `suggested_area` is added so HA places the
-entity in the right room. `nameFor(deviceId)` works the same way for the HA-facing device `name`: if a `name` is set it
+`deviceType`, `roomId` (a reference into the `rooms` collection below), `name`, `lastSeenAt`, and — for
+Yandex-controlled actuators — `externalId` (the actuator's id in the Yandex smart home), `externalKind` (which Yandex
+endpoint drives it: `GROUP` for a group action, `DEVICE` for a single-device action) and `groupExternalIds` (the
+`externalId`s of the Yandex groups it belongs to — a device can be in several, so this is a list, used for UI nesting
+and to keep the lamp automation off individual grouped bulbs). These three ride the replication chain below; the lamp
+gate and targeting under **Lamp control path** read `externalId`/`externalKind` to switch the room's own lamps, and the
+**Yandex sync** below fills them automatically for discovered lamps (they can still be set by hand through the devices
+API). `recordSeen(deviceId, deviceType)` is called on every data message (from `EventRunner`, which passes the
+routing-key `sensorType` as the registry `deviceType`) and every availability message (from `AvailabilityHandler`, with
+`deviceType = null`). It is a single atomic field-level upsert (`findAndModify` with `$set`), not a read-modify-write:
+it always sets `lastSeenAt` and creates the row if missing; data messages also set `deviceType` (they always carry the
+device's fixed, correct type), while availability messages omit `deviceType` from the update so they never blank a known
+type. Because the update touches only the named fields (no full-document replace), concurrent data + availability
+messages for the same device can't lose each other's fields, and a manually assigned `roomId` or `name` is never
+clobbered. `roomNameFor(deviceId)` is consumed by handlers when building HA discovery payloads: it resolves the device's
+`roomId` to the room's `name` in the `rooms` collection, added as `suggested_area` so HA places the entity in the right
+room. `nameFor(deviceId)` works the same way for the HA-facing device `name`: if a `name` is set it
 is used as the display name (e.g. `NodeMCU-1`), otherwise discovery falls back to the raw `deviceId` — so the `deviceId`
 stays lowercase in topics while HA shows a friendly name. The lookup is a plain blocking query; its wait is bounded by
 the MongoDB driver timeouts set in the
 connection URI, and if Mongo is slow or unavailable it degrades to no `suggested_area` rather than failing discovery —
-the room is picked up on the next HA restart. `room`/`name` are assigned either via `mongo` (see `NOTES.md`) or
+the room is picked up on the next HA restart. `roomId`/`name` are assigned either via `mongo` (see `NOTES.md`) or
 through the registry REST API below. A room change takes effect after HA restart (handlers re-publish discovery for
 every known device when `homeassistant/status` flips to `online`).
 
+**Rooms collection.** Rooms live in their own `rooms` collection (fields: `id`, `name`, `externalId`), maintained by
+`RoomService` and referenced from devices by `roomId` — renaming a room touches one row instead of every device in it.
+Yandex rooms and user-created rooms share the one namespace and are told apart by `externalId`: a synced room carries
+the Yandex room id there and a deterministic `_id` (`room-<externalId>`, written by `RoomService.upsertFromSync` with a
+full-document `save` — with only `name` and `externalId` in the document, replace-by-id is a safe upsert), while a room
+created through the REST API gets a generated ObjectId and no `externalId`. `RoomController` (`/api/v1/rooms`) exposes
+CRUD: `POST` (body `{name}`, `@NotBlank`) creates one, `GET` returns a paged list, `PUT /{id}` renames
+(`RoomNotFoundException` → `404`), `DELETE /{id}` removes one. Rooms are deliberately not replicated to
+presence-service — see the replication section.
+
 `DeviceService` also backs a REST API (`DeviceController`, `/api/v1/devices`): `POST` creates a device with
 `repository.insert` (insert-only — a duplicate `_id` throws `DeviceAlreadyExistsException`, mapped to `409`, instead of
-overwriting an existing row), `GET` returns a paged list, `PUT /{id}` updates `room`/`name` with the same field-level
-`$set` as `recordSeen` (it never touches `lastSeenAt`/`sensorType`, so a manual edit and a concurrent data message can't
+overwriting an existing row), `GET` returns a paged list, `PUT /{id}` updates `roomId`/`name` and the three Yandex
+fields with the same field-level `$set` as `recordSeen` (only non-null DTO fields are written, and it never touches
+`lastSeenAt`/`deviceType`, so a manual edit and a concurrent data message can't
 clobber each other; a missing device throws `DeviceNotFoundException` → `404`), and `DELETE /{id}` removes one device.
-On `POST` the request body (`CreateDeviceDto`) is `@Valid`-checked — `sensorType` and `room` are `@NotBlank`, a missing
-one returns `400` as a `ValidationErrorResponse` (per-field list) — while `deviceId` is optional: if it is blank,
-`DeviceService` generates an opaque, stable id (`sensorType + "-" + UUID`, deliberately not derived from the mutable
-`room`) so a UI can add a device without supplying one. As a result the `devices` collection has two kinds of rows:
+On `POST` the request body (`CreateDeviceDto`) is `@Valid`-checked — `deviceType` and `roomId` are `@NotBlank`, a
+missing one returns `400` as a `ValidationErrorResponse` (per-field list) — while `deviceId` is optional: if it is
+blank, `DeviceService` generates an opaque, stable id (`deviceType + "-" + UUID`, deliberately not derived from the
+mutable `roomId`) so a UI can add a device without supplying one. As a result the `devices` collection has two kinds of rows:
 auto-discovered ones (created by `recordSeen` under the firmware's `deviceId`, carrying `lastSeenAt`) and ones added
 through the API with a generated id — the latter stay catalog-only (no `lastSeenAt`) until real hardware publishes under
 that same id, since the live data binding is by the routing-key `deviceId`, not by the registry row.
@@ -190,13 +203,14 @@ them, with the response DTOs (`ErrorResponse`, `FieldError`, `ValidationErrorRes
 paths are a separate entry point from the MQTT/AMQP flow — a reading inserted over `POST` is not mirrored to HA and does
 not update the registry the way `EventRunner` does.
 
-**Device registry replication (event-service → presence-service).** `presence-service` needs each device's `room` to
+**Device registry replication (event-service → presence-service).** `presence-service` needs each device's `roomId` to
 make room-aware decisions (the lamp gate and the `MEASURE` trigger under **Lamp control path**), but the registry lives
 in event-service. Room/type changes are replicated with a **transactional outbox** so presence-service holds an
 eventually-consistent copy without querying event-service on the hot path. Write side: every registry mutation that
-matters (`DeviceService.create`, `update` when `room` is set, `delete`) inserts an `OutboxEvent` into the `outbox`
+matters (`DeviceService.create`, `update` when `roomId` is set, `upsertFromSync` when a Yandex-owned field changed,
+`delete`) inserts an `OutboxEvent` into the `outbox`
 collection (`aggregateType=device`, `aggregateId=deviceId`, `eventType` `DEVICE_UPSERTED`/`DEVICE_DELETED`, JSON
-`payload` = `OutboxPayloadDto{deviceId, room, sensorType, externalId, externalKind, groupExternalIds}`) **in the same `@Transactional`** as the device write, so the
+`payload` = `OutboxPayloadDto{deviceId, roomId, deviceType, externalId, externalKind, groupExternalIds}`) **in the same `@Transactional`** as the device write, so the
 device row and the outbox row commit atomically — no lost or phantom events (this is the multi-document transaction the
 `rs0` replica set is required for; see **MongoDB**). Relay: `OutboxPublisher` polls unsent rows oldest-first
 (`findBySentFalseOrderByCreatedAt`) on a `@Scheduled(fixedDelay=10s)` tick and publishes each to the `device-events`
@@ -206,11 +220,11 @@ routable (`ack && getReturned() == null`); otherwise the row stays unsent and th
 so the consumer is idempotent. Wire: `device-events` → `device.event.*` → `presence-device-events` queue (dead-letters to
 `presence-device-events.dlq`), bindings in `definitions.json`. Read side: `DeviceEventListener` consumes
 `presence-device-events`, reads the `event_type` header, and applies it to the in-memory `DeviceRegistryCache`
-(`ConcurrentHashMap<deviceId, DeviceEntry{room, sensorType, externalId, externalKind, groupExternalIds}>`) — `DEVICE_UPSERTED` → `upsert`, `DEVICE_DELETED` →
+(`ConcurrentHashMap<deviceId, DeviceEntry{roomId, deviceType, externalId, externalKind, groupExternalIds}>`) — `DEVICE_UPSERTED` → `upsert`, `DEVICE_DELETED` →
 `remove`; an event with a missing header or bad JSON is dead-lettered. Cold start: `DeviceRegistrySeeder`
 (gated on `app.event-service.seed-enabled`, default on, disabled in tests) pulls the full device list
 over HTTP from event-service `GET /api/v1/devices` (paged, via the `eventServiceRestClient` `RestClient`) and seeds the
-cache, skipping rows without a `room`. The seed runs on a `ScheduledExecutorService` (`@PostConstruct` schedules it with
+cache, skipping rows without a `roomId`. The seed runs on a `ScheduledExecutorService` (`@PostConstruct` schedules it with
 a zero initial delay, retried every `app.event-service.seed-retry-delay`, default 30s): a failed attempt logs a WARN and
 is retried, and the scheduler is shut down after the first success — so a seed started while event-service is down keeps
 retrying instead of leaving the cache empty until the next presence-service restart (`attemptSeed` catches every
@@ -218,7 +232,30 @@ retrying instead of leaving the cache empty until the next presence-service rest
 Because the retrying seed can land *after* the first live delta, it writes with `putIfAbsent` rather than `upsert` — a
 delta is always newer than an in-flight registry response, so it must win. The cache is the room source of truth for the
 lamp gate and `MEASURE` targeting below; a room edit in event-service becomes visible to presence-service within one
-relay tick.
+relay tick. Rooms themselves are not replicated: presence-service uses `roomId` only as an opaque grouping key, so a
+room rename never crosses the service boundary.
+
+**Yandex sync (yandex-service → event-service).** The registry mirrors the Yandex smart-home configuration so lamps and
+their rooms do not have to be entered by hand. `yandex.proto` declares a second rpc, `YandexService.ListDevices`, whose
+`ListDevicesResponse` carries vendor-neutral `DiscoveredDevice`s (`external_id`, `type`, `name`, `room_external_id`,
+`kind`, `group_external_ids`) and `DiscoveredRoom`s (`external_id`, `name`); `yandex-service` fills both from the Yandex
+user-info HTTP endpoint. On the event-service side `YandexSyncService.sync()` calls the stub (a blocking V2 stub bean
+built in `GrpcConfig` on the `yandex-service` channel; note the V2 stub throws the *checked* `StatusException` where the
+older blocking stub threw the unchecked `StatusRuntimeException`) and upserts the result: rooms first
+(`RoomService.upsertFromSync`), then devices whose type appears in the `TYPE_BY_YANDEX` map (currently only
+`LAMP → "lamp"`; unmapped types are skipped). Ids are deterministic — `room-<externalId>` for a room,
+`lamp-<externalId>` for a lamp, `roomId = "room-" + room_external_id` (or `null` when Yandex reports no room) on the
+device — so every run maps the same Yandex object onto the same rows and the sync is idempotent.
+`DeviceService.upsertFromSync` `$set`s only the five Yandex-owned fields (`deviceType`, `roomId`, `externalId`,
+`externalKind`, `groupExternalIds`) — `name` and `lastSeenAt` are never touched, so a manual display name and the
+liveness heartbeat survive every sync — and it first compares those fields with the stored row and returns without
+writing when nothing changed, so the periodic sync does not grow the `outbox` collection with no-op `DEVICE_UPSERTED`
+events; a real change commits the device and the outbox row in one transaction and reaches presence-service through the
+replication chain above. Two triggers: `scheduledSync()` runs every `app.yandex.sync-interval` (900 s, first run 10 s
+after start so yandex-service has time to come up) and swallows/logs a failure — the next tick retries; and
+`POST /api/v1/devices/sync` (`SyncController`, reachable through the gateway's existing `/api/v1/devices/**` route)
+calls `sync()` directly, so a failure surfaces to the caller as `500`. The gRPC call deliberately carries no deadline —
+nothing latency-critical waits on a sync, unlike the lamp path.
 
 **Lamp control path.** The lamp decision lives in `presence-service`, not on the device, and depends on both presence
 and illuminance. The decision is a small stateful engine (`LampService`) fed by two independent listeners:
@@ -255,15 +292,15 @@ The two listeners run on separate threads, so `LampService` is synchronised.
 **Room gate.** Both listeners feed the engine only for sensors that share a room with a lamp. Each parses the sensor's
 `deviceId` from the routing key and consults `LampGate.lampsFor(deviceId)`, which reads the device's room from
 `DeviceRegistryCache` (see **Device registry replication**) and returns that room's `GROUP`-kind `lamp` entries
-(`getDevicesBy(room, "lamp", "GROUP")` resolved to their `DeviceEntry`s); if the list is empty — no group-lamp in the
+(`getDevicesBy(roomId, "lamp", "GROUP")` resolved to their `DeviceEntry`s); if the list is empty — no group-lamp in the
 room, or the device is not yet in the cache — the message is skipped. So a presence or illuminance reading from a room
 with no lamp never drives the engine, and the resolved lamps ride along to the engine so it knows *which* lamps to
-switch. Sensor types are the `DeviceType` enum (`CLIMATE`/`PRESENCE`/`LAMP`), whose string values are the lowercase
-`sensorType` used on the wire and in the registry; `externalKind` (`GROUP`/`DEVICE`) is the `ExternalKind` enum — a
+switch. Device types are the `DeviceType` enum (`CLIMATE`/`PRESENCE`/`LAMP`), whose string values are the lowercase
+`deviceType` used on the wire and in the registry; `externalKind` (`GROUP`/`DEVICE`) is the `ExternalKind` enum — a
 presence-owned copy of the gRPC `TargetKind`, so the Yandex transport type never leaks into the gate. Only `GROUP`-kind
 lamps are automated: a bulb grouped under a chandelier carries `DEVICE` kind and is left to its group. Each lamp is
-itself a registry device with `sensorType=lamp` and a `room`, catalog-only (added through the devices API — it publishes
-no sensor data of its own). The manual `POST /state` path resolves the same way via `LampGate.lampsForRoom(room)`, so a
+itself a registry device with `deviceType=lamp` and a `roomId`, catalog-only (created by the Yandex sync or through the
+devices API — it publishes no sensor data of its own). The manual `POST /state` path resolves the same way via `LampGate.lampsForRoom(room)`, so a
 forced toggle targets the room's own group-lamps too.
 
 **MEASURE trigger.** On a presence transition absent→present in a lamp room, `MeasureTrigger` (called from
@@ -310,8 +347,8 @@ variant, not the reactive WebFlux one) used as a router for the domain APIs (no 
 logic it hosts itself is authentication (below). Routes are
 declared in `application.yml` under `spring.cloud.gateway.server.webmvc.routes` (note the `server.webmvc` segment — the
 bare `spring.cloud.gateway.routes` prefix is the old reactive one and is silently ignored here) and match by path
-prefix, forwarding to the owning service by its in-network name without rewriting the path: `/api/v1/devices/**` and
-`/api/v1/sensor-data/**` → `event-service:8081`, `/api/v1/lamp/**` → `presence-service:8082`. It is the only service
+prefix, forwarding to the owning service by its in-network name without rewriting the path: `/api/v1/devices/**`,
+`/api/v1/rooms/**` and `/api/v1/sensor-data/**` → `event-service:8081`, `/api/v1/lamp/**` → `presence-service:8082`. It is the only service
 whose port is published in `docker-compose.yml` (`8080`); the domain services have no `ports:` and stay internal to
 `homesweethome_net`, reachable only through the gateway. The Spring Cloud version is pinned via the
 `spring-cloud-dependencies` BOM (train 2025.1.x / Oakwood, which targets Boot 4.0) in `api-gateway/build.gradle`, not

@@ -11,21 +11,18 @@ public class Device {
 
     @Id
     private String deviceId;
-    private String sensorType;
-    private String room;
+    private String deviceType;
+    private String roomId;
     private String name;
     private Instant lastSeenAt;
     private String externalId;
     private String externalKind;
     private List<String> groupExternalIds;
 
-    public Device() {
-    }
-
-    public Device(String deviceId, String sensorType, String room, String name, String externalId, String externalKind, List<String> groupExternalIds) {
+    public Device(String deviceId, String deviceType, String roomId, String name, String externalId, String externalKind, List<String> groupExternalIds) {
         this.deviceId = deviceId;
-        this.sensorType = sensorType;
-        this.room = room;
+        this.deviceType = deviceType;
+        this.roomId = roomId;
         this.name = name;
         this.externalId = externalId;
         this.externalKind = externalKind;
@@ -36,20 +33,20 @@ public class Device {
         return deviceId;
     }
 
-    public String getSensorType() {
-        return sensorType;
+    public String getDeviceType() {
+        return deviceType;
     }
 
-    public void setSensorType(String sensorType) {
-        this.sensorType = sensorType;
+    public void setDeviceType(String deviceType) {
+        this.deviceType = deviceType;
     }
 
-    public String getRoom() {
-        return room;
+    public String getRoomId() {
+        return roomId;
     }
 
-    public void setRoom(String room) {
-        this.room = room;
+    public void setRoomId(String roomId) {
+        this.roomId = roomId;
     }
 
     public String getName() {

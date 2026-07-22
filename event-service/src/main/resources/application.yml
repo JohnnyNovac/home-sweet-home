@@ -12,6 +12,11 @@ spring:
       mandatory: true
   mongodb:
     uri: mongodb://${EVENT_MONGO_USER}:${EVENT_MONGO_PASS}@mongodb:27017/events?replicaSet=rs0&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000&socketTimeoutMS=5000
+  grpc:
+    client:
+      channels:
+        yandex-service:
+          address: yandex-service:9090
 
 server:
   port: 8081
@@ -27,6 +32,8 @@ app:
     service-availability-topic: homeassistant/event-service/availability
     status-topic: homeassistant/status
     expire-after: 120
+  yandex:
+    sync-interval: 900
 
 logging:
   level:

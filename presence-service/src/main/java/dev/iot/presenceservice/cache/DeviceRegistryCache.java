@@ -17,23 +17,23 @@ public class DeviceRegistryCache {
         return Optional.ofNullable(cache.get(deviceId));
     }
 
-    public void upsert(String deviceId, String room, String sensorType, String externalId, String externalKind, List<String> groupExternalIds) {
-        cache.put(deviceId, new DeviceEntry(room, sensorType, externalId, externalKind, groupExternalIds));
+    public void upsert(String deviceId, String roomId, String deviceType, String externalId, String externalKind, List<String> groupExternalIds) {
+        cache.put(deviceId, new DeviceEntry(roomId, deviceType, externalId, externalKind, groupExternalIds));
     }
 
-    public void putIfAbsent(String deviceId, String room, String sensorType, String externalId, String externalKind, List<String> groupExternalIds) {
-        cache.putIfAbsent(deviceId, new DeviceEntry(room, sensorType, externalId, externalKind, groupExternalIds));
+    public void putIfAbsent(String deviceId, String roomId, String deviceType, String externalId, String externalKind, List<String> groupExternalIds) {
+        cache.putIfAbsent(deviceId, new DeviceEntry(roomId, deviceType, externalId, externalKind, groupExternalIds));
     }
 
     public void remove(String deviceId) {
         cache.remove(deviceId);
     }
 
-    public List<String> getDevicesBy(String room, String sensorType, String externalKind) {
+    public List<String> getDevicesBy(String roomId, String deviceType, String externalKind) {
         return cache.entrySet().stream()
                 .filter(entry ->
-                        Objects.equals(entry.getValue().room(), room)
-                                && Objects.equals(entry.getValue().sensorType(), sensorType)
+                        Objects.equals(entry.getValue().roomId(), roomId)
+                                && Objects.equals(entry.getValue().deviceType(), deviceType)
                                 && (externalKind == null || Objects.equals(entry.getValue().externalKind(), externalKind))
                 )
                 .map(Map.Entry::getKey)
@@ -41,6 +41,6 @@ public class DeviceRegistryCache {
     }
 
     public Optional<String> roomOf(String deviceId) {
-        return Optional.ofNullable(cache.get(deviceId)).map(DeviceEntry::room);
+        return Optional.ofNullable(cache.get(deviceId)).map(DeviceEntry::roomId);
     }
 }

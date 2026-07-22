@@ -10,8 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class DeviceRegistryCacheTest {
 
     @Test
-    @DisplayName("Should return only devices matching both room and sensor type")
-    void shouldUpsertAndGetByRoomAndSensorType() {
+    @DisplayName("Should return only devices matching both room and device type")
+    void shouldUpsertAndGetByRoomAndDeviceType() {
         DeviceRegistryCache cache = new DeviceRegistryCache();
 
         cache.upsert("esp-01-1", "kitchen", "climate", null, null, null);

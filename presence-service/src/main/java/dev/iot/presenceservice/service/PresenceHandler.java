@@ -35,9 +35,9 @@ public class PresenceHandler {
 
         CreateEventDto createEventDTO = new CreateEventDto(deviceId, JsonDtoParser.parseMeasurements(jsonData));
         boolean isPresenceDetected = isPresenceDetected(createEventDTO);
-        String room = lamps.getFirst().room();
-        lampService.onPresence(room, lamps, isPresenceDetected);
-        measureTrigger.onPresence(deviceId, room, isPresenceDetected);
+        String roomId = lamps.getFirst().roomId();
+        lampService.onPresence(roomId, lamps, isPresenceDetected);
+        measureTrigger.onPresence(deviceId, roomId, isPresenceDetected);
     }
 
     private boolean isPresenceDetected(CreateEventDto createEventDTO) {

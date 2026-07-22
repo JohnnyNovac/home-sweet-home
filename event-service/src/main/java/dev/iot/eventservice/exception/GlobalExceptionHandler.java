@@ -26,4 +26,13 @@ public class GlobalExceptionHandler {
                 ex.getMessage()
         );
     }
+
+    @ExceptionHandler(RoomNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handle(RoomNotFoundException ex) {
+        return new ErrorResponse(
+                "ROOM_NOT_FOUND",
+                ex.getMessage()
+        );
+    }
 }

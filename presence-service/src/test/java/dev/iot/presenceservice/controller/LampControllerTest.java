@@ -102,7 +102,7 @@ class LampControllerTest {
     void postStateForcesLamp() throws Exception {
         mockMvc.perform(post("/api/v1/lamp/state")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"room\": \"living-room\", \"on\": true}"))
+                        .content("{\"roomId\": \"living-room\", \"on\": true}"))
                 .andExpect(status().isOk());
 
         verify(lampService).setLamp("living-room", true);

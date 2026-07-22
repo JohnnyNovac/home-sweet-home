@@ -18,8 +18,8 @@ public class LampGate {
         this.deviceRegistryCache = deviceRegistryCache;
     }
 
-    public List<DeviceEntry> lampsForRoom(String room) {
-        return deviceRegistryCache.getDevicesBy(room, LAMP.getType(), ExternalKind.GROUP.name()).stream()
+    public List<DeviceEntry> lampsForRoom(String roomId) {
+        return deviceRegistryCache.getDevicesBy(roomId, LAMP.getType(), ExternalKind.GROUP.name()).stream()
                 .flatMap(id -> deviceRegistryCache.get(id).stream())
                 .toList();
     }

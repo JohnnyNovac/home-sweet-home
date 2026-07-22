@@ -44,8 +44,8 @@ public class DeviceEventListener {
                 case DEVICE_UPSERTED ->
                         cache.upsert(
                                 deviceEventDto.deviceId(),
-                                deviceEventDto.room(),
-                                deviceEventDto.sensorType(),
+                                deviceEventDto.roomId(),
+                                deviceEventDto.deviceType(),
                                 deviceEventDto.externalId(),
                                 deviceEventDto.externalKind(),
                                 deviceEventDto.groupExternalIds()

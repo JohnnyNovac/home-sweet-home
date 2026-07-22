@@ -61,7 +61,7 @@ class ClimateHandlerTest {
                 """;
 
         when(haProperties.discoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomNameFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -84,7 +84,7 @@ class ClimateHandlerTest {
     }
 
     @Test
-    @DisplayName("Should include suggested_area in discovery when device has room")
+    @DisplayName("Should include suggested_area in discovery when device has roomId")
     void shouldIncludeSuggestedAreaWhenRoomKnown() {
         String jsonData = """
                 {
@@ -96,7 +96,7 @@ class ClimateHandlerTest {
                 """;
 
         when(haProperties.discoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.of("bedroom"));
+        when(deviceService.roomNameFor(DEVICE_ID)).thenReturn(Optional.of("bedroom"));
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -124,7 +124,7 @@ class ClimateHandlerTest {
                 """;
 
         when(haProperties.discoveryPrefix()).thenReturn(DISCOVERY_PREFIX);
-        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomNameFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenReturn(new SensorData(DEVICE_ID, null, List.of()));
 
@@ -171,7 +171,7 @@ class ClimateHandlerTest {
                 }
                 """;
 
-        when(deviceService.roomFor(DEVICE_ID)).thenReturn(Optional.empty());
+        when(deviceService.roomNameFor(DEVICE_ID)).thenReturn(Optional.empty());
         when(sensorDataService.saveIncomingData(eq(DEVICE_ID), any(String.class)))
                 .thenThrow(new RuntimeException("mongo down"));
 

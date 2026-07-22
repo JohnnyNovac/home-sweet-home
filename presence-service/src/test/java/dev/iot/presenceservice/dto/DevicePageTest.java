@@ -14,7 +14,7 @@ public class DevicePageTest {
         String json = """
               {
                 "content": [
-                  {"deviceId":"esp01-1","sensorType":"climate","room":"bedroom","name":"ESP-01-1","lastSeenAt":null}
+                  {"deviceId":"esp01-1","deviceType":"climate","roomId":"bedroom","name":"ESP-01-1","lastSeenAt":null}
                 ],
                 "page": {"size":20,"number":0,"totalElements":1,"totalPages":1}
               }
@@ -24,6 +24,6 @@ public class DevicePageTest {
 
         assertThat(page.pageMetadata().totalPages()).isEqualTo(1);
         assertThat(page.content()).hasSize(1);
-        assertThat(page.content().getFirst().room()).isEqualTo("bedroom");
+        assertThat(page.content().getFirst().roomId()).isEqualTo("bedroom");
     }
 }

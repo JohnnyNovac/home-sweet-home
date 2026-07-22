@@ -6,8 +6,8 @@ import java.util.List;
 
 public record CreateDeviceDto(
         String deviceId,
-        @NotBlank String sensorType,
-        @NotBlank String room,
+        @NotBlank String deviceType,
+        @NotBlank String roomId,
         String name,
         String externalId,
         String externalKind,
