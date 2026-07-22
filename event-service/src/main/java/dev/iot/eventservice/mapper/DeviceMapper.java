@@ -8,10 +8,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class DeviceMapper {
 
-    public Device toDevice(CreateDeviceDto createDeviceDto) {
-        return toDevice(createDeviceDto, createDeviceDto.deviceId());
-    }
-
     public Device toDevice(CreateDeviceDto createDeviceDto, String deviceId) {
         return new Device(
                 deviceId,

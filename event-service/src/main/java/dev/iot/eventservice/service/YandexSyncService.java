@@ -45,7 +45,7 @@ public class YandexSyncService {
         try {
             sync();
         } catch (Exception e) {
-            logger.error("Failed to list Yandex devices", e);
+            logger.error("Scheduled Yandex sync failed, next tick will retry", e);
         }
     }
 

@@ -27,11 +27,12 @@ import java.util.concurrent.TimeUnit;
  * Stateful lamp decision engine. The lamp turns on only when presence is detected AND the room is
  * dark (illuminance below the configured threshold); it turns off when presence ends. Brightness
  * never turns the lamp off. Presence and illuminance arrive from two independent listeners, so the
- * latest value of each is held here and the decision is recomputed whenever either changes — this is
- * what lets the lamp come on when the room darkens while someone is already present. Both inputs are
- * unknown ({@code null}) until their first message arrives, and the lamp is only switched on once
- * both are known. Access is synchronised because the two listeners run on separate threads; the
- * lamp command is rare and bounded by the gRPC deadline, so holding the lock across it is fine.
+ * latest value of each is held here per room, and only the room a message belongs to is recomputed
+ * whenever either changes — this is what lets the lamp come on when the room darkens while someone
+ * is already present. Both inputs are unknown ({@code null}) until their first message arrives, and
+ * the lamp is only switched on once both are known. Access is synchronised because the two listeners
+ * run on separate threads; the lamp command is rare and bounded by the gRPC deadline, so holding the
+ * lock across it is fine.
  */
 @Service
 public class LampService {
@@ -49,7 +50,7 @@ public class LampService {
     private final Map<String, RoomState> roomsState = new HashMap<>();
     private double illuminanceThreshold;
     private Duration lampOffDelay;
-    private Duration lampStateSyncGap;
+    private final Duration lampStateSyncGap;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
@@ -92,10 +93,10 @@ public class LampService {
             roomState.setLastPresentAt(now);
             boolean stale = (lastPresentAt == null || Duration.between(lastPresentAt, now).compareTo(lampStateSyncGap) > 0);
             if (stale) {
-                syncLampState(roomState);
+                syncLampState(roomId, roomState);
             }
             cancelPendingOff(roomState);
-            reevaluate(roomState, roomId,"presence");
+            reevaluate(roomState, roomId, "presence");
         } else {
             scheduleLampOff(roomState);
         }
@@ -104,13 +105,13 @@ public class LampService {
     public synchronized void onIlluminance(String roomId, double illuminance) {
         RoomState roomState = roomState(roomId);
         roomState.setIlluminance(illuminance);
-        reevaluate(roomState, roomId,"illuminance");
+        reevaluate(roomState, roomId, "illuminance");
     }
 
     private void reevaluate(RoomState roomState, String roomId, String trigger) {
         boolean shouldTurnOn = Boolean.TRUE.equals(roomState.getPresent()) && isDark(roomState) && !roomState.isLampOn();
-        logger.debug("Reevaluating lamp (triggered by {}): present={}, illuminance={}, lampOn={} -> {}",
-                trigger, roomState.getPresent(), roomState.getIlluminance(), roomState.isLampOn(), shouldTurnOn ? "turn on" : "no change");
+        logger.debug("Reevaluating lamp in room {} (triggered by {}): present={}, illuminance={}, lampOn={} -> {}",
+                roomId, trigger, roomState.getPresent(), roomState.getIlluminance(), roomState.isLampOn(), shouldTurnOn ? "turn on" : "no change");
         if (shouldTurnOn && turnLamps(roomState.getLamps(), true)) {
             roomState.setLampOn(true);
         }
@@ -181,7 +182,7 @@ public class LampService {
     }
 
     // opportunistic: any failure aborts the whole sync and keeps the tracked lampOn untouched
-    private void syncLampState(RoomState roomState) {
+    private void syncLampState(String roomId, RoomState roomState) {
         boolean anyOn = false;
         for (DeviceEntry lamp : roomState.getLamps()) {
             Yandex.GetStateRequest request = Yandex.GetStateRequest.newBuilder()
@@ -194,12 +195,13 @@ public class LampService {
                     break;
                 }
             } catch (Exception e) {
-                logger.error("Failed to read lamp state, keeping lampOn={}", roomState.isLampOn(), e);
+                logger.error("Failed to read lamp {} state in room {}, keeping lampOn={}",
+                        lamp.externalId(), roomId, roomState.isLampOn(), e);
                 return;
             }
         }
         roomState.setLampOn(anyOn);
-        logger.info("Lamp state synced: lampOn={}", anyOn);
+        logger.info("Lamp state synced for room {}: lampOn={}", roomId, anyOn);
     }
 
     private boolean turnLamps(List<DeviceEntry> lamps, boolean on) {
@@ -211,14 +213,14 @@ public class LampService {
                     .setKind(Yandex.TargetKind.GROUP)
                     .build();
 
-            logger.info("Setting lamp state to {}", on ? "ON" : "OFF");
+            logger.info("Setting lamp {} state to {}", lamp.externalId(), on ? "ON" : "OFF");
 
             try {
                 yandexServiceStub
                         .withDeadlineAfter(grpcClientProperties.lampDeadline().toMillis(), TimeUnit.MILLISECONDS)
                         .setState(request);
             } catch (Exception e) {
-                logger.error("Failed to change lamp state", e);
+                logger.error("Failed to change lamp {} state", lamp.externalId(), e);
                 allOk = false;
             }
         }

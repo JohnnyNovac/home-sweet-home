@@ -1,10 +1,11 @@
 package utils;
 
-import dev.iot.shared.dto.CreateEventDto;
 import dev.iot.shared.dto.CreateMeasurementDto;
 import dev.iot.shared.utils.JsonDtoParser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -12,28 +13,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class JsonDtoParserTest {
 
     @Test
-    @DisplayName("Should correctly parse sensorId from JSON")
-    void shouldParseSensorIdFromJson() {
-        String jsonData = """
-                {
-                    "sensorId": "ESP-01",
-                    "measurements": {
-                        "temperature": 22.5
-                    }
-                }
-                """;
-
-        String sensorId = JsonDtoParser.parseSensorId(jsonData);
-
-        assertThat(sensorId).isEqualTo("ESP-01");
-    }
-
-    @Test
     @DisplayName("Should correctly parse measurements with different data types")
-    void shouldParseJsonWithDifferentTypes() {
+    void shouldParseMeasurementsWithDifferentTypes() {
         String jsonData = """
                 {
-                    "sensorId": "ESP-01",
                     "measurements": {
                         "temperature": 22.5,
                         "humidity": 65,
@@ -43,15 +26,15 @@ class JsonDtoParserTest {
                 }
                 """;
 
-        CreateEventDto createEventDTO = JsonDtoParser.parseJson(jsonData);
+        List<CreateMeasurementDto> measurements = JsonDtoParser.parseMeasurements(jsonData);
 
-        assertThat(createEventDTO.measurements()).hasSize(4);
+        assertThat(measurements).hasSize(4);
 
-        assertThat(createEventDTO.measurements())
+        assertThat(measurements)
                 .extracting(CreateMeasurementDto::type)
                 .containsExactlyInAnyOrder("temperature", "humidity", "motion", "status");
 
-        assertThat(createEventDTO.measurements())
+        assertThat(measurements)
                 .extracting(CreateMeasurementDto::value)
                 .containsExactlyInAnyOrder(22.5, 65, true, "active");
     }
@@ -61,14 +44,13 @@ class JsonDtoParserTest {
     void shouldHandleEmptyMeasurements() {
         String jsonData = """
                 {
-                    "sensorId": "ESP-01",
                     "measurements": {}
                 }
                 """;
 
-        CreateEventDto createEventDTO = JsonDtoParser.parseJson(jsonData);
+        List<CreateMeasurementDto> measurements = JsonDtoParser.parseMeasurements(jsonData);
 
-        assertThat(createEventDTO.measurements()).isEmpty();
+        assertThat(measurements).isEmpty();
     }
 
     @Test
@@ -76,7 +58,6 @@ class JsonDtoParserTest {
     void shouldHandleNumericValues() {
         String jsonData = """
                 {
-                    "sensorId": "ESP-01",
                     "measurements": {
                         "temperature": 25.7,
                         "pressure": 1013
@@ -84,10 +65,10 @@ class JsonDtoParserTest {
                 }
                 """;
 
-        CreateEventDto createEventDTO = JsonDtoParser.parseJson(jsonData);
+        List<CreateMeasurementDto> measurements = JsonDtoParser.parseMeasurements(jsonData);
 
-        assertThat(createEventDTO.measurements()).hasSize(2);
-        assertThat(createEventDTO.measurements())
+        assertThat(measurements).hasSize(2);
+        assertThat(measurements)
                 .extracting(CreateMeasurementDto::value)
                 .containsExactlyInAnyOrder(25.7, 1013);
     }
@@ -97,7 +78,6 @@ class JsonDtoParserTest {
     void shouldHandleBooleanValues() {
         String jsonData = """
                 {
-                    "sensorId": "ESP-01",
                     "measurements": {
                         "motion": true,
                         "active": false
@@ -105,10 +85,10 @@ class JsonDtoParserTest {
                 }
                 """;
 
-        CreateEventDto createEventDTO = JsonDtoParser.parseJson(jsonData);
+        List<CreateMeasurementDto> measurements = JsonDtoParser.parseMeasurements(jsonData);
 
-        assertThat(createEventDTO.measurements()).hasSize(2);
-        assertThat(createEventDTO.measurements())
+        assertThat(measurements).hasSize(2);
+        assertThat(measurements)
                 .extracting(CreateMeasurementDto::value)
                 .containsExactlyInAnyOrder(true, false);
     }
@@ -118,25 +98,7 @@ class JsonDtoParserTest {
     void shouldThrowExceptionForInvalidJson() {
         String invalidJson = "{ invalid json }";
 
-        assertThatThrownBy(() -> JsonDtoParser.parseSensorId(invalidJson))
-                .isInstanceOf(RuntimeException.class);
-
-        assertThatThrownBy(() -> JsonDtoParser.parseJson(invalidJson))
-                .isInstanceOf(RuntimeException.class);
-    }
-
-    @Test
-    @DisplayName("Should throw exception when sensorId is missing")
-    void shouldThrowExceptionWhenSensorIdMissing() {
-        String jsonWithoutSensorId = """
-                {
-                    "measurements": {
-                        "temperature": 22.5
-                    }
-                }
-                """;
-
-        assertThatThrownBy(() -> JsonDtoParser.parseSensorId(jsonWithoutSensorId))
+        assertThatThrownBy(() -> JsonDtoParser.parseMeasurements(invalidJson))
                 .isInstanceOf(RuntimeException.class);
     }
 
@@ -145,11 +107,11 @@ class JsonDtoParserTest {
     void shouldThrowExceptionWhenMeasurementsMissing() {
         String jsonWithoutMeasurements = """
                 {
-                    "sensorId": "ESP-01"
+                    "temperature": 22.5
                 }
                 """;
 
-        assertThatThrownBy(() -> JsonDtoParser.parseJson(jsonWithoutMeasurements))
+        assertThatThrownBy(() -> JsonDtoParser.parseMeasurements(jsonWithoutMeasurements))
                 .isInstanceOf(RuntimeException.class);
     }
 
@@ -158,7 +120,6 @@ class JsonDtoParserTest {
     void shouldHandleNullValuesInMeasurements() {
         String jsonWithNullValues = """
                 {
-                    "sensorId": "ESP-01",
                     "measurements": {
                         "temperature": null,
                         "humidity": null
@@ -166,10 +127,10 @@ class JsonDtoParserTest {
                 }
                 """;
 
-        CreateEventDto createEventDTO = JsonDtoParser.parseJson(jsonWithNullValues);
+        List<CreateMeasurementDto> measurements = JsonDtoParser.parseMeasurements(jsonWithNullValues);
 
-        assertThat(createEventDTO.measurements()).hasSize(2);
-        assertThat(createEventDTO.measurements())
+        assertThat(measurements).hasSize(2);
+        assertThat(measurements)
                 .extracting(CreateMeasurementDto::value)
                 .containsExactlyInAnyOrder(null, null);
     }

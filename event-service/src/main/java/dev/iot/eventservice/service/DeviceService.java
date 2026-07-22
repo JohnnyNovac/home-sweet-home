@@ -37,7 +37,8 @@ import java.util.UUID;
 
 /**
  * Device registry: maintains the {@code devices} collection in MongoDB, keyed by {@code deviceId},
- * also holding {@code deviceType}, {@code roomId}, {@code name} and {@code lastSeenAt}.
+ * also holding {@code deviceType}, {@code roomId}, {@code name}, {@code lastSeenAt} and the Yandex
+ * actuator fields ({@code externalId}, {@code externalKind}, {@code groupExternalIds}).
  */
 @Service
 public class DeviceService {
@@ -113,13 +114,14 @@ public class DeviceService {
     }
 
     /**
-     * Updates the manually managed fields ({@code roomId}, {@code name}) of an existing device with a
-     * field-level {@code $set}, mirroring {@link #recordSeen}: {@code lastSeenAt} and {@code deviceType}
+     * Updates the manually managed fields ({@code roomId}, {@code name}, {@code externalId},
+     * {@code externalKind}, {@code groupExternalIds}) of an existing device with a field-level
+     * {@code $set}, mirroring {@link #recordSeen}: {@code lastSeenAt} and {@code deviceType}
      * stay under the pipeline's control and are never touched here, so a concurrent data message can't be
      * clobbered. Only non-null fields are written, so a partial update leaves the rest intact.
      *
      * @param deviceId        device identifier from the request path
-     * @param updateDeviceDto the new {@code roomId}/{@code name} values
+     * @param updateDeviceDto the new field values; {@code null} fields are left unchanged
      * @return the updated device
      * @throws DeviceNotFoundException if no device with this id exists
      */
