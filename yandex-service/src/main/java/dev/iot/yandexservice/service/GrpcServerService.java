@@ -18,6 +18,8 @@ public class GrpcServerService extends YandexServiceGrpc.YandexServiceImplBase {
 
     private static final Logger logger = LoggerFactory.getLogger(GrpcServerService.class);
 
+    private static final String ON_OFF_CAPABILITY = "devices.capabilities.on_off";
+
     private final YandexRestClient client;
     private final YandexDiscoveredDeviceMapper discoveredDeviceMapper;
     private final YandexDiscoveredRoomMapper discoveredRoomMapper;
@@ -33,13 +35,78 @@ public class GrpcServerService extends YandexServiceGrpc.YandexServiceImplBase {
     }
 
     @Override
+    public void listDevices(Yandex.ListDevicesRequest request, StreamObserver<Yandex.ListDevicesResponse> responseObserver) {
+        try {
+            UserInfoResponse userInfo = client.getUserInfo();
+            verifyOk(userInfo.status(), userInfo.requestId());
+            Yandex.ListDevicesResponse listDevicesResponse = Yandex.ListDevicesResponse.newBuilder()
+                    .addAllDevices(discoveredDeviceMapper.toDiscoveredDevices(userInfo))
+                    .addAllRooms(discoveredRoomMapper.toDiscoveredRooms(userInfo))
+                    .build();
+            responseObserver.onNext(listDevicesResponse);
+            responseObserver.onCompleted();
+        } catch (YandexApiException e) {
+            logger.error("Yandex API rejected the device-list request (httpStatus={}, requestId={}): {}",
+                    e.getStatusCode(), e.getRequestId(), e.getMessage());
+            responseObserver.onError(e);
+        } catch (Exception e) {
+            logger.error("listDevices failed", e);
+            responseObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void getState(Yandex.GetStateRequest request, StreamObserver<Yandex.GetStateResponse> responseObserver) {
+        Yandex.TargetKind kind = request.getKind();
+        try {
+            boolean on;
+            switch (kind) {
+                case GROUP -> {
+                    String groupId = request.getExternalId();
+                    DeviceGroupResponse response = client.getGroupInfo(groupId);
+                    verifyOk(response.status(), response.requestId());
+                    GroupCapability onOff = response.capabilities().stream()
+                            .filter(capability -> ON_OFF_CAPABILITY.equals(capability.type()))
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalArgumentException("No on_off capability on group " + groupId));
+                    on = isOn(onOff.state());
+                }
+                case DEVICE -> {
+                    String deviceId = request.getExternalId();
+                    DeviceResponse response = client.getDeviceInfo(deviceId);
+                    verifyOk(response.status(), response.requestId());
+                    DeviceCapability onOff = response.capabilities().stream()
+                            .filter(capability -> ON_OFF_CAPABILITY.equals(capability.type()))
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalArgumentException("No on_off capability on device " + deviceId));
+                    on = isOn(onOff.state());
+                }
+                default -> throw new IllegalArgumentException("Unsupported target kind: " + kind);
+            }
+
+            Yandex.GetStateResponse getStateResponse = Yandex.GetStateResponse.newBuilder()
+                    .setOn(on)
+                    .build();
+            responseObserver.onNext(getStateResponse);
+            responseObserver.onCompleted();
+        } catch (YandexApiException e) {
+            logger.error("Yandex API rejected the get-state request (httpStatus={}, requestId={}): {}",
+                    e.getStatusCode(), e.getRequestId(), e.getMessage());
+            responseObserver.onError(e);
+        } catch (Exception e) {
+            logger.error("getState failed", e);
+            responseObserver.onError(e);
+        }
+    }
+
+    @Override
     public void setState(Yandex.SetStateRequest request, StreamObserver<Yandex.SetStateResponse> responseObserver) {
         String externalId = request.getExternalId();
         boolean on = request.getOn();
         Yandex.TargetKind kind = request.getKind();
         try {
             Capability capability = new Capability(
-                    "devices.capabilities.on_off",
+                    ON_OFF_CAPABILITY,
                     new State("on", on)
             );
 
@@ -71,25 +138,8 @@ public class GrpcServerService extends YandexServiceGrpc.YandexServiceImplBase {
         }
     }
 
-    @Override
-    public void listDevices(Yandex.ListDevicesRequest request, StreamObserver<Yandex.ListDevicesResponse> responseObserver) {
-        try {
-            UserInfoResponse userInfo = client.getUserInfo();
-            verifyOk(userInfo.status(), userInfo.requestId());
-            Yandex.ListDevicesResponse listDevicesResponse = Yandex.ListDevicesResponse.newBuilder()
-                    .addAllDevices(discoveredDeviceMapper.toDiscoveredDevices(userInfo))
-                    .addAllRooms(discoveredRoomMapper.toDiscoveredRooms(userInfo))
-                    .build();
-            responseObserver.onNext(listDevicesResponse);
-            responseObserver.onCompleted();
-        } catch (YandexApiException e) {
-            logger.error("Yandex API rejected the device-list request (httpStatus={}, requestId={}): {}",
-                    e.getStatusCode(), e.getRequestId(), e.getMessage());
-            responseObserver.onError(e);
-        } catch (Exception e) {
-            logger.error("listDevices failed", e);
-            responseObserver.onError(e);
-        }
+    private static boolean isOn(State state) {
+        return state == null || !Boolean.FALSE.equals(state.value());
     }
 
     private void verifyOk(String status, String requestId) {

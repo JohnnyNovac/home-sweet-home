@@ -2,6 +2,7 @@ package dev.iot.presenceservice.model;
 
 import dev.iot.presenceservice.cache.DeviceEntry;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Future;
 
@@ -12,15 +13,24 @@ public class RoomState {
     private boolean lampOn;
     private Future<?> pendingLampOff;
     private List<DeviceEntry> lamps;
+    private Instant lastPresentAt;
 
     public RoomState() {}
 
-    public RoomState(Boolean present, Double illuminance, boolean lampOn, Future<?> pendingLampOff, List<DeviceEntry> lamps) {
+    public RoomState(
+            Boolean present,
+            Double illuminance,
+            boolean lampOn,
+            Future<?> pendingLampOff,
+            List<DeviceEntry> lamps,
+            Instant lastPresenceAt
+    ) {
         this.present = present;
         this.illuminance = illuminance;
         this.lampOn = lampOn;
         this.pendingLampOff = pendingLampOff;
         this.lamps = lamps;
+        this.lastPresentAt = lastPresenceAt;
     }
 
     public Boolean getPresent() {
@@ -61,5 +71,13 @@ public class RoomState {
 
     public void setLamps(List<DeviceEntry> lamps) {
         this.lamps = lamps;
+    }
+
+    public Instant getLastPresentAt() {
+        return lastPresentAt;
+    }
+
+    public void setLastPresentAt(Instant lastPresentAt) {
+        this.lastPresentAt = lastPresentAt;
     }
 }

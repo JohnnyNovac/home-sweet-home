@@ -4,6 +4,7 @@ package yandex;
 
 service YandexService {
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  rpc GetState(GetStateRequest) returns (GetStateResponse);
   rpc SetState(SetStateRequest) returns (SetStateResponse);
 }
 
@@ -26,6 +27,15 @@ message DiscoveredDevice {
 message DiscoveredRoom {
   string external_id = 1;
   string name = 2;
+}
+
+message GetStateRequest {
+  string external_id = 1;
+  TargetKind kind = 2;
+}
+
+message GetStateResponse {
+  bool on = 1;
 }
 
 message SetStateRequest {

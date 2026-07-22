@@ -289,6 +289,22 @@ is still retried on redelivery). A lamp command that fails for any of
 the room's lamps leaves that room's tracked state unchanged, so it is retried on the next presence/illuminance update.
 The two listeners run on separate threads, so `LampService` is synchronised.
 
+**Lamp state sync (presence-gap detector).** `lampOn` is tracked in memory and drifts from reality when the lamp is
+driven behind the engine's back (a voice command while the room is empty): with a stale `lampOn=true` the turn-on
+condition `present && dark && !lampOn` stays false and the room stays dark. The engine therefore re-reads the real
+state, but only after a window in which it could have gone blind: `RoomState.lastPresentAt` records the last
+`present=true` message, and a presence arriving after a gap longer than `app.lamp.lamp-state-sync-gap` (90 s —
+deliberately above the 60 s heartbeat, so normal traffic never triggers it; the first message after a restart counts as
+an infinite gap) runs `syncLampState` *before* the usual reevaluate, so the decision is made against the fresh value.
+Only `present=true` messages move the timestamp: `false` heartbeats keep flowing from an empty room, and the gap must
+measure "how long nobody was seen", not "how long no data arrived" (which is what the registry's `lastSeenAt` tracks).
+The sync reads the room's `GROUP` lamps over `YandexService.GetState` and ORs them ("lit if at least one group is on",
+stopping at the first `on`); any failure aborts the whole sync leaving the tracked `lampOn` untouched — writing
+`anyMatch` over successful calls only would record "off" exactly when nothing is known. Unlike `turnLamps`, the call
+carries no gRPC deadline (a deliberate choice), so it is bounded only by yandex-service's own HTTP timeouts. An
+intervention while someone is present is deliberately not caught — the presence stream never pauses then; that case
+self-corrects on the next presence/illuminance change.
+
 **Room gate.** Both listeners feed the engine only for sensors that share a room with a lamp. Each parses the sensor's
 `deviceId` from the routing key and consults `LampGate.lampsFor(deviceId)`, which reads the device's room from
 `DeviceRegistryCache` (see **Device registry replication**) and returns that room's `GROUP`-kind `lamp` entries
@@ -315,10 +331,13 @@ real-time measure is not worth requeuing the presence message.
 
 The engine calls `yandex-service` via the gRPC stub declared in `grpc-api/src/main/proto/yandex.proto`
 (`YandexService.SetState(external_id, on, kind)` — a vendor-neutral contract, one call per lamp in the room, keyed by
-the lamp's `externalId` and `externalKind`; the room's lamp state flips only if every one of its lamps switches). Client
+the lamp's `externalId` and `externalKind`; the room's lamp state flips only if every one of its lamps switches), and
+reads it back with `GetState(external_id, kind)` during the lamp state sync above. Client
 channel is configured in `presence-service/application.yml` as `spring.grpc.client.channels.yandex-service.address`.
 `yandex-service` (`GrpcServerService`) routes by `kind`: `GROUP` becomes a Yandex Smart Home "group action" HTTP
-request, `DEVICE` a single-device action, both via `YandexRestClient`. The unary reply (`SetStateResponse`) is empty —
+request, `DEVICE` a single-device action, both via `YandexRestClient`; `GetState` reads the group/device the same way
+and answers from its `devices.capabilities.on_off` capability — a missing capability is an error (asking a non-lamp),
+while a missing/odd state value reads as `on` (only an explicit `false` means off). The unary reply (`SetStateResponse`) is empty —
 success or failure travels as the gRPC status, not a body field. The whole chain is time-bounded so a slow or
 hung Yandex cloud cannot block a listener thread indefinitely: `LampService` applies a gRPC deadline
 (`app.grpc.lamp-deadline`, default 12s) per call, and the `RestClient` in `YandexClientConfig` is built

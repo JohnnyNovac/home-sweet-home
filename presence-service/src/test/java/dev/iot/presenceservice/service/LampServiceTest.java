@@ -26,6 +26,7 @@ class LampServiceTest {
 
     private static final double THRESHOLD = 50;
     private static final Duration OFF_DELAY = Duration.ofMillis(50);
+    private static final Duration SYNC_GAP = Duration.ofSeconds(90);
     private static final String ROOM = "living-room";
     private static final List<DeviceEntry> LAMPS = List.of(new DeviceEntry(ROOM, "lamp", "chandelier-1", "GROUP", List.of()));
 
@@ -42,7 +43,7 @@ class LampServiceTest {
 
     @BeforeEach
     void setUp() {
-        LampProperties lampProperties = new LampProperties(THRESHOLD, OFF_DELAY);
+        LampProperties lampProperties = new LampProperties(THRESHOLD, OFF_DELAY, SYNC_GAP);
         lampService = new LampService(yandexServiceStub, new GrpcClientProperties(Duration.ofSeconds(12)), lampProperties, lampSettingsRepository, lampGate);
     }
 

@@ -88,6 +88,10 @@ To run the sync at once, without waiting for the next scheduled run, send `POST 
 gateway, with a token). What remains is assigning the sensors the `roomId` of their room — with
 `PUT /api/v1/devices/{id}`.
 
+If the light was driven behind the system's back (say, by voice while the room was empty), presence-service notices it
+on its own: on the first presence after a pause longer than 90 seconds it reconciles its view of the lamp with the real
+state in Yandex and acts on the reconciled value from then on. The threshold is set by `app.lamp.lamp-state-sync-gap`.
+
 The lamp publishes nothing over MQTT — it is a catalog row with no `lastSeenAt`. presence-service learns the sensors'
 rooms and the lamps themselves from event-service's registry, which is replicated to it through an outbox (see
 CLAUDE.md, "Device registry replication"); the `rooms` collection itself is not replicated — presence-service uses

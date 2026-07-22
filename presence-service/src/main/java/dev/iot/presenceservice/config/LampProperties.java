@@ -11,6 +11,7 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "app.lamp")
 public record LampProperties(
         @DefaultValue("50") double illuminanceThreshold,
-        @DefaultValue("15s") Duration lampOffDelay
+        @DefaultValue("15s") Duration lampOffDelay,
+        @DefaultValue("90s") Duration lampStateSyncGap
 ) {
 }

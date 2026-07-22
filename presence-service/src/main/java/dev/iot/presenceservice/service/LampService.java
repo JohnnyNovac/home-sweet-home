@@ -15,6 +15,7 @@ import yandex.Yandex;
 import yandex.YandexServiceGrpc;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,7 @@ public class LampService {
     private final Map<String, RoomState> roomsState = new HashMap<>();
     private double illuminanceThreshold;
     private Duration lampOffDelay;
+    private Duration lampStateSyncGap;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
@@ -64,6 +66,7 @@ public class LampService {
         this.illuminanceThreshold = lampProperties.illuminanceThreshold();
         this.lampOffDelay = lampProperties.lampOffDelay();
         this.lampGate = lampGate;
+        this.lampStateSyncGap = lampProperties.lampStateSyncGap();
     }
 
     @PostConstruct
@@ -84,6 +87,13 @@ public class LampService {
         roomState.setLamps(lamps);
         roomState.setPresent(present);
         if (present) {
+            Instant now = Instant.now();
+            Instant lastPresentAt = roomState.getLastPresentAt();
+            roomState.setLastPresentAt(now);
+            boolean stale = (lastPresentAt == null || Duration.between(lastPresentAt, now).compareTo(lampStateSyncGap) > 0);
+            if (stale) {
+                syncLampState(roomState);
+            }
             cancelPendingOff(roomState);
             reevaluate(roomState, roomId,"presence");
         } else {
@@ -168,6 +178,28 @@ public class LampService {
 
     private boolean isDark(RoomState roomState) {
         return roomState.getIlluminance() != null && roomState.getIlluminance() < illuminanceThreshold;
+    }
+
+    // opportunistic: any failure aborts the whole sync and keeps the tracked lampOn untouched
+    private void syncLampState(RoomState roomState) {
+        boolean anyOn = false;
+        for (DeviceEntry lamp : roomState.getLamps()) {
+            Yandex.GetStateRequest request = Yandex.GetStateRequest.newBuilder()
+                    .setExternalId(lamp.externalId())
+                    .setKind(Yandex.TargetKind.GROUP)
+                    .build();
+            try {
+                if (yandexServiceStub.getState(request).getOn()) {
+                    anyOn = true;
+                    break;
+                }
+            } catch (Exception e) {
+                logger.error("Failed to read lamp state, keeping lampOn={}", roomState.isLampOn(), e);
+                return;
+            }
+        }
+        roomState.setLampOn(anyOn);
+        logger.info("Lamp state synced: lampOn={}", anyOn);
     }
 
     private boolean turnLamps(List<DeviceEntry> lamps, boolean on) {

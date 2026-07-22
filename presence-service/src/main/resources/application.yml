@@ -29,6 +29,7 @@ app:
   lamp:
     illuminance-threshold: 50
     lamp-off-delay: 15s
+    lamp-state-sync-gap: 90s
   measurements:
     radar-presence:
       name: radarPresence
