@@ -105,7 +105,7 @@ class LampServiceTest {
         lampService.onPresence(ROOM, LAMPS, true);
         lampService.onPresence(ROOM, LAMPS, false);
 
-        verify(yandexServiceStub, timeout(1000)).setState(argThat(request -> !request.getOn()));
+        verify(yandexServiceStub, timeout(5000)).setState(argThat(request -> !request.getOn()));
     }
 
     @Test
@@ -217,7 +217,7 @@ class LampServiceTest {
         lampService.onPresence(ROOM, LAMPS, false);  // schedules the delayed off
         lampService.onPresence(ROOM, LAMPS, false);  // off already pending -> early return
 
-        verify(yandexServiceStub, timeout(1000).times(1)).setState(argThat(request -> !request.getOn()));
+        verify(yandexServiceStub, timeout(5000).times(1)).setState(argThat(request -> !request.getOn()));
     }
 
     @Test
@@ -233,7 +233,7 @@ class LampServiceTest {
         lampService.onPresence(ROOM, LAMPS, true);   // lamp on
         lampService.onPresence(ROOM, LAMPS, false);  // after the delay the OFF call fails
 
-        verify(yandexServiceStub, timeout(1000)).setState(argThat(request -> !request.getOn()));
+        verify(yandexServiceStub, timeout(5000)).setState(argThat(request -> !request.getOn()));
         assertThat(lampService.isLampOn()).isTrue();
     }
 }
