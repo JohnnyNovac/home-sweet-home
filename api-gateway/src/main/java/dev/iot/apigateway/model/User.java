@@ -21,6 +21,9 @@ public class User {
 
     private boolean enabled;
 
+    public User() {
+    }
+
     public User(String username, String passwordHash, Set<Role> roles, boolean enabled) {
         this.username = username;
         this.passwordHash = passwordHash;
