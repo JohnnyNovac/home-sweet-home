@@ -171,6 +171,7 @@ public class DeviceService {
     public void upsertFromSync(
             String deviceId,
             String deviceType,
+            String deviceName,
             String roomId,
             String externalId,
             String externalKind,
@@ -184,6 +185,7 @@ public class DeviceService {
         Query byId = Query.query(Criteria.where("_id").is(deviceId));
 
         Update update = new Update()
+                .setOnInsert("name", deviceName)
                 .set("deviceType", deviceType)
                 .set("roomId", roomId)
                 .set("externalId", externalId)

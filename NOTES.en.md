@@ -83,7 +83,9 @@ room's name from `rooms`) and name when HA transitions to `online`.
 presence-service controls the lighting and decides by room: a sensor's readings affect the lamp only if the same room
 also contains a lamp device. Lamps and rooms from the Yandex smart home appear in the registry automatically:
 every 15 minutes event-service requests the device list from yandex-service over gRPC and records the rooms in `rooms`
-(id of the form `room-<externalId>`) and the lamps in `devices` (id of the form `lamp-<externalId>`, type `lamp`).
+(id of the form `room-<externalId>`) and the lamps in `devices` (id of the form `lamp-<externalId>`, type `lamp`,
+with the name from Yandex). The name is taken from Yandex only when the lamp first appears; if you later rename it by
+hand, the sync no longer overwrites that name.
 To run the sync at once, without waiting for the next scheduled run, send `POST /api/v1/devices/sync` (through the
 gateway, with a token). What remains is assigning the sensors the `roomId` of their room — with
 `PUT /api/v1/devices/{id}`.

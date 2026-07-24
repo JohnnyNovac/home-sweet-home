@@ -246,9 +246,11 @@ older blocking stub threw the unchecked `StatusRuntimeException`) and upserts th
 `LAMP → "lamp"`; unmapped types are skipped). Ids are deterministic — `room-<externalId>` for a room,
 `lamp-<externalId>` for a lamp, `roomId = "room-" + room_external_id` (or `null` when Yandex reports no room) on the
 device — so every run maps the same Yandex object onto the same rows and the sync is idempotent.
-`DeviceService.upsertFromSync` `$set`s only the five Yandex-owned fields (`deviceType`, `roomId`, `externalId`,
-`externalKind`, `groupExternalIds`) — `name` and `lastSeenAt` are never touched, so a manual display name and the
-liveness heartbeat survive every sync — and it first compares those fields with the stored row and returns without
+`DeviceService.upsertFromSync` `$set`s the five Yandex-owned fields (`deviceType`, `roomId`, `externalId`,
+`externalKind`, `groupExternalIds`) and seeds `name` from Yandex on the first insert only (`$setOnInsert`) — so a
+discovered lamp arrives with its Yandex name instead of the raw `deviceId`, while a later manual rename and the
+`lastSeenAt` heartbeat survive every sync (neither is touched on an update) — and it first compares those five fields
+with the stored row and returns without
 writing when nothing changed, so the periodic sync does not grow the `outbox` collection with no-op `DEVICE_UPSERTED`
 events; a real change commits the device and the outbox row in one transaction and reaches presence-service through the
 replication chain above. Two triggers: `scheduledSync()` runs every `app.yandex.sync-interval` (900 s, first run 10 s

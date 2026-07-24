@@ -62,12 +62,13 @@ public class YandexSyncService {
             }
             String deviceId = "lamp-" + device.getExternalId();
             String deviceType = deviceTypeOpt.get();
+            String deviceName = device.getName();
             String roomExternalId = device.getRoomExternalId();
             String roomId = roomExternalId.isBlank() ? null : "room-" + roomExternalId;
             String externalId = device.getExternalId();
             String externalKind = device.getKind().name();
             List<String> groupExternalIds = device.getGroupExternalIdsList();
-            deviceService.upsertFromSync(deviceId, deviceType, roomId, externalId, externalKind, groupExternalIds);
+            deviceService.upsertFromSync(deviceId, deviceType, deviceName, roomId, externalId, externalKind, groupExternalIds);
         });
     }
 }
